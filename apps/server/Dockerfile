@@ -1,0 +1,27 @@
+FROM node:24-alpine AS build
+RUN corepack enable
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
+COPY apps/server/package.json apps/server/package.json
+COPY packages/db/package.json packages/db/package.json
+COPY packages/shared/package.json packages/shared/package.json
+RUN CI=true pnpm install --frozen-lockfile
+
+COPY apps/server apps/server
+COPY packages/db packages/db
+COPY packages/shared packages/shared
+RUN pnpm --filter @splidly/server build
+
+FROM node:24-alpine AS runtime
+RUN corepack enable
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=build /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
+COPY --from=build /app/node_modules node_modules
+COPY --from=build /app/apps/server apps/server
+COPY --from=build /app/packages packages
+USER node
+EXPOSE 4000
+CMD ["node", "apps/server/dist/index.js"]
+

@@ -1,0 +1,105 @@
+name: splidly
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${API_BIND_PORT:-4000}:4000"
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-splidly}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-splidly}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET}
+      API_PUBLIC_URL: https://${APP_DOMAIN}
+      APP_PUBLIC_URL: https://${APP_DOMAIN}
+      APP_SCHEME: splidly
+      APPLE_CLIENT_ID: ${APPLE_CLIENT_ID:?Set APPLE_CLIENT_ID}
+      APPLE_KEY_ID: ${APPLE_KEY_ID:?Set APPLE_KEY_ID}
+      APPLE_PRIVATE_KEY_PATH: /run/secrets/apple_sign_in_key
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      FRANKFURTER_URL: http://frankfurter:8080
+      IOS_APP_ID: ${IOS_APP_ID:?Set IOS_APP_ID}
+      IOS_TEAM_ID: ${IOS_TEAM_ID:?Set IOS_TEAM_ID}
+      ANDROID_PACKAGE: ${ANDROID_PACKAGE:?Set ANDROID_PACKAGE}
+      ANDROID_SHA256_FINGERPRINT: ${ANDROID_SHA256_FINGERPRINT:?Set ANDROID_SHA256_FINGERPRINT}
+      IOS_STORE_URL: ${IOS_STORE_URL:?Set IOS_STORE_URL}
+      ANDROID_STORE_URL: ${ANDROID_STORE_URL:?Set ANDROID_STORE_URL}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      frankfurter:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    secrets:
+      - apple_sign_in_key
+    networks: [backend, egress]
+
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    command: ["./packages/db/node_modules/.bin/tsx", "packages/db/src/migrate.ts"]
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-splidly}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-splidly}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [backend]
+
+  postgres:
+    image: postgres:17.6-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-splidly}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-splidly}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-splidly} -d ${POSTGRES_DB:-splidly}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [backend]
+
+  frankfurter:
+    image: lineofflight/frankfurter:latest
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: sqlite:///data/db.sqlite3
+    volumes:
+      - frankfurter_data:/data
+    depends_on:
+      frankfurter-data-init:
+        condition: service_completed_successfully
+    networks: [backend]
+
+  frankfurter-data-init:
+    image: lineofflight/frankfurter:latest
+    user: root
+    command: ["sh", "-c", "chown -R frankfurter:frankfurter /data"]
+    restart: "no"
+    volumes:
+      - frankfurter_data:/data
+
+networks:
+  egress:
+  backend:
+    internal: true
+
+volumes:
+  postgres_data:
+  frankfurter_data:
+
+secrets:
+  apple_sign_in_key:
+    file: ${APPLE_PRIVATE_KEY_FILE:?Set APPLE_PRIVATE_KEY_FILE}

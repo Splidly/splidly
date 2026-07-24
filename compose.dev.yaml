@@ -1,0 +1,42 @@
+name: splidly-dev
+
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    environment:
+      POSTGRES_USER: splidly
+      POSTGRES_PASSWORD: splidly
+      POSTGRES_DB: splidly
+    volumes:
+      - splidly_dev_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U splidly -d splidly"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  frankfurter:
+    image: lineofflight/frankfurter:latest
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: sqlite:///data/db.sqlite3
+    volumes:
+      - splidly_dev_frankfurter:/data
+    depends_on:
+      frankfurter-data-init:
+        condition: service_completed_successfully
+
+  frankfurter-data-init:
+    image: lineofflight/frankfurter:latest
+    user: root
+    command: ["sh", "-c", "chown -R frankfurter:frankfurter /data"]
+    restart: "no"
+    volumes:
+      - splidly_dev_frankfurter:/data
+
+volumes:
+  splidly_dev_postgres:
+  splidly_dev_frankfurter:

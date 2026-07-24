@@ -1,0 +1,37 @@
+{
+  "name": "@splidly/server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/router.ts"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "node --env-file-if-exists=../../.env --import tsx --watch src/index.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@better-auth/expo": "1.6.24",
+    "@hono/node-server": "2.0.11",
+    "@splidly/db": "workspace:*",
+    "@splidly/shared": "workspace:*",
+    "@trpc/server": "11.18.0",
+    "better-auth": "1.6.24",
+    "drizzle-orm": "0.45.2",
+    "hono": "4.12.31",
+    "jose": "6.2.4",
+    "pg": "8.22.0",
+    "superjson": "2.2.6",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "tsx": "4.20.6",
+    "tsup": "8.5.1",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
+  }
+}

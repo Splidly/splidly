@@ -1,0 +1,130 @@
+import { useState } from "react";
+import { fireEvent, render } from "@testing-library/react-native";
+import { StyleSheet, Text } from "react-native";
+import { SafeAreaInsetsContext } from "react-native-safe-area-context";
+import { CollectionScreen, EmptyState, Field, Screen } from "./ui";
+
+function ControlledField() {
+  const [value, setValue] = useState("");
+  return (
+    <Field label="Description" value={value} onChangeText={setValue} />
+  );
+}
+
+describe("EmptyState", () => {
+  it("renders an accessible title and explanation", async () => {
+    const view = await render(
+      <EmptyState
+        title="No friends yet"
+        message="Share an invite to get started."
+      />,
+    );
+    expect(view.getByLabelText("Splidly app icon")).toBeTruthy();
+    expect(view.getByText("No friends yet")).toBeTruthy();
+    expect(view.getByText("Share an invite to get started.")).toBeTruthy();
+  });
+});
+
+describe("Field", () => {
+  it("preserves trailing whitespace in right-aligned text fields", async () => {
+    const view = await render(<ControlledField />);
+    const input = view.getByLabelText("Description");
+
+    await fireEvent.changeText(input, "Dinner ");
+
+    const updatedInput = view.getByLabelText("Description");
+    const inputStyle = StyleSheet.flatten(updatedInput.props.style);
+    expect(updatedInput.props.value).toBe("Dinner ");
+    expect(inputStyle.textAlign).toBe("right");
+  });
+
+  it("keeps numeric fields right aligned", async () => {
+    const view = await render(
+      <Field
+        label="Amount"
+        value="12.34"
+        onChangeText={jest.fn()}
+        keyboardType="decimal-pad"
+      />,
+    );
+
+    expect(
+      StyleSheet.flatten(view.getByLabelText("Amount").props.style).textAlign,
+    ).toBe("right");
+  });
+});
+
+describe("Screen", () => {
+  it("lets the native navigator own insets without flex-created scroll space", async () => {
+    const view = await render(
+      <SafeAreaInsetsContext.Provider
+        value={{ top: 0, right: 0, bottom: 20, left: 0 }}
+      >
+        <Screen>
+          <Text>Content</Text>
+        </Screen>
+      </SafeAreaInsetsContext.Provider>,
+    );
+    const [scrollView] = view.container.queryAll(
+      (instance) =>
+        instance.props.contentInsetAdjustmentBehavior === "automatic",
+    );
+    expect(scrollView).toBeDefined();
+    expect(scrollView?.props.contentInsetAdjustmentBehavior).toBe("automatic");
+    expect(scrollView?.props.automaticallyAdjustKeyboardInsets).toBeUndefined();
+    expect(scrollView?.props.alwaysBounceVertical).toBe(true);
+    expect(scrollView?.props.onLayout).toEqual(expect.any(Function));
+
+    if (!scrollView) throw new Error("ScrollView was not rendered");
+    await fireEvent(scrollView, "layout", {
+      nativeEvent: { layout: { height: 800 } },
+    });
+    const [resizedScrollView] = view.container.queryAll(
+      (instance) =>
+        instance.props.contentInsetAdjustmentBehavior === "automatic",
+    );
+    const contentStyle = StyleSheet.flatten(
+      resizedScrollView?.props.contentContainerStyle,
+    );
+    expect(contentStyle.flexGrow).toBeUndefined();
+    expect(contentStyle.minHeight).toBe(780);
+    expect(contentStyle.paddingBottom).toBeUndefined();
+
+    if (!resizedScrollView) throw new Error("ScrollView was not resized");
+    await fireEvent(resizedScrollView, "contentSizeChange", 400, 1000);
+    const [overflowingScrollView] = view.container.queryAll(
+      (instance) =>
+        instance.props.contentInsetAdjustmentBehavior === "automatic",
+    );
+    const overflowingContentStyle = StyleSheet.flatten(
+      overflowingScrollView?.props.contentContainerStyle,
+    );
+    expect(overflowingContentStyle.paddingBottom).toBe(16);
+  });
+});
+
+describe("CollectionScreen", () => {
+  it("centers a confirmed empty state and disables its scroll gesture", async () => {
+    const view = await render(
+      <SafeAreaInsetsContext.Provider
+        value={{ top: 0, right: 0, bottom: 20, left: 0 }}
+      >
+        <CollectionScreen isEmpty>
+          <EmptyState title="Nothing here" message="Add your first item." />
+        </CollectionScreen>
+      </SafeAreaInsetsContext.Provider>,
+    );
+    const [scrollView] = view.container.queryAll(
+      (instance) =>
+        instance.props.contentInsetAdjustmentBehavior === "automatic",
+    );
+
+    expect(scrollView?.props.scrollEnabled).toBe(false);
+    expect(scrollView?.props.alwaysBounceVertical).toBe(false);
+    expect(scrollView?.props.bounces).toBe(false);
+    expect(
+      StyleSheet.flatten(scrollView?.props.contentContainerStyle)
+        .justifyContent,
+    ).toBe("center");
+  });
+});

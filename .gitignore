@@ -1,0 +1,16 @@
+node_modules/
+.turbo/
+.expo/
+.env
+.env.*
+!.env.example
+!.env.production.example
+.pnpm-store/
+dist/
+coverage/
+*.log
+.DS_Store
+apps/mobile/ios/
+apps/mobile/android/
+apps/mobile/.expo/
+backups/

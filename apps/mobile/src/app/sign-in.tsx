@@ -1,0 +1,238 @@
+import {
+  GoogleSignin,
+  GoogleSigninButton,
+} from "@react-native-google-signin/google-signin";
+import { useQueryClient } from "@tanstack/react-query";
+import * as AppleAuthentication from "expo-apple-authentication";
+import { router } from "expo-router";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Text, View } from "react-native";
+import { AppIcon } from "../components/app-icon";
+import {
+  ErrorState,
+  PrimaryButton,
+  Screen,
+} from "../components/ui";
+import { authClient, signInAsDemo } from "../lib/auth-client";
+import { pendingInvite } from "../lib/pending-invite";
+import { api } from "../lib/trpc";
+import { spacing, useTheme } from "../theme";
+
+GoogleSignin.configure({
+  ...(process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
+    ? { webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }
+    : {}),
+  ...(process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID
+    ? { iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID }
+    : {}),
+});
+
+const authCallbackPath = "/sign-in" as const;
+
+export default function SignInScreen() {
+  const theme = useTheme();
+  const session = authClient.useSession();
+  const queryClient = useQueryClient();
+  const profile = api.profile.me.useQuery(undefined, {
+    enabled: Boolean(session.data?.user),
+  });
+  const handledUserId = useRef<string | undefined>(undefined);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+
+  useEffect(() => {
+    const userId = session.data?.user.id;
+    if (!userId) {
+      handledUserId.current = undefined;
+      return;
+    }
+    if (profile.isPending || handledUserId.current === userId) return;
+    handledUserId.current = userId;
+    if (!profile.data?.onboardedAt) {
+      router.push("/onboarding");
+      return;
+    }
+    void pendingInvite.get().then((token) => {
+      router.replace(token ? `/invite/${token}` : "/(tabs)/friends");
+    });
+  }, [
+    profile.data?.onboardedAt,
+    profile.isPending,
+    session.data?.user?.id,
+  ]);
+
+  async function finishSignIn() {
+    queryClient.clear();
+    await session.refetch();
+  }
+
+  async function signInGoogle() {
+    setBusy(true);
+    setError(undefined);
+    try {
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      const response = await GoogleSignin.signIn();
+      const idToken = response.data?.idToken;
+      if (!idToken) throw new Error("Google did not return an identity token");
+      const result = await authClient.signIn.social({
+        provider: "google",
+        idToken: { token: idToken },
+        callbackURL: authCallbackPath,
+      });
+      if (result.error) throw new Error(result.error.message);
+      await finishSignIn();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Google sign-in failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function signInApple() {
+    setBusy(true);
+    setError(undefined);
+    try {
+      if (process.env.EXPO_OS === "ios") {
+        const credential = await AppleAuthentication.signInAsync({
+          requestedScopes: [
+            AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+            AppleAuthentication.AppleAuthenticationScope.EMAIL,
+          ],
+        });
+        if (!credential.identityToken) {
+          throw new Error("Apple did not return an identity token");
+        }
+        const fullName = credential.fullName
+          ? AppleAuthentication.formatFullName(credential.fullName).trim()
+          : "";
+        const result = await authClient.signIn.social({
+          provider: "apple",
+          idToken: {
+            token: credential.identityToken,
+            ...(fullName
+              ? { user: { name: { firstName: fullName } } }
+              : {}),
+          },
+          callbackURL: authCallbackPath,
+        });
+        if (result.error) throw new Error(result.error.message);
+      } else {
+        const result = await authClient.signIn.social({
+          provider: "apple",
+          callbackURL: authCallbackPath,
+        });
+        if (result.error) throw new Error(result.error.message);
+      }
+      await finishSignIn();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Apple sign-in failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function signInDemo() {
+    setBusy(true);
+    setError(undefined);
+    try {
+      await signInAsDemo();
+      await finishSignIn();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Demo sign-in failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Screen
+      bounces={false}
+      contentContainerStyle={{
+        justifyContent: "space-between",
+        paddingBottom: spacing.xl,
+      }}
+    >
+      <View style={{ gap: 24 }}>
+        <AppIcon size={68} />
+        <View style={{ gap: 12 }}>
+          <Text
+            style={{
+              color: theme.text,
+              fontSize: 40,
+              lineHeight: 44,
+              fontWeight: "800",
+              letterSpacing: -1.4,
+            }}
+          >
+            Split the cost.{`\n`}Keep the friendship.
+          </Text>
+          <Text
+            style={{ color: theme.muted, fontSize: 17, lineHeight: 24 }}
+          >
+            A private, precise ledger for trips, homes, and everything friends
+            pay for together.
+          </Text>
+        </View>
+      </View>
+
+      <View style={{ gap: 12, alignItems: "center" }}>
+        {busy ? <ActivityIndicator color={theme.primary} /> : null}
+        <GoogleSigninButton
+          size={GoogleSigninButton.Size.Wide}
+          color={
+            theme.background === "#000000"
+              ? GoogleSigninButton.Color.Dark
+              : GoogleSigninButton.Color.Light
+          }
+          onPress={() => void signInGoogle()}
+          disabled={busy}
+          style={{ width: "100%", height: 52 }}
+        />
+        {process.env.EXPO_OS === "ios" ? (
+          <AppleAuthentication.AppleAuthenticationButton
+            buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+            buttonStyle={
+              theme.background === "#000000"
+                ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+            }
+            cornerRadius={12}
+            style={{ width: "100%", height: 50 }}
+            onPress={() => void signInApple()}
+          />
+        ) : (
+          <View style={{ width: "100%" }}>
+        <PrimaryButton
+          label="Continue with Apple"
+          onPress={() => void signInApple()}
+          disabled={busy}
+          tone="secondary"
+        />
+          </View>
+        )}
+        {__DEV__ ? (
+          <View style={{ width: "100%" }}>
+            <PrimaryButton
+              label="Continue as Demo User"
+              onPress={() => void signInDemo()}
+              disabled={busy}
+              tone="plain"
+            />
+          </View>
+        ) : null}
+        {error ? <View style={{ width: "100%" }}><ErrorState message={error} /></View> : null}
+        <Text
+          style={{
+            color: theme.muted,
+            textAlign: "center",
+            fontSize: 12,
+            lineHeight: 17,
+            paddingHorizontal: 16,
+          }}
+        >
+          Splidly records shared accounting. It never moves your money.
+        </Text>
+      </View>
+    </Screen>
+  );
+}

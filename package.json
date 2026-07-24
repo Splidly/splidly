@@ -1,0 +1,26 @@
+{
+  "name": "splidly",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@11.14.0",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "dev:mobile": "pnpm --filter @splidly/mobile dev",
+    "dev:server": "pnpm --filter @splidly/server dev",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "db:generate": "pnpm --filter @splidly/db db:generate",
+    "db:migrate": "pnpm --filter @splidly/db db:migrate",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down"
+  },
+  "devDependencies": {
+    "turbo": "2.10.6",
+    "typescript": "5.9.3"
+  }
+}
+
