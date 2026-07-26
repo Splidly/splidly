@@ -171,7 +171,7 @@ Backups are retained locally for seven days. Copy encrypted files to independent
 pnpm typecheck
 pnpm test
 pnpm build
-pnpm --filter @splidly/mobile exec expo-doctor
+pnpm dlx expo-doctor@latest apps/mobile
 ```
 
 Real Apple/Google auth and universal links must also be verified on signed physical-device builds. For store delivery, build and sign locally, then use `pnpm --filter @splidly/mobile submit:ios` or `submit:android`.

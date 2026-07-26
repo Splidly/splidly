@@ -11,7 +11,8 @@ RUN CI=true pnpm install --frozen-lockfile
 COPY apps/server apps/server
 COPY packages/db packages/db
 COPY packages/shared packages/shared
-RUN pnpm --filter @splidly/server build
+WORKDIR /app/apps/server
+RUN node node_modules/tsdown/dist/run.mjs
 
 FROM node:24-alpine AS runtime
 RUN corepack enable
@@ -24,4 +25,3 @@ COPY --from=build /app/packages packages
 USER node
 EXPOSE 4000
 CMD ["node", "apps/server/dist/index.js"]
-
