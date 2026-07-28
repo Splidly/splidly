@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Env } from "../src/env";
-import { invitePage } from "../src/pages";
+import { invitePage, privacyPage } from "../src/pages";
 
 const env = {
   APP_SCHEME: "splidly",
@@ -22,3 +22,20 @@ describe("invite page", () => {
   });
 });
 
+describe("privacy page", () => {
+  it("describes collected data, retention, deletion, and contact", () => {
+    const html = privacyPage();
+    expect(html).toContain("Account and profile data");
+    expect(html).toContain("Shared-ledger data");
+    expect(html).toContain("IP address");
+    expect(html).toContain("Service providers");
+    expect(html).toContain("Retention and deletion");
+    expect(html).toContain("privacy@splidly.site");
+  });
+
+  it("does not claim that data export exists in Settings", () => {
+    expect(privacyPage()).not.toContain(
+      "export or delete your account from Settings",
+    );
+  });
+});

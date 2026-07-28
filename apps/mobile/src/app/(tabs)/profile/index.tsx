@@ -2,7 +2,7 @@ import type { CurrencyCode } from "@splidly/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Alert, Text } from "react-native";
+import { Alert, Linking, Text } from "react-native";
 import {
   ErrorState,
   Field,
@@ -14,6 +14,7 @@ import {
 } from "../../../components/ui";
 import { CurrencyField } from "../../../components/currency-field";
 import { authClient } from "../../../lib/auth-client";
+import { APP_URL } from "../../../lib/env";
 import { api } from "../../../lib/trpc";
 import { useTheme } from "../../../theme";
 
@@ -133,6 +134,13 @@ export default function ProfileScreen() {
       >
         {update.isPending ? "Saving…" : "Changes save automatically"}
       </Text>
+      <Section title="Privacy">
+        <ListRow
+          title="Privacy policy"
+          subtitle="How Splidly collects, uses, and retains your data"
+          onPress={() => void Linking.openURL(`${APP_URL}/privacy`)}
+        />
+      </Section>
       <Section title="Account">
         <ListRow
           title="Sign out"
