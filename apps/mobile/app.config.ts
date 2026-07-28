@@ -24,6 +24,11 @@ const config: ExpoConfig = {
   orientation: "portrait",
   userInterfaceStyle: "automatic",
   experiments: { typedRoutes: true },
+  extra: {
+    eas: {
+      projectId: "7a8d0057-80ee-4695-a5bb-8113724c0d67",
+    },
+  },
   plugins: [
     "expo-router",
     "expo-secure-store",
@@ -48,6 +53,7 @@ const config: ExpoConfig = {
     usesAppleSignIn: true,
     associatedDomains: [`applinks:${host}`],
     infoPlist: {
+      ITSAppUsesNonExemptEncryption: false,
       UIApplicationSceneManifest: {
         UIApplicationSupportsMultipleScenes: false,
         UISceneConfigurations: {
