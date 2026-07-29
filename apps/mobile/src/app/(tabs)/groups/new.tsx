@@ -1,10 +1,13 @@
-import type { CurrencyCode } from "@splidly/shared";
+import type {
+  CurrencyCode,
+  GroupIconKey,
+} from "@splidly/shared";
 import { router } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { CurrencyField } from "../../../components/currency-field";
+import { GroupIconPicker } from "../../../components/group-icon";
 import {
-  Avatar,
   ErrorState,
   Field,
   FormSection,
@@ -20,6 +23,7 @@ export default function NewGroupScreen() {
   const profile = api.profile.me.useQuery();
   const utils = api.useUtils();
   const [name, setName] = useState("");
+  const [iconKey, setIconKey] = useState<GroupIconKey>("default");
   const [currency, setCurrency] = useState<CurrencyCode>();
   const create = api.groups.create.useMutation({
     async onSuccess(group) {
@@ -46,7 +50,6 @@ export default function NewGroupScreen() {
       />
 
       <View style={styles.hero}>
-        <Avatar name={name || "New group"} variant="group" size={72} />
         <View style={styles.heroCopy}>
           <Text style={[styles.title, { color: theme.text }]}>
             Create a group
@@ -60,6 +63,14 @@ export default function NewGroupScreen() {
       <FormSection footer="The accounting currency locks after the first expense or settlement.">
         <Field
           label="Name"
+          leading={
+            <GroupIconPicker
+              value={iconKey}
+              onValueChange={setIconKey}
+              name={name || "New group"}
+              colorKey="new-group"
+            />
+          }
           value={name}
           onChangeText={setName}
           placeholder="Lisbon weekend"
@@ -80,6 +91,7 @@ export default function NewGroupScreen() {
           onPress={() =>
             create.mutate({
               name: name.trim(),
+              iconKey,
               currency: selectedCurrency,
             })
           }

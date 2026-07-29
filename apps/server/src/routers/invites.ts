@@ -60,7 +60,12 @@ export const invitesRouter = router({
         .limit(1);
       const [group] = invite.groupId
         ? await ctx.db
-            .select({ id: groups.id, name: groups.name, currency: groups.currency })
+            .select({
+              id: groups.id,
+              name: groups.name,
+              iconKey: groups.iconKey,
+              currency: groups.currency,
+            })
             .from(groups)
             .where(eq(groups.id, invite.groupId))
             .limit(1)

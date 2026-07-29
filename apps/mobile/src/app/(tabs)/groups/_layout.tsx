@@ -29,7 +29,7 @@ export default function GroupsStackLayout() {
         options={{
           headerShown: false,
           ...formSheetOptions(theme.sheet),
-          sheetAllowedDetents: [0.62],
+          sheetAllowedDetents: [0.48],
           sheetInitialDetentIndex: 0,
           sheetGrabberVisible: false,
           sheetCornerRadius: 30,
@@ -39,6 +39,19 @@ export default function GroupsStackLayout() {
       />
       <Stack.Screen name="[id]/index" options={{ title: "Group" }} />
       <Stack.Screen name="[id]/settings" options={{ title: "Group Settings" }} />
+      <Stack.Screen
+        name="[id]/edit"
+        options={{
+          headerShown: false,
+          ...formSheetOptions(theme.sheet),
+          sheetAllowedDetents: [0.48],
+          sheetInitialDetentIndex: 0,
+          sheetGrabberVisible: false,
+          sheetCornerRadius: 30,
+          gestureEnabled: false,
+          headerBackButtonMenuEnabled: false,
+        }}
+      />
     </Stack>
   );
 }

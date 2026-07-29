@@ -16,7 +16,11 @@ import {
   rateSnapshots,
   settlements,
 } from "@splidly/db";
-import { currencyCodeSchema, money } from "@splidly/shared";
+import {
+  currencyCodeSchema,
+  groupIconKeySchema,
+  money,
+} from "@splidly/shared";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { repaymentPlan } from "../domain/debt-simplification";
@@ -128,6 +132,7 @@ export const groupsRouter = router({
     .input(
       z.object({
         name: z.string().trim().min(1).max(120),
+        iconKey: groupIconKeySchema.default("default"),
         currency: currencyCodeSchema,
       }),
     )
@@ -137,6 +142,7 @@ export const groupsRouter = router({
           .insert(groups)
           .values({
             name: input.name,
+            iconKey: input.iconKey,
             currency: input.currency,
             simplifyDebts: true,
             createdBy: ctx.session.user.id,
@@ -253,6 +259,7 @@ export const groupsRouter = router({
         groupId: z.uuid(),
         expectedVersion: z.number().int().positive(),
         name: z.string().trim().min(1).max(120),
+        iconKey: groupIconKeySchema.optional(),
         currency: currencyCodeSchema,
         simplifyDebts: z.boolean(),
       }),
@@ -294,6 +301,7 @@ export const groupsRouter = router({
         .update(groups)
         .set({
           name: input.name,
+          ...(input.iconKey ? { iconKey: input.iconKey } : {}),
           currency: input.currency,
           simplifyDebts: input.simplifyDebts,
           version: current.version + 1,

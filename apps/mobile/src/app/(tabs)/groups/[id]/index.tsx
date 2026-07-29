@@ -2,6 +2,10 @@ import { formatMinor, type CurrencyCode } from "@splidly/shared";
 import { Stack, router, useLocalSearchParams, type Href } from "expo-router";
 import { Alert, Text, View } from "react-native";
 import {
+  normalizeGroupIconKey,
+} from "../../../../components/group-icon";
+import { GroupSummaryHeader } from "../../../../components/group-summary-header";
+import {
   Avatar,
   EmptyState,
   ErrorState,
@@ -36,54 +40,12 @@ export default function GroupDetailScreen() {
   return (
     <>
       <Screen>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 14,
-            paddingVertical: 2,
-          }}
-        >
-          <Avatar
-            name={group.name}
-            colorKey={group.id}
-            size={58}
-            variant="group"
-          />
-          <View style={{ flex: 1, gap: 3 }}>
-            <Text
-              numberOfLines={1}
-              style={{
-                color: theme.text,
-                fontSize: 24,
-                fontWeight: "700",
-                letterSpacing: -0.5,
-              }}
-            >
-              {group.name}
-            </Text>
-            {balanceLines.map((line) => (
-              <Text
-                key={line.key}
-                selectable
-                numberOfLines={1}
-                style={{
-                  color:
-                    line.tone === "positive"
-                      ? theme.positive
-                      : line.tone === "negative"
-                        ? theme.negative
-                        : theme.muted,
-                  fontSize: 13,
-                  fontWeight: line.tone === "muted" ? "400" : "500",
-                  fontVariant: ["tabular-nums"],
-                }}
-              >
-                {line.text}
-              </Text>
-            ))}
-          </View>
-        </View>
+        <GroupSummaryHeader
+          iconKey={normalizeGroupIconKey(group.iconKey)}
+          name={group.name}
+          colorKey={group.id}
+          lines={balanceLines}
+        />
         <View style={{ flexDirection: "row", gap: 10 }}>
           <View style={{ flex: 1 }}>
             <PrimaryButton

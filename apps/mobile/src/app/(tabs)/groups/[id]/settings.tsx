@@ -1,19 +1,22 @@
 import type { CurrencyCode } from "@splidly/shared";
-import { router, useLocalSearchParams } from "expo-router";
+import {
+  router,
+  useLocalSearchParams,
+  type Href,
+} from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, Switch, View } from "react-native";
+import { normalizeGroupIconKey } from "../../../../components/group-icon";
+import { GroupSummaryHeader } from "../../../../components/group-summary-header";
 import {
   Avatar,
   ErrorState,
-  Field,
-  FormSection,
   ListRow,
-  PrimaryButton,
+  LoadingState,
   RowDivider,
   Screen,
   Section,
 } from "../../../../components/ui";
-import { CurrencyField } from "../../../../components/currency-field";
 import { shareInvite } from "../../../../lib/share-invite";
 import { api } from "../../../../lib/trpc";
 
@@ -22,22 +25,21 @@ export default function GroupSettingsScreen() {
   const detail = api.groups.detail.useQuery({ groupId: id });
   const me = api.profile.me.useQuery();
   const utils = api.useUtils();
-  const [name, setName] = useState("");
-  const [currency, setCurrency] = useState<CurrencyCode>("EUR");
+  const group = detail.data?.group;
   const [simplifyDebts, setSimplifyDebts] = useState(true);
   useEffect(() => {
-    if (!detail.data) return;
-    setName(detail.data.group.name);
-    setCurrency(detail.data.group.currency as CurrencyCode);
-    setSimplifyDebts(detail.data.group.simplifyDebts);
-  }, [detail.data]);
-  const update = api.groups.update.useMutation({
+    if (!group) return;
+    setSimplifyDebts(group.simplifyDebts);
+  }, [group?.id, group?.simplifyDebts, group?.version]);
+  const updateSimplification = api.groups.update.useMutation({
     async onSuccess() {
       await Promise.all([
         utils.groups.detail.invalidate({ groupId: id }),
         utils.groups.list.invalidate(),
       ]);
-      router.back();
+    },
+    onError() {
+      setSimplifyDebts(group?.simplifyDebts ?? true);
     },
   });
   const removeMember = api.groups.removeMember.useMutation({
@@ -67,24 +69,36 @@ export default function GroupSettingsScreen() {
       router.dismissTo("/groups");
     },
   });
-  const group = detail.data?.group;
+  if (detail.isPending) {
+    return <Screen><LoadingState /></Screen>;
+  }
+  if (detail.error || !group) {
+    return (
+      <Screen>
+        <ErrorState
+          message={detail.error?.message ?? "Unable to load this group."}
+        />
+      </Screen>
+    );
+  }
+
   return (
     <Screen>
-      <FormSection
-        title="Details"
-        footer="Every active member can manage this group. Currency locks after the first financial entry."
-      >
-        <Field
-          label="Name"
-          value={name}
-          onChangeText={setName}
-        />
-        <CurrencyField
-          label="Currency"
-          value={currency}
-          onValueChange={setCurrency}
-        />
-      </FormSection>
+      <GroupSummaryHeader
+        iconKey={normalizeGroupIconKey(group.iconKey)}
+        name={group.name}
+        colorKey={group.id}
+        lines={[
+          {
+            key: "currency",
+            text: group.currency,
+            tone: "muted",
+          },
+        ]}
+        onEdit={() =>
+          router.push(`/groups/${group.id}/edit` as Href)
+        }
+      />
       <Section
         title="Balances"
         footer="When enabled, everyone’s net group balance is combined into the smallest repayment plan instead of preserving who originally paid for whom."
@@ -95,26 +109,23 @@ export default function GroupSettingsScreen() {
           trailing={
             <Switch
               accessibilityLabel="Simplify debts"
+              disabled={updateSimplification.isPending}
               value={simplifyDebts}
-              onValueChange={setSimplifyDebts}
+              onValueChange={(nextValue) => {
+                setSimplifyDebts(nextValue);
+                updateSimplification.mutate({
+                  groupId: id,
+                  expectedVersion: group.version,
+                  name: group.name,
+                  iconKey: normalizeGroupIconKey(group.iconKey),
+                  currency: group.currency as CurrencyCode,
+                  simplifyDebts: nextValue,
+                });
+              }}
             />
           }
         />
       </Section>
-      <PrimaryButton
-        label={update.isPending ? "Saving…" : "Save changes"}
-        disabled={!group || update.isPending || name.trim().length === 0}
-        onPress={() =>
-          group &&
-          update.mutate({
-            groupId: id,
-            expectedVersion: group.version,
-            name: name.trim(),
-            currency,
-            simplifyDebts,
-          })
-        }
-      />
       <Section title="Members">
         <ListRow
           title={createInvite.isPending ? "Creating invitation…" : "Invite people"}
@@ -232,7 +243,9 @@ export default function GroupSettingsScreen() {
           </>
         ) : null}
       </Section>
-      {update.error ? <ErrorState message={update.error.message} /> : null}
+      {updateSimplification.error ? (
+        <ErrorState message={updateSimplification.error.message} />
+      ) : null}
       {removeMember.error ? <ErrorState message={removeMember.error.message} /> : null}
       {leave.error ? <ErrorState message={leave.error.message} /> : null}
       {archive.error ? <ErrorState message={archive.error.message} /> : null}

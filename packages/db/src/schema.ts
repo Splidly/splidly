@@ -129,6 +129,7 @@ export const friendships = pgTable(
 export const groups = pgTable("expense_group", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
+  iconKey: text("icon_key").notNull().default("default"),
   currency: text("currency").notNull(),
   simplifyDebts: boolean("simplify_debts").notNull().default(true),
   createdBy: text("created_by")

@@ -2,6 +2,10 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect } from "react";
 import { Text, View } from "react-native";
 import {
+  GroupIcon,
+  normalizeGroupIconKey,
+} from "../../components/group-icon";
+import {
   Avatar,
   ErrorState,
   LoadingState,
@@ -52,16 +56,20 @@ export default function InviteScreen() {
   return (
     <Screen contentContainerStyle={{ justifyContent: "center" }}>
       <View style={{ alignItems: "center", gap: 12, paddingHorizontal: 24 }}>
-        <Avatar
-          name={subject}
-          colorKey={
-            isGroup
-              ? preview.data.group?.id
-              : preview.data.inviter?.userId
-          }
-          size={82}
-          variant={isGroup ? "group" : "person"}
-        />
+        {isGroup ? (
+          <GroupIcon
+            iconKey={normalizeGroupIconKey(preview.data.group?.iconKey)}
+            name={subject}
+            colorKey={preview.data.group?.id}
+            size={82}
+          />
+        ) : (
+          <Avatar
+            name={subject}
+            colorKey={preview.data.inviter?.userId}
+            size={82}
+          />
+        )}
         <Text
           style={{
             color: theme.text,

@@ -1,7 +1,10 @@
 import { Stack, router } from "expo-router";
 import { View } from "react-native";
 import {
-  Avatar,
+  GroupIcon,
+  normalizeGroupIconKey,
+} from "../../../components/group-icon";
+import {
   BalanceText,
   CollectionScreen,
   EmptyState,
@@ -44,10 +47,10 @@ export default function GroupsScreen() {
                   title={group.name}
                   subtitle={`Accounting in ${group.currency}`}
                   leading={
-                    <Avatar
+                    <GroupIcon
+                      iconKey={normalizeGroupIconKey(group.iconKey)}
                       name={group.name}
                       colorKey={group.id}
-                      variant="group"
                     />
                   }
                   trailing={<BalanceText value={group.balance} />}

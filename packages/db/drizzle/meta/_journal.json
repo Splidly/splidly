@@ -15,6 +15,13 @@
       "when": 1785276799663,
       "tag": "0001_windy_mauler",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785286819638,
+      "tag": "0002_gigantic_cardiac",
+      "breakpoints": true
     }
   ]
 }

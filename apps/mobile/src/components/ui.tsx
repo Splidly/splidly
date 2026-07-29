@@ -494,8 +494,13 @@ export function SheetCloseButton({
 export function Field({
   label,
   hint,
+  leading,
   ...props
-}: TextInputProps & { label: string; hint?: string }) {
+}: TextInputProps & {
+  label: string;
+  hint?: string;
+  leading?: ReactNode;
+}) {
   const theme = useTheme();
   const usesNumericKeyboard =
     props.keyboardType === "decimal-pad" ||
@@ -508,6 +513,7 @@ export function Field({
         props.multiline ? styles.fieldMultiline : null,
       ]}
     >
+      {leading}
       <Text style={[styles.label, { color: theme.text }]}>
         {label}
       </Text>

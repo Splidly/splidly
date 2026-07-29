@@ -6,6 +6,29 @@ export const currencyCodeSchema = z
 
 export type CurrencyCode = z.infer<typeof currencyCodeSchema>;
 
+export const groupIconKeys = [
+  "default",
+  "trip",
+  "home",
+  "food",
+  "drinks",
+  "party",
+  "beach",
+  "outdoors",
+  "car",
+  "sports",
+  "music",
+  "gift",
+  "work",
+  "study",
+  "shopping",
+  "event",
+] as const;
+
+export const groupIconKeySchema = z.enum(groupIconKeys);
+
+export type GroupIconKey = z.infer<typeof groupIconKeySchema>;
+
 export const moneySchema = z.object({
   currency: currencyCodeSchema,
   minor: z.string().regex(/^-?\d+$/),
@@ -106,4 +129,3 @@ export const settlementMutationSchema = z.object({
 });
 
 export type SettlementMutation = z.infer<typeof settlementMutationSchema>;
-
