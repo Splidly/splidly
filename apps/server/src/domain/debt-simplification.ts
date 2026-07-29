@@ -10,6 +10,15 @@ export type RepaymentTransfer = {
   amountMinor: bigint;
 };
 
+export type RepaymentMember = {
+  userId: string;
+  displayName: string;
+};
+
+export type ViewerRepaymentBalance = RepaymentMember & {
+  amountMinor: bigint;
+};
+
 function netBalances(entries: LedgerAmount[]) {
   const balances = new Map<string, bigint>();
   for (const entry of entries) {
@@ -126,4 +135,39 @@ export function repaymentPlan(
   return simplifyDebts
     ? simplifiedTransfers(entries)
     : pairwiseTransfers(entries);
+}
+
+export function viewerRepaymentBalances(
+  transfers: RepaymentTransfer[],
+  members: RepaymentMember[],
+  viewerId: string,
+): ViewerRepaymentBalance[] {
+  const balancesByMember = new Map<string, bigint>();
+  for (const transfer of transfers) {
+    const viewerIsCreditor = transfer.toUserId === viewerId;
+    const viewerIsDebtor = transfer.fromUserId === viewerId;
+    if (!viewerIsCreditor && !viewerIsDebtor) continue;
+
+    const memberId = viewerIsCreditor
+      ? transfer.fromUserId
+      : transfer.toUserId;
+    const signedAmount = viewerIsCreditor
+      ? transfer.amountMinor
+      : -transfer.amountMinor;
+    balancesByMember.set(
+      memberId,
+      (balancesByMember.get(memberId) ?? 0n) + signedAmount,
+    );
+  }
+
+  return members
+    .filter((member) => member.userId !== viewerId)
+    .map((member) => ({
+      ...member,
+      amountMinor: balancesByMember.get(member.userId) ?? 0n,
+    }))
+    .filter((member) => member.amountMinor !== 0n)
+    .sort((left, right) =>
+      left.displayName.localeCompare(right.displayName),
+    );
 }

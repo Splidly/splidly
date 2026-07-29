@@ -1,21 +1,20 @@
 import { Stack, router } from "expo-router";
 import { View } from "react-native";
+import { normalizeGroupIconKey } from "../../../components/group-icon";
 import {
-  GroupIcon,
-  normalizeGroupIconKey,
-} from "../../../components/group-icon";
+  GroupListRow,
+  GroupListSummary,
+} from "../../../components/group-list-row";
 import {
-  BalanceText,
   CollectionScreen,
   EmptyState,
   ErrorState,
   HeaderButton,
-  ListRow,
   LoadingState,
   PrimaryButton,
   RowDivider,
-  Section,
 } from "../../../components/ui";
+import { overallGroupBalanceLines } from "../../../lib/group-balance-summary";
 import { api } from "../../../lib/trpc";
 
 export default function GroupsScreen() {
@@ -39,26 +38,26 @@ export default function GroupsScreen() {
           />
         ) : null}
         {groups.data && groups.data.length > 0 ? (
-          <Section title={`${groups.data.length} ${groups.data.length === 1 ? "group" : "groups"}`}>
-            {groups.data.map((group, index) => (
-              <View key={group.id}>
-                {index > 0 ? <RowDivider /> : null}
-                <ListRow
-                  title={group.name}
-                  subtitle={`Accounting in ${group.currency}`}
-                  leading={
-                    <GroupIcon
-                      iconKey={normalizeGroupIconKey(group.iconKey)}
-                      name={group.name}
-                      colorKey={group.id}
-                    />
-                  }
-                  trailing={<BalanceText value={group.balance} />}
-                  onPress={() => router.push(`/groups/${group.id}`)}
-                />
-              </View>
-            ))}
-          </Section>
+          <>
+            <GroupListSummary
+              lines={overallGroupBalanceLines(groups.data)}
+            />
+            <View>
+              {groups.data.map((group, index) => (
+                <View key={group.id}>
+                  {index > 0 ? <RowDivider inset={78} /> : null}
+                  <GroupListRow
+                    id={group.id}
+                    name={group.name}
+                    iconKey={normalizeGroupIconKey(group.iconKey)}
+                    balance={group.balance}
+                    memberBalances={group.memberBalances}
+                    onPress={() => router.push(`/groups/${group.id}`)}
+                  />
+                </View>
+              ))}
+            </View>
+          </>
         ) : null}
       </CollectionScreen>
       <Stack.Screen

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   repaymentPlan,
+  viewerRepaymentBalances,
   type LedgerAmount,
 } from "../src/domain/debt-simplification";
 
@@ -71,6 +72,27 @@ describe("repaymentPlan", () => {
       ),
     ).toEqual([
       { fromUserId: "a", toUserId: "b", amountMinor: 650n },
+    ]);
+  });
+
+  it("returns the viewer's signed balances with every repayment counterparty", () => {
+    expect(
+      viewerRepaymentBalances(
+        [
+          { fromUserId: "viewer", toUserId: "alex", amountMinor: 800n },
+          { fromUserId: "sam", toUserId: "viewer", amountMinor: 1_200n },
+          { fromUserId: "alex", toUserId: "sam", amountMinor: 400n },
+        ],
+        [
+          { userId: "viewer", displayName: "Viewer" },
+          { userId: "sam", displayName: "Sam" },
+          { userId: "alex", displayName: "Alex" },
+        ],
+        "viewer",
+      ),
+    ).toEqual([
+      { userId: "alex", displayName: "Alex", amountMinor: -800n },
+      { userId: "sam", displayName: "Sam", amountMinor: 1_200n },
     ]);
   });
 });

@@ -23,7 +23,10 @@ import {
 } from "@splidly/shared";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { repaymentPlan } from "../domain/debt-simplification";
+import {
+  repaymentPlan,
+  viewerRepaymentBalances,
+} from "../domain/debt-simplification";
 import { requireActiveGroupMember } from "../domain/helpers";
 import { protectedProcedure, router } from "../trpc";
 
@@ -114,15 +117,38 @@ export const groupsRouter = router({
             and(
               eq(ledgerEntries.contextType, "group"),
               eq(ledgerEntries.contextId, group.id),
-              or(
-                eq(ledgerEntries.debtorId, ctx.session.user.id),
-                eq(ledgerEntries.creditorId, ctx.session.user.id),
-              ),
             ),
           );
+        const members = await ctx.db
+          .select({
+            userId: groupMembers.userId,
+            displayName: profiles.displayName,
+          })
+          .from(groupMembers)
+          .innerJoin(profiles, eq(profiles.userId, groupMembers.userId))
+          .where(
+            and(
+              eq(groupMembers.groupId, group.id),
+              isNull(groupMembers.removedAt),
+            ),
+          );
+        const transfers = repaymentPlan(entries, group.simplifyDebts);
+        const memberBalances = viewerRepaymentBalances(
+          transfers,
+          members,
+          ctx.session.user.id,
+        ).map((member) => ({
+          userId: member.userId,
+          displayName: member.displayName,
+          balance: money(group.currency, member.amountMinor),
+        }));
         return {
           ...group,
-          balance: money(group.currency, groupBalance(entries, ctx.session.user.id)),
+          balance: money(
+            group.currency,
+            groupBalance(entries, ctx.session.user.id),
+          ),
+          memberBalances,
         };
       }),
     );
@@ -213,38 +239,15 @@ export const groupsRouter = router({
         groupEntries,
         group.simplifyDebts,
       );
-      const balancesByMember = new Map<string, bigint>();
-      for (const transfer of transfers) {
-        const viewerIsCreditor =
-          transfer.toUserId === ctx.session.user.id;
-        const viewerIsDebtor =
-          transfer.fromUserId === ctx.session.user.id;
-        if (!viewerIsCreditor && !viewerIsDebtor) continue;
-        const memberId = viewerIsCreditor
-          ? transfer.fromUserId
-          : transfer.toUserId;
-        const signedAmount = viewerIsCreditor
-          ? transfer.amountMinor
-          : -transfer.amountMinor;
-        balancesByMember.set(
-          memberId,
-          (balancesByMember.get(memberId) ?? 0n) + signedAmount,
-        );
-      }
-      const memberBalances = members
-        .filter((member) => member.userId !== ctx.session.user.id)
-        .map((member) => ({
-          userId: member.userId,
-          displayName: member.displayName,
-          balance: money(
-            group.currency,
-            balancesByMember.get(member.userId) ?? 0n,
-          ),
-        }))
-        .filter((item) => BigInt(item.balance.minor) !== 0n)
-        .sort((left, right) =>
-          left.displayName.localeCompare(right.displayName),
-        );
+      const memberBalances = viewerRepaymentBalances(
+        transfers,
+        members,
+        ctx.session.user.id,
+      ).map((member) => ({
+        userId: member.userId,
+        displayName: member.displayName,
+        balance: money(group.currency, member.amountMinor),
+      }));
       return {
         group,
         members,
