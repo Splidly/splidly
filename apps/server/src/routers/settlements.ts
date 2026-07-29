@@ -29,6 +29,18 @@ import {
 } from "../domain/helpers";
 import { protectedProcedure, router } from "../trpc";
 
+export function assertSettlementParticipant(
+  actorId: string,
+  fromUserId: string,
+  toUserId: string,
+) {
+  if (actorId === fromUserId || actorId === toUserId) return;
+  throw new TRPCError({
+    code: "FORBIDDEN",
+    message: "Only the people involved can record this settlement",
+  });
+}
+
 export const settlementsRouter = router({
   create: protectedProcedure
     .input(settlementMutationSchema)
@@ -39,6 +51,11 @@ export const settlementsRouter = router({
           message: "A settlement requires two people",
         });
       }
+      assertSettlementParticipant(
+        ctx.session.user.id,
+        input.fromUserId,
+        input.toUserId,
+      );
       const [duplicate] = await ctx.db
         .select()
         .from(settlements)

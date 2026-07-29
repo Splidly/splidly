@@ -32,7 +32,11 @@ export default function FriendDetailScreen() {
     <>
       <Screen>
         <View style={{ alignItems: "center", gap: 10, paddingVertical: 8 }}>
-          <Avatar name={name} size={76} />
+          <Avatar
+            name={name}
+            colorKey={detail.data.friend?.userId ?? id}
+            size={76}
+          />
           <Text style={{ color: theme.text, fontSize: 28, fontWeight: "700", letterSpacing: -0.6 }}>
             {name}
           </Text>

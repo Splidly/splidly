@@ -14,6 +14,7 @@ import {
   Field,
   FormSection,
   Intro,
+  LoadingState,
   PrimaryButton,
   Screen,
 } from "../../components/ui";
@@ -25,16 +26,26 @@ export default function NewSettlementScreen() {
   const params = useLocalSearchParams<{
     type: "group" | "friend";
     id: string;
-    friendshipId: string;
+    friendshipId?: string;
     friendId: string;
     canonicalCurrency: CurrencyCode;
     canonicalMinor: string;
   }>();
   const theme = useTheme();
   const profile = api.profile.me.useQuery();
-  const friend = api.friends.detail.useQuery({
-    friendshipId: params.friendshipId,
-  });
+  const friend = api.friends.detail.useQuery(
+    {
+      friendshipId: params.friendshipId ?? "",
+    },
+    {
+      enabled:
+        params.type === "friend" && Boolean(params.friendshipId),
+    },
+  );
+  const group = api.groups.detail.useQuery(
+    { groupId: params.id },
+    { enabled: params.type === "group" },
+  );
   const utils = api.useUtils();
   const negative = BigInt(params.canonicalMinor) < 0n;
   const absolute = negative
@@ -66,15 +77,21 @@ export default function NewSettlementScreen() {
   });
   const fromUserId = negative ? profile.data?.userId : params.friendId;
   const toUserId = negative ? params.friendId : profile.data?.userId;
-  const friendName = friend.data?.friend?.displayName ?? "Your friend";
+  const counterparty =
+    params.type === "group"
+      ? group.data?.members.find(
+          (member) => member.userId === params.friendId,
+        )
+      : friend.data?.friend;
+  const friendName = counterparty?.displayName ?? "Your friend";
   const contextCurrencies = [
-    friend.data?.friend?.homeCurrency,
+    counterparty?.homeCurrency,
     profile.data?.homeCurrency,
   ].filter((value): value is CurrencyCode => Boolean(value));
 
   async function preview() {
     setFormError(undefined);
-    if (!profile.data || !friend.data?.friend) return;
+    if (!profile.data || !counterparty) return;
     try {
       parseDecimalToMinor(amount, currency);
       const result = await quote.mutateAsync({
@@ -82,7 +99,7 @@ export default function NewSettlementScreen() {
         targets: [
           params.canonicalCurrency,
           profile.data.homeCurrency,
-          friend.data.friend.homeCurrency,
+          counterparty.homeCurrency,
         ],
       });
       setRateValues(
@@ -129,10 +146,42 @@ export default function NewSettlementScreen() {
     }
   }
 
+  const contextPending =
+    profile.isPending ||
+    (params.type === "group" ? group.isPending : friend.isPending);
+  const contextError =
+    profile.error ??
+    (params.type === "group" ? group.error : friend.error);
+  if (contextPending) {
+    return (
+      <Screen background="sheet">
+        <LoadingState />
+      </Screen>
+    );
+  }
+  if (contextError || !counterparty) {
+    return (
+      <Screen background="sheet">
+        <ErrorState
+          message={
+            contextError?.message ??
+            (params.type === "group"
+              ? "Group member not found"
+              : "Friend not found")
+          }
+        />
+      </Screen>
+    );
+  }
+
   return (
     <Screen background="sheet">
       <View style={{ alignItems: "center", gap: 10, paddingVertical: 8 }}>
-        <Avatar name={friendName} size={68} />
+        <Avatar
+          name={friendName}
+          colorKey={counterparty.userId}
+          size={68}
+        />
         <Text
           style={{
             color: theme.text,

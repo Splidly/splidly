@@ -51,6 +51,7 @@ export const invitesRouter = router({
       const invite = await readInvite(ctx.db, input.token);
       const [inviter] = await ctx.db
         .select({
+          userId: profiles.userId,
           displayName: profiles.displayName,
           avatarUrl: profiles.avatarUrl,
         })

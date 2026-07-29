@@ -62,7 +62,12 @@ export default function FriendsScreen() {
                             : "Direct ledger"
                           : `${balances.length} open ledgers`
                     }
-                    leading={<Avatar name={name} />}
+                    leading={
+                      <Avatar
+                        name={name}
+                        colorKey={friend?.userId ?? friendship.id}
+                      />
+                    }
                     onPress={() => router.push(`/friends/${friendship.id}`)}
                     trailing={
                       balances[0] ? (

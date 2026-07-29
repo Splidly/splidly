@@ -103,7 +103,11 @@ export default function OnboardingScreen() {
       />
 
       <View style={styles.hero}>
-        <Avatar name={displayName || "Splidly"} size={72} />
+        <Avatar
+          name={displayName || "Splidly"}
+          colorKey={profile.data?.userId}
+          size={72}
+        />
         <View style={styles.heroCopy}>
           <Text style={[styles.title, { color: theme.text }]}>
             Make Splidly yours

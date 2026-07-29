@@ -43,7 +43,13 @@ export default function GroupsScreen() {
                 <ListRow
                   title={group.name}
                   subtitle={`Accounting in ${group.currency}`}
-                  leading={<Avatar name={group.name} variant="group" />}
+                  leading={
+                    <Avatar
+                      name={group.name}
+                      colorKey={group.id}
+                      variant="group"
+                    />
+                  }
                   trailing={<BalanceText value={group.balance} />}
                   onPress={() => router.push(`/groups/${group.id}`)}
                 />

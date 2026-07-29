@@ -131,7 +131,12 @@ export default function GroupSettingsScreen() {
               <ListRow
                 title={member.displayName}
                 subtitle={isMe ? "You" : `Home currency · ${member.homeCurrency}`}
-                leading={<Avatar name={member.displayName} />}
+                leading={
+                  <Avatar
+                    name={member.displayName}
+                    colorKey={member.userId}
+                  />
+                }
                 valueTone="negative"
                 {...(!isMe ? { value: "Remove" } : {})}
                 {...(!isMe && !removeMember.isPending

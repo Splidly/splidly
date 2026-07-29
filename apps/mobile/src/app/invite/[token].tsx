@@ -52,7 +52,16 @@ export default function InviteScreen() {
   return (
     <Screen contentContainerStyle={{ justifyContent: "center" }}>
       <View style={{ alignItems: "center", gap: 12, paddingHorizontal: 24 }}>
-        <Avatar name={subject} size={82} variant={isGroup ? "group" : "person"} />
+        <Avatar
+          name={subject}
+          colorKey={
+            isGroup
+              ? preview.data.group?.id
+              : preview.data.inviter?.userId
+          }
+          size={82}
+          variant={isGroup ? "group" : "person"}
+        />
         <Text
           style={{
             color: theme.text,

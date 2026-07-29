@@ -44,7 +44,12 @@ export default function GroupDetailScreen() {
             paddingVertical: 2,
           }}
         >
-          <Avatar name={group.name} size={58} variant="group" />
+          <Avatar
+            name={group.name}
+            colorKey={group.id}
+            size={58}
+            variant="group"
+          />
           <View style={{ flex: 1, gap: 3 }}>
             <Text
               numberOfLines={1}
@@ -104,6 +109,57 @@ export default function GroupDetailScreen() {
             />
           </View>
         </View>
+        {memberBalances.length > 0 ? (
+          <Section title="Open balances">
+            {memberBalances.map((memberBalance, index) => {
+              const minor = BigInt(memberBalance.balance.minor);
+              const absolute = minor < 0n ? -minor : minor;
+              return (
+                <View key={memberBalance.userId}>
+                  {index > 0 ? <RowDivider /> : null}
+                  <ListRow
+                    title={memberBalance.displayName}
+                    subtitle={`${
+                      minor < 0n ? "You owe" : "Owes you"
+                    } ${formatMinor(
+                      absolute,
+                      memberBalance.balance.currency as CurrencyCode,
+                    )} ${memberBalance.balance.currency}`}
+                    leading={
+                      <Avatar
+                        name={memberBalance.displayName}
+                        colorKey={memberBalance.userId}
+                      />
+                    }
+                    trailing={
+                      <Text
+                        style={{
+                          color: theme.primary,
+                          fontSize: 15,
+                          fontWeight: "600",
+                        }}
+                      >
+                        Settle
+                      </Text>
+                    }
+                    onPress={() =>
+                      router.push({
+                        pathname: "/settlement/new",
+                        params: {
+                          type: "group",
+                          id: group.id,
+                          friendId: memberBalance.userId,
+                          canonicalCurrency: memberBalance.balance.currency,
+                          canonicalMinor: memberBalance.balance.minor,
+                        },
+                      })
+                    }
+                  />
+                </View>
+              );
+            })}
+          </Section>
+        ) : null}
         <Section title="Activity">
           {expenses.length === 0 ? (
             <EmptyState

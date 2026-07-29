@@ -15,11 +15,13 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useColorScheme,
   View,
   type ScrollViewProps,
   type TextInputProps,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { avatarColorsFor } from "../lib/avatar-colors";
 import { spacing, useTheme } from "../theme";
 import { AppIcon } from "./app-icon";
 
@@ -321,14 +323,20 @@ export function ListRow({
 
 export function Avatar({
   name,
+  colorKey,
   size = 44,
   variant = "person",
 }: {
   name: string;
+  colorKey?: string | undefined;
   size?: number;
   variant?: "person" | "group";
 }) {
-  const theme = useTheme();
+  const colorScheme = useColorScheme() === "dark" ? "dark" : "light";
+  const colors = avatarColorsFor(
+    `${variant}:${colorKey ?? name.trim().toLowerCase()}`,
+    colorScheme,
+  );
   const initials = name
     .split(/\s+/)
     .filter(Boolean)
@@ -344,13 +352,12 @@ export function Avatar({
         borderCurve: "continuous",
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor:
-          variant === "person" ? theme.positiveSurface : theme.elevated,
+        backgroundColor: colors.background,
       }}
     >
       <Text
         style={{
-          color: variant === "person" ? theme.positive : theme.primary,
+          color: colors.foreground,
           fontSize: size * 0.36,
           fontWeight: "700",
           letterSpacing: -0.3,
