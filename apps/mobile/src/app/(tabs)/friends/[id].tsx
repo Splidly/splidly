@@ -1,4 +1,5 @@
-import { Stack, router, useLocalSearchParams } from "expo-router";
+import { formatMinor, type CurrencyCode } from "@splidly/shared";
+import { Stack, router, useLocalSearchParams, type Href } from "expo-router";
 import { Text, View } from "react-native";
 import {
   Avatar,
@@ -100,6 +101,34 @@ export default function FriendDetailScreen() {
             message={`There are no open balances between you and ${name}.`}
           />
         )}
+        <Section title="Activity">
+          {detail.data.expenses.length === 0 ? (
+            <EmptyState
+              title="No expenses yet"
+              message={`Add the first direct expense with ${name}.`}
+            />
+          ) : (
+            detail.data.expenses.map((expense, index) => (
+              <View key={expense.id}>
+                {index > 0 ? <RowDivider inset={16} /> : null}
+                <ListRow
+                  title={expense.description}
+                  subtitle={new Date(expense.occurredAt).toLocaleDateString(
+                    undefined,
+                    { dateStyle: "medium" },
+                  )}
+                  value={`${formatMinor(
+                    expense.sourceAmountMinor,
+                    expense.sourceCurrency as CurrencyCode,
+                  )} ${expense.sourceCurrency}`}
+                  onPress={() =>
+                    router.push(`/expense/${expense.id}` as Href)
+                  }
+                />
+              </View>
+            ))
+          )}
+        </Section>
       </Screen>
       <Stack.Screen options={{ title: name }} />
     </>

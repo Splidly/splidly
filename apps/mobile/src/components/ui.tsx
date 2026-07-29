@@ -23,7 +23,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { spacing, useTheme } from "../theme";
 import { AppIcon } from "./app-icon";
 
-function useScrollViewportFill() {
+function useScrollViewportFill(accountForTopInset = false) {
   const insets = useSafeAreaInsets();
   const [viewportHeight, setViewportHeight] = useState(0);
   const [contentMeasurement, setContentMeasurement] = useState({
@@ -31,7 +31,12 @@ function useScrollViewportFill() {
     includesBottomSpacing: false,
   });
   const [hasBottomSpacing, setHasBottomSpacing] = useState(false);
-  const fillHeight = Math.max(0, viewportHeight - insets.bottom);
+  const fillHeight = Math.max(
+    0,
+    viewportHeight -
+      insets.bottom -
+      (accountForTopInset ? insets.top : 0),
+  );
 
   useEffect(() => {
     if (viewportHeight === 0 || contentMeasurement.height === 0) return;
@@ -75,22 +80,28 @@ export function Screen({
   children,
   scroll = true,
   bounces = true,
+  background = "default",
+  accountForTopInset = false,
   contentContainerStyle,
 }: PropsWithChildren<{
   scroll?: boolean;
   bounces?: boolean;
+  background?: "default" | "sheet";
+  accountForTopInset?: boolean;
   contentContainerStyle?: ScrollViewProps["contentContainerStyle"];
 }>) {
   const theme = useTheme();
+  const backgroundColor =
+    background === "sheet" ? theme.sheet : theme.background;
   const { fillStyle, onLayout, onContentSizeChange } =
-    useScrollViewportFill();
+    useScrollViewportFill(accountForTopInset);
   if (!scroll) {
     return (
       <View
         style={[
           styles.screen,
           styles.screenContent,
-          { backgroundColor: theme.background },
+          { backgroundColor },
           contentContainerStyle,
         ]}
       >
@@ -100,7 +111,7 @@ export function Screen({
   }
   return (
     <ScrollView
-      style={[styles.screen, { backgroundColor: theme.background }]}
+      style={[styles.screen, { backgroundColor }]}
       contentContainerStyle={[
         styles.screenContent,
         fillStyle,

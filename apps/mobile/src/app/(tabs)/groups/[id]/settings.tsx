@@ -1,7 +1,7 @@
 import type { CurrencyCode } from "@splidly/shared";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, Share, View } from "react-native";
+import { Alert, Switch, View } from "react-native";
 import {
   Avatar,
   ErrorState,
@@ -14,6 +14,7 @@ import {
   Section,
 } from "../../../../components/ui";
 import { CurrencyField } from "../../../../components/currency-field";
+import { shareInvite } from "../../../../lib/share-invite";
 import { api } from "../../../../lib/trpc";
 
 export default function GroupSettingsScreen() {
@@ -23,10 +24,12 @@ export default function GroupSettingsScreen() {
   const utils = api.useUtils();
   const [name, setName] = useState("");
   const [currency, setCurrency] = useState<CurrencyCode>("EUR");
+  const [simplifyDebts, setSimplifyDebts] = useState(true);
   useEffect(() => {
     if (!detail.data) return;
     setName(detail.data.group.name);
     setCurrency(detail.data.group.currency as CurrencyCode);
+    setSimplifyDebts(detail.data.group.simplifyDebts);
   }, [detail.data]);
   const update = api.groups.update.useMutation({
     async onSuccess() {
@@ -44,11 +47,7 @@ export default function GroupSettingsScreen() {
   });
   const createInvite = api.invites.create.useMutation({
     onSuccess: (invite) =>
-      void Share.share({
-        title: `Join ${detail.data?.group.name ?? "my group"} on Splidly`,
-        message: invite.url,
-        url: invite.url,
-      }),
+      void shareInvite(invite.url),
   });
   const leave = api.groups.leave.useMutation({
     async onSuccess() {
@@ -86,6 +85,22 @@ export default function GroupSettingsScreen() {
           onValueChange={setCurrency}
         />
       </FormSection>
+      <Section
+        title="Balances"
+        footer="When enabled, everyone’s net group balance is combined into the smallest repayment plan instead of preserving who originally paid for whom."
+      >
+        <ListRow
+          title="Simplify debts"
+          subtitle="Use fewer payments to settle the group"
+          trailing={
+            <Switch
+              accessibilityLabel="Simplify debts"
+              value={simplifyDebts}
+              onValueChange={setSimplifyDebts}
+            />
+          }
+        />
+      </Section>
       <PrimaryButton
         label={update.isPending ? "Saving…" : "Save changes"}
         disabled={!group || update.isPending || name.trim().length === 0}
@@ -96,6 +111,7 @@ export default function GroupSettingsScreen() {
             expectedVersion: group.version,
             name: name.trim(),
             currency,
+            simplifyDebts,
           })
         }
       />

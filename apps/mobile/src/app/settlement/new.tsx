@@ -55,6 +55,11 @@ export default function NewSettlementScreen() {
       await Promise.all([
         utils.friends.list.invalidate(),
         utils.groups.list.invalidate(),
+        params.type === "group"
+          ? utils.groups.detail.invalidate({ groupId: params.id })
+          : utils.friends.detail.invalidate({
+              friendshipId: params.id,
+            }),
       ]);
       router.back();
     },
@@ -125,7 +130,7 @@ export default function NewSettlementScreen() {
   }
 
   return (
-    <Screen>
+    <Screen background="sheet">
       <View style={{ alignItems: "center", gap: 10, paddingVertical: 8 }}>
         <Avatar name={friendName} size={68} />
         <Text

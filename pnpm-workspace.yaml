@@ -33,3 +33,6 @@ minimumReleaseAgeExclude:
   - expo-web-browser@57.0.2
   - expo@57.0.8
   - turbo@2.10.6
+
+patchedDependencies:
+  react-native-screens@4.26.2: patches/react-native-screens@4.26.2.patch

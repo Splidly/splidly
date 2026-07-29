@@ -1,8 +1,10 @@
 import {
   and,
   eq,
+  expenses,
   friendships,
   groupMembers,
+  groups,
   isNull,
   ledgerEntries,
   ledgerValuations,
@@ -12,6 +14,10 @@ import {
 import { money } from "@splidly/shared";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import {
+  repaymentPlan,
+  type RepaymentTransfer,
+} from "../domain/debt-simplification";
 import {
   requireFriendshipParticipant,
 } from "../domain/helpers";
@@ -32,6 +38,40 @@ export const friendsRouter = router({
           isNull(friendships.removedAt),
         ),
       );
+
+    const simplifiedMemberships = await ctx.db
+      .select({ group: groups })
+      .from(groupMembers)
+      .innerJoin(groups, eq(groups.id, groupMembers.groupId))
+      .where(
+        and(
+          eq(groupMembers.userId, userId),
+          isNull(groupMembers.removedAt),
+          isNull(groups.archivedAt),
+          eq(groups.simplifyDebts, true),
+        ),
+      );
+    const simplifiedGroups = new Map<
+      string,
+      { currency: string; transfers: RepaymentTransfer[] }
+    >();
+    await Promise.all(
+      simplifiedMemberships.map(async ({ group }) => {
+        const entries = await ctx.db
+          .select()
+          .from(ledgerEntries)
+          .where(
+            and(
+              eq(ledgerEntries.contextType, "group"),
+              eq(ledgerEntries.contextId, group.id),
+            ),
+          );
+        simplifiedGroups.set(group.id, {
+          currency: group.currency,
+          transfers: repaymentPlan(entries, true),
+        });
+      }),
+    );
 
     return Promise.all(
       rows.map(async (friendship) => {
@@ -73,6 +113,12 @@ export const friendsRouter = router({
           }
         >();
         for (const entry of entries) {
+          if (
+            entry.contextType === "group" &&
+            simplifiedGroups.has(entry.contextId)
+          ) {
+            continue;
+          }
           const values = await ctx.db
             .select()
             .from(ledgerValuations)
@@ -96,6 +142,38 @@ export const friendsRouter = router({
           existing.friendMinor += sign * counterpart.amountMinor;
           existing.canonicalMinor += sign * entry.canonicalAmountMinor;
           buckets.set(key, existing);
+        }
+        for (const [groupId, plan] of simplifiedGroups) {
+          const canonicalMinor = plan.transfers.reduce(
+            (sum, transfer) => {
+              if (
+                transfer.fromUserId === friendId &&
+                transfer.toUserId === userId
+              ) {
+                return sum + transfer.amountMinor;
+              }
+              if (
+                transfer.fromUserId === userId &&
+                transfer.toUserId === friendId
+              ) {
+                return sum - transfer.amountMinor;
+              }
+              return sum;
+            },
+            0n,
+          );
+          if (canonicalMinor === 0n) continue;
+          const key = `group:${groupId}:${plan.currency}:${plan.currency}:${plan.currency}`;
+          buckets.set(key, {
+            contextId: groupId,
+            contextType: "group",
+            viewerCurrency: plan.currency,
+            friendCurrency: plan.currency,
+            canonicalCurrency: plan.currency,
+            canonicalMinor,
+            viewerMinor: canonicalMinor,
+            friendMinor: canonicalMinor,
+          });
         }
 
         return {
@@ -141,7 +219,17 @@ export const friendsRouter = router({
         .from(profiles)
         .where(eq(profiles.userId, friendId))
         .limit(1);
-      return { friendship, friend };
+      const activity = await ctx.db
+        .select()
+        .from(expenses)
+        .where(
+          and(
+            eq(expenses.friendshipId, friendship.id),
+            isNull(expenses.deletedAt),
+          ),
+        )
+        .orderBy(expenses.occurredAt);
+      return { friendship, friend, expenses: activity.reverse() };
     }),
 
   remove: protectedProcedure

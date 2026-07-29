@@ -123,7 +123,7 @@ export default function CurrencyPickerScreen() {
   return (
     <>
       <SectionList
-        style={{ flex: 1, backgroundColor: theme.background }}
+        style={{ flex: 1, backgroundColor: theme.sheet }}
         contentContainerStyle={{ paddingBottom: 32 }}
         sections={sections}
         keyExtractor={(currency) => currency.code}

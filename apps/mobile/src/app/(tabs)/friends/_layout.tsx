@@ -1,4 +1,5 @@
 import { Stack } from "expo-router";
+import { inlineLargeTitleOptions } from "../../../lib/navigation";
 import { useTheme } from "../../../theme";
 
 export default function FriendsStackLayout() {
@@ -11,10 +12,15 @@ export default function FriendsStackLayout() {
         headerShadowVisible: false,
         contentStyle: { backgroundColor: theme.background },
         headerBackButtonDisplayMode: "minimal",
-        headerLargeTitleShadowVisible: false,
       }}
     >
-      <Stack.Screen name="index" />
+      <Stack.Screen
+        name="index"
+        options={{
+          title: "Friends",
+          ...inlineLargeTitleOptions(theme.text),
+        }}
+      />
       <Stack.Screen name="[id]" options={{ title: "" }} />
     </Stack>
   );

@@ -91,7 +91,11 @@ export default function OnboardingScreen() {
   }
 
   return (
-    <Screen scroll={false} contentContainerStyle={styles.content}>
+    <Screen
+      scroll={false}
+      background="sheet"
+      contentContainerStyle={styles.content}
+    >
       <SheetCloseButton
         label="Cancel account setup"
         disabled={cancel.isPending || update.isPending}

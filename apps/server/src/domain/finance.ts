@@ -24,6 +24,7 @@ export async function resolveRates(input: {
   targets: CurrencyCode[];
   quoteId: string | undefined;
   overrides: RateSnapshot[];
+  fallbackRates?: RateSnapshot[];
 }): Promise<RateSnapshot[]> {
   const targets = [...new Set(input.targets)];
   let automatic: RateSnapshot[] = [];
@@ -71,13 +72,18 @@ export async function resolveRates(input: {
       (candidate) =>
         candidate.base === input.base && candidate.quote === target,
     );
-    if (!rate) {
+    if (rate) return rate;
+    const fallback = input.fallbackRates?.find(
+      (candidate) =>
+        candidate.base === input.base && candidate.quote === target,
+    );
+    if (!fallback) {
       throw new TRPCError({
         code: "PRECONDITION_FAILED",
         message: `A ${input.base}/${target} rate is required`,
       });
     }
-    return rate;
+    return fallback;
   });
 }
 

@@ -1,4 +1,8 @@
 import { Stack } from "expo-router";
+import {
+  formSheetOptions,
+  inlineLargeTitleOptions,
+} from "../../../lib/navigation";
 import { useTheme } from "../../../theme";
 
 export default function GroupsStackLayout() {
@@ -11,22 +15,26 @@ export default function GroupsStackLayout() {
         headerShadowVisible: false,
         contentStyle: { backgroundColor: theme.background },
         headerBackButtonDisplayMode: "minimal",
-        headerLargeTitleShadowVisible: false,
       }}
     >
-      <Stack.Screen name="index" />
+      <Stack.Screen
+        name="index"
+        options={{
+          title: "Groups",
+          ...inlineLargeTitleOptions(theme.text),
+        }}
+      />
       <Stack.Screen
         name="new"
         options={{
           headerShown: false,
-          presentation: "formSheet",
+          ...formSheetOptions(theme.sheet),
           sheetAllowedDetents: [0.62],
           sheetInitialDetentIndex: 0,
           sheetGrabberVisible: false,
           sheetCornerRadius: 30,
           gestureEnabled: false,
           headerBackButtonMenuEnabled: false,
-          contentStyle: { backgroundColor: theme.background },
         }}
       />
       <Stack.Screen name="[id]/index" options={{ title: "Group" }} />

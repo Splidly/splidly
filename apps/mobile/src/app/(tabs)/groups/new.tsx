@@ -34,7 +34,11 @@ export default function NewGroupScreen() {
   ) as CurrencyCode;
 
   return (
-    <Screen scroll={false} contentContainerStyle={styles.content}>
+    <Screen
+      scroll={false}
+      background="sheet"
+      contentContainerStyle={styles.content}
+    >
       <SheetCloseButton
         label="Close new group"
         disabled={create.isPending}

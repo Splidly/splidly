@@ -19,6 +19,7 @@ import {
 import { currencyCodeSchema, money } from "@splidly/shared";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { repaymentPlan } from "../domain/debt-simplification";
 import { requireActiveGroupMember } from "../domain/helpers";
 import { protectedProcedure, router } from "../trpc";
 
@@ -137,6 +138,7 @@ export const groupsRouter = router({
           .values({
             name: input.name,
             currency: input.currency,
+            simplifyDebts: true,
             createdBy: ctx.session.user.id,
           })
           .returning();
@@ -192,7 +194,57 @@ export const groupsRouter = router({
           ),
         )
         .orderBy(expenses.occurredAt);
-      return { group, members, expenses: activity.reverse() };
+      const groupEntries = await ctx.db
+        .select()
+        .from(ledgerEntries)
+        .where(
+          and(
+            eq(ledgerEntries.contextType, "group"),
+            eq(ledgerEntries.contextId, group.id),
+          ),
+        );
+      const transfers = repaymentPlan(
+        groupEntries,
+        group.simplifyDebts,
+      );
+      const balancesByMember = new Map<string, bigint>();
+      for (const transfer of transfers) {
+        const viewerIsCreditor =
+          transfer.toUserId === ctx.session.user.id;
+        const viewerIsDebtor =
+          transfer.fromUserId === ctx.session.user.id;
+        if (!viewerIsCreditor && !viewerIsDebtor) continue;
+        const memberId = viewerIsCreditor
+          ? transfer.fromUserId
+          : transfer.toUserId;
+        const signedAmount = viewerIsCreditor
+          ? transfer.amountMinor
+          : -transfer.amountMinor;
+        balancesByMember.set(
+          memberId,
+          (balancesByMember.get(memberId) ?? 0n) + signedAmount,
+        );
+      }
+      const memberBalances = members
+        .filter((member) => member.userId !== ctx.session.user.id)
+        .map((member) => ({
+          userId: member.userId,
+          displayName: member.displayName,
+          balance: money(
+            group.currency,
+            balancesByMember.get(member.userId) ?? 0n,
+          ),
+        }))
+        .filter((item) => BigInt(item.balance.minor) !== 0n)
+        .sort((left, right) =>
+          left.displayName.localeCompare(right.displayName),
+        );
+      return {
+        group,
+        members,
+        memberBalances,
+        expenses: activity.reverse(),
+      };
     }),
 
   update: protectedProcedure
@@ -202,6 +254,7 @@ export const groupsRouter = router({
         expectedVersion: z.number().int().positive(),
         name: z.string().trim().min(1).max(120),
         currency: currencyCodeSchema,
+        simplifyDebts: z.boolean(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -242,6 +295,7 @@ export const groupsRouter = router({
         .set({
           name: input.name,
           currency: input.currency,
+          simplifyDebts: input.simplifyDebts,
           version: current.version + 1,
           updatedAt: new Date(),
         })

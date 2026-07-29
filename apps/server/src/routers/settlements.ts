@@ -16,6 +16,7 @@ import {
 } from "@splidly/shared";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { repaymentPlan } from "../domain/debt-simplification";
 import {
   convertWithRates,
   loadHomeCurrencies,
@@ -51,6 +52,7 @@ export const settlementsRouter = router({
       if (duplicate) return duplicate;
 
       let contextId: string;
+      let simplifyDebts = false;
       if (input.context.type === "group") {
         await requireActiveGroupMember(
           ctx.db,
@@ -88,6 +90,7 @@ export const settlementsRouter = router({
           });
         }
         contextId = group.id;
+        simplifyDebts = group.simplifyDebts;
       } else {
         const friendship = await requireFriendshipParticipant(
           ctx.db,
@@ -135,21 +138,16 @@ export const settlementsRouter = router({
             eq(ledgerEntries.canonicalCurrency, input.canonicalCurrency),
           ),
         );
-      const outstanding = pairEntries.reduce((sum, entry) => {
-        if (
-          entry.debtorId === input.fromUserId &&
-          entry.creditorId === input.toUserId
-        ) {
-          return sum + entry.canonicalAmountMinor;
-        }
-        if (
-          entry.debtorId === input.toUserId &&
-          entry.creditorId === input.fromUserId
-        ) {
-          return sum - entry.canonicalAmountMinor;
-        }
-        return sum;
-      }, 0n);
+      const outstanding = repaymentPlan(
+        pairEntries,
+        simplifyDebts,
+      )
+        .filter(
+          (transfer) =>
+            transfer.fromUserId === input.fromUserId &&
+            transfer.toUserId === input.toUserId,
+        )
+        .reduce((sum, transfer) => sum + transfer.amountMinor, 0n);
       if (outstanding <= 0n || canonicalAmount > outstanding) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
@@ -313,4 +311,3 @@ export const settlementsRouter = router({
       });
     }),
 });
-

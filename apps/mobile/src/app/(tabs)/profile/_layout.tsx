@@ -1,4 +1,5 @@
 import { Stack } from "expo-router";
+import { inlineLargeTitleOptions } from "../../../lib/navigation";
 import { useTheme } from "../../../theme";
 
 export default function ProfileStackLayout() {
@@ -10,10 +11,15 @@ export default function ProfileStackLayout() {
         headerTintColor: theme.text,
         headerShadowVisible: false,
         contentStyle: { backgroundColor: theme.background },
-        headerLargeTitleShadowVisible: false,
       }}
     >
-      <Stack.Screen name="index" options={{ title: "Profile" }} />
+      <Stack.Screen
+        name="index"
+        options={{
+          title: "Profile",
+          ...inlineLargeTitleOptions(theme.text),
+        }}
+      />
     </Stack>
   );
 }

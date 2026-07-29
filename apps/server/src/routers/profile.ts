@@ -4,12 +4,14 @@ import {
   eq,
   groupMembers,
   groups,
+  inArray,
   invites,
   isNull,
   ledgerEntries,
   or,
   profiles,
   sessions,
+  sql,
   users,
 } from "@splidly/db";
 import { currencyCodeSchema } from "@splidly/shared";
@@ -59,54 +61,106 @@ export const profileRouter = router({
     }),
 
   deleteAccount: protectedProcedure
-    .input(z.object({ confirmation: z.literal("DELETE") }))
-    .mutation(async ({ ctx }) => {
+    .input(
+      z.object({
+        confirmation: z.literal("DELETE"),
+        leaveGroups: z.boolean().optional().default(false),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
-      const activeMemberships = await ctx.db
-        .select({ groupId: groupMembers.groupId })
-        .from(groupMembers)
-        .innerJoin(groups, eq(groups.id, groupMembers.groupId))
-        .where(
-          and(
-            eq(groupMembers.userId, userId),
-            isNull(groupMembers.removedAt),
-            isNull(groups.archivedAt),
-          ),
-        );
-      if (activeMemberships.length > 0) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "Leave all groups before deleting your account",
-        });
-      }
-
-      const entries = await ctx.db
-        .select()
-        .from(ledgerEntries)
-        .where(
-          or(
-            eq(ledgerEntries.debtorId, userId),
-            eq(ledgerEntries.creditorId, userId),
-          ),
-        );
-      const balances = new Map<string, bigint>();
-      for (const entry of entries) {
-        const key = `${entry.contextType}:${entry.contextId}:${entry.canonicalCurrency}`;
-        const signed =
-          entry.creditorId === userId
-            ? entry.canonicalAmountMinor
-            : -entry.canonicalAmountMinor;
-        balances.set(key, (balances.get(key) ?? 0n) + signed);
-      }
-      if ([...balances.values()].some((amount) => amount !== 0n)) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "Settle all balances before deleting your account",
-        });
-      }
-
       const tombstone = `deleted-${crypto.randomUUID()}@invalid.splidly`;
-      await ctx.db.transaction(async (tx) => {
+      return ctx.db.transaction(async (tx) => {
+        const activeMemberships = await tx
+          .select({ groupId: groupMembers.groupId })
+          .from(groupMembers)
+          .innerJoin(groups, eq(groups.id, groupMembers.groupId))
+          .where(
+            and(
+              eq(groupMembers.userId, userId),
+              isNull(groupMembers.removedAt),
+              isNull(groups.archivedAt),
+            ),
+          );
+        if (activeMemberships.length > 0 && !input.leaveGroups) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Leave all groups before deleting your account",
+          });
+        }
+
+        const entries = await tx
+          .select()
+          .from(ledgerEntries)
+          .where(
+            or(
+              eq(ledgerEntries.debtorId, userId),
+              eq(ledgerEntries.creditorId, userId),
+            ),
+          );
+        const balances = new Map<string, bigint>();
+        for (const entry of entries) {
+          const key = `${entry.contextType}:${entry.contextId}:${entry.canonicalCurrency}`;
+          const signed =
+            entry.creditorId === userId
+              ? entry.canonicalAmountMinor
+              : -entry.canonicalAmountMinor;
+          balances.set(key, (balances.get(key) ?? 0n) + signed);
+        }
+        if ([...balances.values()].some((amount) => amount !== 0n)) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Settle all balances before deleting your account",
+          });
+        }
+
+        const deletedAt = new Date();
+        const activeGroupIds = activeMemberships.map(
+          (membership) => membership.groupId,
+        );
+        if (input.leaveGroups && activeGroupIds.length > 0) {
+          const groupMemberships = await tx
+            .select({
+              groupId: groupMembers.groupId,
+              userId: groupMembers.userId,
+            })
+            .from(groupMembers)
+            .where(
+              and(
+                inArray(groupMembers.groupId, activeGroupIds),
+                isNull(groupMembers.removedAt),
+              ),
+            );
+          const groupsWithOtherMembers = new Set(
+            groupMemberships
+              .filter((membership) => membership.userId !== userId)
+              .map((membership) => membership.groupId),
+          );
+          const groupsToArchive = activeGroupIds.filter(
+            (groupId) => !groupsWithOtherMembers.has(groupId),
+          );
+          if (groupsToArchive.length > 0) {
+            await tx
+              .update(groups)
+              .set({
+                archivedAt: deletedAt,
+                updatedAt: deletedAt,
+                version: sql`${groups.version} + 1`,
+              })
+              .where(inArray(groups.id, groupsToArchive));
+          }
+          await tx
+            .update(groupMembers)
+            .set({ removedAt: deletedAt })
+            .where(
+              and(
+                eq(groupMembers.userId, userId),
+                inArray(groupMembers.groupId, activeGroupIds),
+                isNull(groupMembers.removedAt),
+              ),
+            );
+        }
+
         await tx.delete(invites).where(eq(invites.inviterId, userId));
         await tx.delete(sessions).where(eq(sessions.userId, userId));
         await tx.delete(accounts).where(eq(accounts.userId, userId));
@@ -116,8 +170,8 @@ export const profileRouter = router({
             displayName: "Deleted user",
             avatarUrl: null,
             onboardedAt: null,
-            deletedAt: new Date(),
-            updatedAt: new Date(),
+            deletedAt,
+            updatedAt: deletedAt,
           })
           .where(eq(profiles.userId, userId));
         await tx
@@ -126,10 +180,10 @@ export const profileRouter = router({
             name: "Deleted user",
             email: tombstone,
             image: null,
-            updatedAt: new Date(),
+            updatedAt: deletedAt,
           })
           .where(eq(users.id, userId));
+        return { deleted: true };
       });
-      return { deleted: true };
     }),
 });

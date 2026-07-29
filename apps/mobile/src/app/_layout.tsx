@@ -8,6 +8,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { useColorScheme } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { formSheetOptions } from "../lib/navigation";
 import { ApiProvider } from "../lib/trpc";
 import { useTheme } from "../theme";
 
@@ -26,7 +27,6 @@ function Navigation() {
           headerShadowVisible: false,
           contentStyle: { backgroundColor: theme.background },
           headerBackButtonDisplayMode: "minimal",
-          headerLargeTitleShadowVisible: false,
         }}
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
@@ -35,24 +35,43 @@ function Navigation() {
           name="onboarding"
           options={{
             headerShown: false,
-            presentation: "formSheet",
+            ...formSheetOptions(theme.sheet),
             sheetAllowedDetents: [0.62],
             sheetInitialDetentIndex: 0,
             sheetGrabberVisible: false,
             sheetCornerRadius: 30,
             gestureEnabled: false,
             headerBackButtonMenuEnabled: false,
-            contentStyle: { backgroundColor: theme.background },
           }}
         />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="expense/new" options={{ title: "New Expense", presentation: "formSheet" }} />
-        <Stack.Screen name="settlement/new" options={{ title: "Settle Up", presentation: "formSheet" }} />
+        <Stack.Screen
+          name="expense/new"
+          options={{
+            title: "New Expense",
+            ...formSheetOptions(theme.sheet),
+          }}
+        />
+        <Stack.Screen name="expense/[id]/index" options={{ title: "Expense" }} />
+        <Stack.Screen
+          name="expense/[id]/edit"
+          options={{
+            title: "Edit Expense",
+            ...formSheetOptions(theme.sheet),
+          }}
+        />
+        <Stack.Screen
+          name="settlement/new"
+          options={{
+            title: "Settle Up",
+            ...formSheetOptions(theme.sheet),
+          }}
+        />
         <Stack.Screen
           name="currency-picker"
           options={{
             title: "Currency",
-            presentation: "formSheet",
+            ...formSheetOptions(theme.sheet),
             sheetAllowedDetents: [1],
             sheetGrabberVisible: false,
           }}

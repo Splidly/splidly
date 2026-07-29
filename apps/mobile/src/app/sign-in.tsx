@@ -14,9 +14,10 @@ import {
   Screen,
 } from "../components/ui";
 import { authClient, signInAsDemo } from "../lib/auth-client";
+import { isAppleSignInCancellation } from "../lib/auth-errors";
 import { pendingInvite } from "../lib/pending-invite";
 import { api } from "../lib/trpc";
-import { spacing, useTheme } from "../theme";
+import { useTheme } from "../theme";
 
 GoogleSignin.configure({
   ...(process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
@@ -125,6 +126,7 @@ export default function SignInScreen() {
       }
       await finishSignIn();
     } catch (cause) {
+      if (isAppleSignInCancellation(cause)) return;
       setError(cause instanceof Error ? cause.message : "Apple sign-in failed");
     } finally {
       setBusy(false);
@@ -147,9 +149,9 @@ export default function SignInScreen() {
   return (
     <Screen
       bounces={false}
+      accountForTopInset
       contentContainerStyle={{
         justifyContent: "space-between",
-        paddingBottom: spacing.xl,
       }}
     >
       <View style={{ gap: 24 }}>

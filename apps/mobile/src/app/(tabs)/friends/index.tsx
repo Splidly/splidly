@@ -1,5 +1,5 @@
 import { Stack, router } from "expo-router";
-import { Share, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import {
   Avatar,
   BalanceText,
@@ -14,6 +14,7 @@ import {
   Section,
 } from "../../../components/ui";
 import { api } from "../../../lib/trpc";
+import { shareInvite } from "../../../lib/share-invite";
 import { useTheme } from "../../../theme";
 
 export default function FriendsScreen() {
@@ -21,11 +22,7 @@ export default function FriendsScreen() {
   const friends = api.friends.list.useQuery();
   const createInvite = api.invites.create.useMutation({
     onSuccess: (invite) =>
-      void Share.share({
-        title: "Join me on Splidly",
-        message: `Let’s track shared expenses on Splidly: ${invite.url}`,
-        url: invite.url,
-      }),
+      void shareInvite(invite.url),
   });
 
   return (

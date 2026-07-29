@@ -23,9 +23,12 @@ type SavedProfile = {
   homeCurrency: CurrencyCode;
 };
 
+const ACTIVE_GROUPS_ERROR = "Leave all groups before deleting your account";
+
 export default function ProfileScreen() {
   const theme = useTheme();
   const profile = api.profile.me.useQuery();
+  const groups = api.groups.list.useQuery();
   const utils = api.useUtils();
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
@@ -88,6 +91,11 @@ export default function ProfileScreen() {
       await authClient.signOut();
       router.replace("/sign-in");
     },
+    onError(error, input) {
+      if (!input.leaveGroups && error.message === ACTIVE_GROUPS_ERROR) {
+        confirmLeaveGroupsAndDelete();
+      }
+    },
   });
 
   async function signOut() {
@@ -96,16 +104,49 @@ export default function ProfileScreen() {
     router.replace("/sign-in");
   }
 
+  function deleteAccount(leaveGroups = false) {
+    remove.mutate({ confirmation: "DELETE", leaveGroups });
+  }
+
+  function confirmLeaveGroupsAndDelete() {
+    const groupCount = groups.data?.length;
+    const membershipDescription = groupCount
+      ? `You're still a member of ${groupCount} ${
+          groupCount === 1 ? "group" : "groups"
+        }.`
+      : "You're still a member of one or more groups.";
+    Alert.alert(
+      "Leave groups and delete account?",
+      `${membershipDescription} Splidly can leave them all and then permanently delete your account. All balances must be settled first.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Leave & Delete",
+          style: "destructive",
+          onPress: () => deleteAccount(true),
+        },
+      ],
+    );
+  }
+
+  function startAccountDeletion() {
+    if (groups.data && groups.data.length > 0) {
+      confirmLeaveGroupsAndDelete();
+      return;
+    }
+    deleteAccount();
+  }
+
   function confirmDelete() {
     Alert.alert(
       "Delete account?",
-      "All balances must be settled and all groups left. This cannot be undone.",
+      "All balances must be settled. This cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         {
           text: "Delete",
           style: "destructive",
-          onPress: () => remove.mutate({ confirmation: "DELETE" }),
+          onPress: startAccountDeletion,
         },
       ],
     );

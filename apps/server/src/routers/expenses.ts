@@ -6,18 +6,21 @@ import {
   financialRevisions,
   groupMembers,
   groups,
-  inArray,
   isNull,
   ledgerEntries,
   ledgerValuations,
+  profiles,
   rateSnapshots,
 } from "@splidly/db";
 import {
   allocateByWeights,
   expenseMutationSchema,
+  rateSnapshotSchema,
+  splitInputSchema,
   splitSourceAmount,
   type CurrencyCode,
   type ExpenseMutation,
+  type RateSnapshot,
 } from "@splidly/shared";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -51,6 +54,7 @@ interface PreparedExpense {
 async function prepareExpense(
   ctx: TrpcContext,
   input: ExpenseMutation,
+  fallbackRates: RateSnapshot[] = [],
 ): Promise<PreparedExpense> {
   const userId = ctx.session?.user.id;
   if (!userId) throw new TRPCError({ code: "UNAUTHORIZED" });
@@ -116,6 +120,7 @@ async function prepareExpense(
     targets,
     quoteId: input.quoteId,
     overrides: input.rateOverrides,
+    fallbackRates,
   });
   const canonicalTotal = convertWithRates(
     sourceAmount,
@@ -236,6 +241,102 @@ function revisionSnapshot(prepared: PreparedExpense) {
 }
 
 export const expensesRouter = router({
+  detail: protectedProcedure
+    .input(z.object({ expenseId: z.uuid() }))
+    .query(async ({ ctx, input }) => {
+      const [expense] = await ctx.db
+        .select()
+        .from(expenses)
+        .where(
+          and(
+            eq(expenses.id, input.expenseId),
+            isNull(expenses.deletedAt),
+          ),
+        )
+        .limit(1);
+      if (!expense) throw new TRPCError({ code: "NOT_FOUND" });
+
+      if (expense.groupId) {
+        await requireActiveGroupMember(
+          ctx.db,
+          expense.groupId,
+          ctx.session.user.id,
+        );
+      } else if (expense.friendshipId) {
+        await requireFriendshipParticipant(
+          ctx.db,
+          expense.friendshipId,
+          ctx.session.user.id,
+        );
+      } else {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      }
+
+      const splitRows = await ctx.db
+        .select({
+          userId: expenseSplits.userId,
+          sourceAmountMinor: expenseSplits.sourceAmountMinor,
+          displayName: profiles.displayName,
+          homeCurrency: profiles.homeCurrency,
+        })
+        .from(expenseSplits)
+        .innerJoin(profiles, eq(profiles.userId, expenseSplits.userId))
+        .where(eq(expenseSplits.expenseId, expense.id));
+      const [payer] = await ctx.db
+        .select({
+          userId: profiles.userId,
+          displayName: profiles.displayName,
+          homeCurrency: profiles.homeCurrency,
+        })
+        .from(profiles)
+        .where(eq(profiles.userId, expense.payerId))
+        .limit(1);
+      const storedRates = await ctx.db
+        .select()
+        .from(rateSnapshots)
+        .where(eq(rateSnapshots.expenseId, expense.id));
+      const rates = storedRates.map((rate) =>
+        rateSnapshotSchema.parse({
+          base: rate.base,
+          quote: rate.quote,
+          rate: rate.rate,
+          provider: rate.provider,
+          providerDate: rate.providerDate,
+          source: rate.source,
+        }),
+      );
+      const [revision] = await ctx.db
+        .select({ snapshot: financialRevisions.snapshot })
+        .from(financialRevisions)
+        .where(
+          and(
+            eq(financialRevisions.recordType, "expense"),
+            eq(financialRevisions.recordId, expense.id),
+            eq(financialRevisions.version, expense.version),
+          ),
+        )
+        .limit(1);
+      const storedSplit = splitInputSchema.safeParse(
+        revision?.snapshot["split"],
+      );
+
+      return {
+        expense,
+        payer: payer ?? null,
+        splits: splitRows,
+        rates,
+        split: storedSplit.success
+          ? storedSplit.data
+          : {
+              mode: "exact" as const,
+              shares: splitRows.map((row) => ({
+                userId: row.userId,
+                amountMinor: row.sourceAmountMinor.toString(),
+              })),
+            },
+      };
+    }),
+
   create: protectedProcedure
     .input(expenseMutationSchema)
     .mutation(async ({ ctx, input }) => {
@@ -317,7 +418,24 @@ export const expensesRouter = router({
           message: "An expense cannot be moved to a different ledger",
         });
       }
-      const prepared = await prepareExpense(ctx, input);
+      const existingRates = await ctx.db
+        .select()
+        .from(rateSnapshots)
+        .where(eq(rateSnapshots.expenseId, current.id));
+      const prepared = await prepareExpense(
+        ctx,
+        input,
+        existingRates.map((rate) =>
+          rateSnapshotSchema.parse({
+            base: rate.base,
+            quote: rate.quote,
+            rate: rate.rate,
+            provider: rate.provider,
+            providerDate: rate.providerDate,
+            source: rate.source,
+          }),
+        ),
+      );
       return ctx.db.transaction(async (tx) => {
         await reverseActiveEntries(tx, "expense", current.id);
         await tx.delete(expenseSplits).where(eq(expenseSplits.expenseId, current.id));

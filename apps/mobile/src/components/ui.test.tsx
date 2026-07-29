@@ -101,6 +101,60 @@ describe("Screen", () => {
     );
     expect(overflowingContentStyle.paddingBottom).toBe(16);
   });
+
+  it("uses the elevated sheet background without changing scroll behavior", async () => {
+    const view = await render(
+      <SafeAreaInsetsContext.Provider
+        value={{ top: 0, right: 0, bottom: 0, left: 0 }}
+      >
+        <Screen background="sheet">
+          <Text>Sheet content</Text>
+        </Screen>
+      </SafeAreaInsetsContext.Provider>,
+    );
+    const [scrollView] = view.container.queryAll(
+      (instance) =>
+        instance.props.contentInsetAdjustmentBehavior === "automatic",
+    );
+
+    expect(StyleSheet.flatten(scrollView?.props.style).backgroundColor).toBe(
+      "#FFFFFF",
+    );
+    expect(scrollView?.props.contentInsetAdjustmentBehavior).toBe("automatic");
+    expect(scrollView?.props.alwaysBounceVertical).toBe(true);
+  });
+
+  it("removes the native top inset from headerless viewport fill", async () => {
+    const view = await render(
+      <SafeAreaInsetsContext.Provider
+        value={{ top: 44, right: 0, bottom: 20, left: 0 }}
+      >
+        <Screen accountForTopInset bounces={false}>
+          <Text>Headerless content</Text>
+        </Screen>
+      </SafeAreaInsetsContext.Provider>,
+    );
+    const [scrollView] = view.container.queryAll(
+      (instance) =>
+        instance.props.contentInsetAdjustmentBehavior === "automatic",
+    );
+    if (!scrollView) throw new Error("ScrollView was not rendered");
+
+    await fireEvent(scrollView, "layout", {
+      nativeEvent: { layout: { height: 800 } },
+    });
+    const [resizedScrollView] = view.container.queryAll(
+      (instance) =>
+        instance.props.contentInsetAdjustmentBehavior === "automatic",
+    );
+    const contentStyle = StyleSheet.flatten(
+      resizedScrollView?.props.contentContainerStyle,
+    );
+
+    expect(contentStyle.minHeight).toBe(736);
+    expect(resizedScrollView?.props.bounces).toBe(false);
+    expect(resizedScrollView?.props.scrollEnabled).toBeUndefined();
+  });
 });
 
 describe("CollectionScreen", () => {

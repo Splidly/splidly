@@ -130,6 +130,7 @@ export const groups = pgTable("expense_group", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   currency: text("currency").notNull(),
+  simplifyDebts: boolean("simplify_debts").notNull().default(true),
   createdBy: text("created_by")
     .notNull()
     .references(() => users.id),

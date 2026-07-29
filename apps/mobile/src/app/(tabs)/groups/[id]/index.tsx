@@ -1,56 +1,83 @@
-import type { CurrencyCode } from "@splidly/shared";
-import { Stack, router, useLocalSearchParams } from "expo-router";
+import { formatMinor, type CurrencyCode } from "@splidly/shared";
+import { Stack, router, useLocalSearchParams, type Href } from "expo-router";
 import { Alert, Text, View } from "react-native";
 import {
   Avatar,
-  BalanceText,
   EmptyState,
   ErrorState,
   HeaderButton,
   ListRow,
   LoadingState,
-  MoneyValue,
   PrimaryButton,
   RowDivider,
   Screen,
   Section,
 } from "../../../../components/ui";
 import { api } from "../../../../lib/trpc";
+import { groupBalanceLines } from "../../../../lib/group-balance-summary";
 import { useTheme } from "../../../../theme";
 
 export default function GroupDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const theme = useTheme();
   const detail = api.groups.detail.useQuery({ groupId: id });
-  const groupList = api.groups.list.useQuery();
-  if (detail.isPending || groupList.isPending) {
+  if (detail.isPending) {
     return <Screen><LoadingState /></Screen>;
   }
   if (detail.error || !detail.data) {
     return <Screen><ErrorState message={detail.error?.message} /></Screen>;
   }
-  const { group, members, expenses } = detail.data;
-  const summary = groupList.data?.find((item) => item.id === group.id);
+  const { group, members, memberBalances, expenses } = detail.data;
+  const balanceLines = groupBalanceLines(
+    memberBalances,
+    members.length,
+    group.currency,
+  );
   return (
     <>
       <Screen>
-        <View style={{ alignItems: "center", gap: 9, paddingVertical: 8 }}>
-          <Avatar name={group.name} size={76} variant="group" />
-          <Text
-            style={{
-              color: theme.text,
-              fontSize: 28,
-              fontWeight: "700",
-              letterSpacing: -0.6,
-            }}
-          >
-            {group.name}
-          </Text>
-          <Text style={{ color: theme.muted }}>
-            {members.length} {members.length === 1 ? "member" : "members"} ·{" "}
-            {group.currency}
-          </Text>
-          {summary ? <BalanceText value={summary.balance} size="large" /> : null}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 14,
+            paddingVertical: 2,
+          }}
+        >
+          <Avatar name={group.name} size={58} variant="group" />
+          <View style={{ flex: 1, gap: 3 }}>
+            <Text
+              numberOfLines={1}
+              style={{
+                color: theme.text,
+                fontSize: 24,
+                fontWeight: "700",
+                letterSpacing: -0.5,
+              }}
+            >
+              {group.name}
+            </Text>
+            {balanceLines.map((line) => (
+              <Text
+                key={line.key}
+                selectable
+                numberOfLines={1}
+                style={{
+                  color:
+                    line.tone === "positive"
+                      ? theme.positive
+                      : line.tone === "negative"
+                        ? theme.negative
+                        : theme.muted,
+                  fontSize: 13,
+                  fontWeight: line.tone === "muted" ? "400" : "500",
+                  fontVariant: ["tabular-nums"],
+                }}
+              >
+                {line.text}
+              </Text>
+            ))}
+          </View>
         </View>
         <View style={{ flexDirection: "row", gap: 10 }}>
           <View style={{ flex: 1 }}>
@@ -93,11 +120,12 @@ export default function GroupDetailScreen() {
                     undefined,
                     { dateStyle: "medium" },
                   )}
-                  trailing={
-                    <MoneyValue
-                      minor={expense.sourceAmountMinor}
-                      currency={expense.sourceCurrency as CurrencyCode}
-                    />
+                  value={`${formatMinor(
+                    expense.sourceAmountMinor,
+                    expense.sourceCurrency as CurrencyCode,
+                  )} ${expense.sourceCurrency}`}
+                  onPress={() =>
+                    router.push(`/expense/${expense.id}` as Href)
                   }
                 />
               </View>

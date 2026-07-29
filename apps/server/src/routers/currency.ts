@@ -52,7 +52,7 @@ export const currencyRouter = router({
           throw new TRPCError({
             code: "BAD_GATEWAY",
             message:
-              "No fresh exchange rate is available. Enter all rates manually.",
+              "No fresh exchange rate is available. Try again shortly.",
           });
         }
         if (!response.ok) {
@@ -112,4 +112,3 @@ export const currencyRouter = router({
       };
     }),
 });
-

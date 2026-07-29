@@ -1,0 +1,30 @@
+diff --git a/ios/RNSScreenStackHeaderConfig.mm b/ios/RNSScreenStackHeaderConfig.mm
+index 1c844846a5c66e31cfa530ca462774d2fb6bbea1..88770e678ebdfe0a4c20c86a8d433f61ebf81e45 100644
+--- a/ios/RNSScreenStackHeaderConfig.mm
++++ b/ios/RNSScreenStackHeaderConfig.mm
+@@ -518,11 +518,22 @@ + (void)updateViewController:(UIViewController *)vc
+ #if !TARGET_OS_TV
+   [config configureBackItem:prevItem withPrevVC:prevVC];
+ 
+-  if (config.largeTitle) {
++  // Expo Router does not expose UIKit's inline-large display mode. An explicit
++  // large-title font size while collapsible large titles are disabled is used
++  // as the opt-in signal so the JS navigator never enters its large-header
++  // scroll-inset path.
++  BOOL inlineLargeTitle = !config.largeTitle && config.largeTitleFontSize != nil;
++  if (config.largeTitle || inlineLargeTitle) {
+     navctr.navigationBar.prefersLargeTitles = YES;
+   }
+-  navitem.largeTitleDisplayMode =
+-      config.largeTitle ? UINavigationItemLargeTitleDisplayModeAlways : UINavigationItemLargeTitleDisplayModeNever;
++  if (@available(iOS 17.0, *)) {
++    navitem.largeTitleDisplayMode = inlineLargeTitle ? UINavigationItemLargeTitleDisplayModeInline
++        : config.largeTitle ? UINavigationItemLargeTitleDisplayModeAlways
++                            : UINavigationItemLargeTitleDisplayModeNever;
++  } else {
++    navitem.largeTitleDisplayMode = config.largeTitle ? UINavigationItemLargeTitleDisplayModeAlways
++                                                      : UINavigationItemLargeTitleDisplayModeNever;
++  }
+ #endif
+ 
+   UINavigationBarAppearance *appearance = [self buildAppearance:vc withConfig:config];

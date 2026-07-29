@@ -8,6 +8,21 @@ Scrolling in `apps/mobile` is deliberately centralized. Treat the behavior in
 route-local `ScrollView` unless the screen has requirements these components
 cannot support.
 
+## Never use iOS simulators
+
+Never use an iOS Simulator for this project. Simulator processes severely
+degrade the developer machine's performance.
+
+- Do not run `xcrun simctl` commands.
+- Do not boot, open, inspect, or interact with an iOS Simulator.
+- Do not launch an Expo or native iOS build against a simulator.
+- Do not perform simulator-based visual checks, screenshots, or tests.
+- Do not request permission to access simulator services.
+
+Use static checks, unit tests, typechecking, and native platform exports
+instead. Leave any visual verification that requires a running iOS app for the
+user to perform on a physical device.
+
 Every mobile screen must satisfy all of the following:
 
 - Content longer than the viewport scrolls completely above the floating native
@@ -117,8 +132,9 @@ apps/mobile/node_modules/.bin/jest --config apps/mobile/package.json --runInBand
 git diff --check
 ```
 
-For changes affecting layout or navigation, also export both native platforms
-and manually check at least:
+For changes affecting layout or navigation, also export both native platforms.
+Never use an iOS Simulator for manual verification. Tell the user that the
+following visual checks remain for a physical device:
 
 - a short group overview;
 - a long Groups list;

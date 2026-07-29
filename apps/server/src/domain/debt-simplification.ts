@@ -1,0 +1,129 @@
+export type LedgerAmount = {
+  debtorId: string;
+  creditorId: string;
+  canonicalAmountMinor: bigint;
+};
+
+export type RepaymentTransfer = {
+  fromUserId: string;
+  toUserId: string;
+  amountMinor: bigint;
+};
+
+function netBalances(entries: LedgerAmount[]) {
+  const balances = new Map<string, bigint>();
+  for (const entry of entries) {
+    balances.set(
+      entry.debtorId,
+      (balances.get(entry.debtorId) ?? 0n) - entry.canonicalAmountMinor,
+    );
+    balances.set(
+      entry.creditorId,
+      (balances.get(entry.creditorId) ?? 0n) + entry.canonicalAmountMinor,
+    );
+  }
+  return [...balances]
+    .filter(([, amountMinor]) => amountMinor !== 0n)
+    .map(([userId, amountMinor]) => ({ userId, amountMinor }))
+    .sort((left, right) => left.userId.localeCompare(right.userId));
+}
+
+function simplifiedTransfers(entries: LedgerAmount[]): RepaymentTransfer[] {
+  const balances = netBalances(entries);
+  const amounts = balances.map((balance) => balance.amountMinor);
+  const memo = new Map<string, RepaymentTransfer[]>();
+
+  function settle(): RepaymentTransfer[] {
+    const key = amounts.join(",");
+    const cached = memo.get(key);
+    if (cached) return cached;
+
+    if (amounts.every((amount) => amount === 0n)) return [];
+
+    let best: RepaymentTransfer[] | undefined;
+    const seenTransitions = new Set<string>();
+    for (let debtor = 0; debtor < amounts.length; debtor += 1) {
+      const debt = amounts[debtor] ?? 0n;
+      if (debt >= 0n) continue;
+      for (let creditor = 0; creditor < amounts.length; creditor += 1) {
+        const credit = amounts[creditor] ?? 0n;
+        if (credit <= 0n) continue;
+        const transitionKey = `${debt}:${credit}`;
+        if (seenTransitions.has(transitionKey)) continue;
+        seenTransitions.add(transitionKey);
+
+        const payment = -debt < credit ? -debt : credit;
+        amounts[debtor] = debt + payment;
+        amounts[creditor] = credit - payment;
+        const candidate = [
+          {
+            fromUserId: balances[debtor]!.userId,
+            toUserId: balances[creditor]!.userId,
+            amountMinor: payment,
+          },
+          ...settle(),
+        ];
+        if (!best || candidate.length < best.length) best = candidate;
+        amounts[debtor] = debt;
+        amounts[creditor] = credit;
+      }
+    }
+
+    const result = best ?? [];
+    memo.set(key, result);
+    return result;
+  }
+
+  return settle();
+}
+
+function pairwiseTransfers(entries: LedgerAmount[]): RepaymentTransfer[] {
+  const pairs = new Map<
+    string,
+    { lowId: string; highId: string; lowOwesHighMinor: bigint }
+  >();
+  for (const entry of entries) {
+    const [lowId, highId] = [entry.debtorId, entry.creditorId].sort();
+    if (!lowId || !highId || lowId === highId) continue;
+    const key = `${lowId}\u0000${highId}`;
+    const pair = pairs.get(key) ?? {
+      lowId,
+      highId,
+      lowOwesHighMinor: 0n,
+    };
+    pair.lowOwesHighMinor +=
+      entry.debtorId === lowId
+        ? entry.canonicalAmountMinor
+        : -entry.canonicalAmountMinor;
+    pairs.set(key, pair);
+  }
+  return [...pairs.values()]
+    .filter((pair) => pair.lowOwesHighMinor !== 0n)
+    .sort((left, right) =>
+      `${left.lowId}\u0000${left.highId}`.localeCompare(
+        `${right.lowId}\u0000${right.highId}`,
+      ),
+    )
+    .map((pair) =>
+      pair.lowOwesHighMinor > 0n
+        ? {
+            fromUserId: pair.lowId,
+            toUserId: pair.highId,
+            amountMinor: pair.lowOwesHighMinor,
+          }
+        : {
+            fromUserId: pair.highId,
+            toUserId: pair.lowId,
+            amountMinor: -pair.lowOwesHighMinor,
+          },
+    );
+}
+
+export function repaymentPlan(
+  entries: LedgerAmount[],
+  simplifyDebts: boolean,
+): RepaymentTransfer[] {
+  return simplifyDebts
+    ? simplifiedTransfers(entries)
+    : pairwiseTransfers(entries);
+}
