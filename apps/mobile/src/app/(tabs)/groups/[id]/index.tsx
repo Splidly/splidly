@@ -1,10 +1,11 @@
 import { formatMinor, type CurrencyCode } from "@splidly/shared";
 import { Stack, router, useLocalSearchParams, type Href } from "expo-router";
-import { Alert, Text, View } from "react-native";
+import { Alert, Text, View, useColorScheme } from "react-native";
 import {
   normalizeGroupIconKey,
 } from "../../../../components/group-icon";
 import { GroupSummaryHeader } from "../../../../components/group-summary-header";
+import { ExpenseIcon } from "../../../../components/expense-icon";
 import {
   Avatar,
   EmptyState,
@@ -19,11 +20,13 @@ import {
 } from "../../../../components/ui";
 import { api } from "../../../../lib/trpc";
 import { groupBalanceLines } from "../../../../lib/group-balance-summary";
+import { groupActionColorsFor } from "../../../../lib/group-colors";
 import { useTheme } from "../../../../theme";
 
 export default function GroupDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const theme = useTheme();
+  const colorScheme = useColorScheme() === "dark" ? "dark" : "light";
   const detail = api.groups.detail.useQuery({ groupId: id });
   if (detail.isPending) {
     return <Screen><LoadingState /></Screen>;
@@ -37,6 +40,11 @@ export default function GroupDetailScreen() {
     members.length,
     group.currency,
   );
+  const actionColors = groupActionColorsFor(
+    group.color,
+    group.id,
+    colorScheme,
+  );
   return (
     <>
       <Screen>
@@ -44,12 +52,15 @@ export default function GroupDetailScreen() {
           iconKey={normalizeGroupIconKey(group.iconKey)}
           name={group.name}
           colorKey={group.id}
+          color={group.color}
           lines={balanceLines}
         />
         <View style={{ flexDirection: "row", gap: 10 }}>
           <View style={{ flex: 1 }}>
             <PrimaryButton
               label="Add expense"
+              backgroundColor={actionColors.primaryBackground}
+              foregroundColor={actionColors.primaryForeground}
               onPress={() =>
                 router.push({
                   pathname: "/expense/new",
@@ -62,6 +73,8 @@ export default function GroupDetailScreen() {
             <PrimaryButton
               label="Statistics"
               tone="secondary"
+              backgroundColor={actionColors.secondaryBackground}
+              foregroundColor={actionColors.secondaryForeground}
               onPress={() =>
                 Alert.alert(
                   "Statistics",
@@ -142,6 +155,13 @@ export default function GroupDetailScreen() {
                     expense.sourceAmountMinor,
                     expense.sourceCurrency as CurrencyCode,
                   )} ${expense.sourceCurrency}`}
+                  leading={
+                    <ExpenseIcon
+                      iconKey={expense.iconKey}
+                      name={expense.description}
+                      useNameFallback={!expense.iconManuallySet}
+                    />
+                  }
                   onPress={() =>
                     router.push(`/expense/${expense.id}` as Href)
                   }

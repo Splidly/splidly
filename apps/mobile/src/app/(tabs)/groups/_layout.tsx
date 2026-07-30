@@ -2,6 +2,7 @@ import { Stack } from "expo-router";
 import {
   formSheetOptions,
   inlineLargeTitleOptions,
+  nativeHeaderOptions,
 } from "../../../lib/navigation";
 import { useTheme } from "../../../theme";
 
@@ -10,7 +11,7 @@ export default function GroupsStackLayout() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: theme.background },
+        ...nativeHeaderOptions(theme.background),
         headerTintColor: theme.text,
         headerShadowVisible: false,
         contentStyle: { backgroundColor: theme.background },

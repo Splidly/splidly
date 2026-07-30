@@ -8,7 +8,10 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { useColorScheme } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { formSheetOptions } from "../lib/navigation";
+import {
+  formSheetOptions,
+  nativeHeaderOptions,
+} from "../lib/navigation";
 import { ApiProvider } from "../lib/trpc";
 import { useTheme } from "../theme";
 
@@ -22,7 +25,7 @@ function Navigation() {
       <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: theme.background },
+          ...nativeHeaderOptions(theme.background),
           headerTintColor: theme.text,
           headerShadowVisible: false,
           contentStyle: { backgroundColor: theme.background },

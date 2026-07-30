@@ -30,6 +30,8 @@ jest.mock("../lib/trpc", () => ({
             group: {
               id: "group-1",
               name: "Lisbon",
+              iconKey: "trip",
+              color: "#1764B0",
               currency: "EUR",
             },
             members: [

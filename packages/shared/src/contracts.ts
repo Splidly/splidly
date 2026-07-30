@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { expenseIconKeys } from "./expense-icons";
 
 export const currencyCodeSchema = z
   .string()
@@ -28,6 +29,34 @@ export const groupIconKeys = [
 export const groupIconKeySchema = z.enum(groupIconKeys);
 
 export type GroupIconKey = z.infer<typeof groupIconKeySchema>;
+
+export const groupColorPresets = [
+  "#4745B8",
+  "#1764B0",
+  "#00749A",
+  "#087867",
+  "#237A43",
+  "#5D761E",
+  "#8A6500",
+  "#A65300",
+  "#B0442D",
+  "#B7373C",
+  "#A93668",
+  "#923F83",
+  "#7142AE",
+  "#5E4DB3",
+  "#7A5634",
+  "#526675",
+] as const;
+
+export const groupColorSchema = z
+  .string()
+  .regex(/^#[0-9A-Fa-f]{6}$/, "Use a six-digit hexadecimal color")
+  .transform((value) => value.toUpperCase());
+
+export type GroupColor = z.infer<typeof groupColorSchema>;
+
+export const expenseIconKeySchema = z.enum(expenseIconKeys);
 
 export const moneySchema = z.object({
   currency: currencyCodeSchema,
@@ -101,6 +130,8 @@ export const expenseMutationSchema = z.object({
   clientMutationId: z.uuid(),
   expectedVersion: z.number().int().positive().optional(),
   description: z.string().trim().min(1).max(160),
+  iconKey: expenseIconKeySchema.optional(),
+  iconManuallySet: z.boolean().default(false),
   notes: z.string().trim().max(2_000).default(""),
   occurredAt: z.iso.datetime(),
   payerId: z.string().min(1),

@@ -1,11 +1,13 @@
 import type {
   CurrencyCode,
+  GroupColor,
   GroupIconKey,
 } from "@splidly/shared";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { CurrencyField } from "../../../../components/currency-field";
+import { GroupColorPicker } from "../../../../components/group-color-picker";
 import {
   GroupIconPicker,
   normalizeGroupIconKey,
@@ -20,6 +22,9 @@ import {
   SheetCloseButton,
 } from "../../../../components/ui";
 import { api } from "../../../../lib/trpc";
+import {
+  normalizeGroupColor,
+} from "../../../../lib/group-colors";
 import { spacing, useTheme } from "../../../../theme";
 
 export default function EditGroupScreen() {
@@ -30,12 +35,14 @@ export default function EditGroupScreen() {
   const group = detail.data?.group;
   const [name, setName] = useState("");
   const [iconKey, setIconKey] = useState<GroupIconKey>("default");
+  const [color, setColor] = useState<GroupColor>("#4745B8");
   const [currency, setCurrency] = useState<CurrencyCode>("EUR");
 
   useEffect(() => {
     if (!group) return;
     setName(group.name);
     setIconKey(normalizeGroupIconKey(group.iconKey));
+    setColor(normalizeGroupColor(group.color, group.id));
     setCurrency(group.currency as CurrencyCode);
   }, [group?.id, group?.version]);
 
@@ -72,7 +79,6 @@ export default function EditGroupScreen() {
 
   return (
     <Screen
-      scroll={false}
       background="sheet"
       contentContainerStyle={styles.content}
     >
@@ -91,21 +97,26 @@ export default function EditGroupScreen() {
         </Text>
       </View>
 
+      <GroupColorPicker value={color} onValueChange={setColor} />
+
       <FormSection footer="The accounting currency locks after the first expense or settlement.">
         <Field
-          label="Name"
           leading={
             <GroupIconPicker
               value={iconKey}
               onValueChange={setIconKey}
               name={name || group.name}
               colorKey={group.id}
+              color={color}
             />
           }
           value={name}
           onChangeText={setName}
+          accessibilityLabel="Group name"
+          placeholder="Group name"
           returnKeyType="done"
           submitBehavior="blurAndSubmit"
+          style={styles.nameInput}
         />
         <CurrencyField
           label="Currency"
@@ -124,6 +135,7 @@ export default function EditGroupScreen() {
               expectedVersion: group.version,
               name: name.trim(),
               iconKey,
+              color,
               currency,
               simplifyDebts: group.simplifyDebts,
             })
@@ -138,7 +150,7 @@ export default function EditGroupScreen() {
 const styles = StyleSheet.create({
   content: {
     paddingTop: spacing.xl,
-    gap: spacing.xl,
+    gap: spacing.lg,
   },
   hero: {
     alignItems: "center",
@@ -160,5 +172,8 @@ const styles = StyleSheet.create({
   },
   footer: {
     gap: spacing.sm,
+  },
+  nameInput: {
+    textAlign: "left",
   },
 });

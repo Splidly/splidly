@@ -1,8 +1,10 @@
 import { act, fireEvent, render } from "@testing-library/react-native";
+import type { ReactNode } from "react";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import { ExpenseEditor } from "./expense-editor";
 
 const mockQuote = jest.fn();
+const mockCreateExpense = jest.fn();
 
 jest.mock("expo-crypto", () => ({
   randomUUID: () => "00000000-0000-4000-8000-000000000000",
@@ -23,6 +25,19 @@ jest.mock("expo-router", () => {
       Screen,
       Toolbar,
     },
+  };
+});
+
+jest.mock("@expo/ui/community/menu", () => {
+  const { View } = require("react-native") as typeof import("react-native");
+  return {
+    MenuView: ({
+      children,
+      ...props
+    }: {
+      children: ReactNode;
+      [key: string]: unknown;
+    }) => <View {...props}>{children}</View>,
   };
 });
 
@@ -113,7 +128,7 @@ jest.mock("../lib/trpc", () => ({
         useMutation: () => ({
           error: null,
           isPending: false,
-          mutate: jest.fn(),
+          mutate: mockCreateExpense,
         }),
       },
       update: {
@@ -162,10 +177,11 @@ function renderEditor() {
   );
 }
 
-describe("ExpenseEditor automatic conversion preview", () => {
+describe("ExpenseEditor", () => {
   beforeEach(() => {
     jest.useFakeTimers();
     mockQuote.mockReset();
+    mockCreateExpense.mockReset();
     mockQuote.mockResolvedValue({
       id: "22222222-2222-4222-8222-222222222222",
       expiresAt: "2026-07-28T22:00:00.000Z",
@@ -218,5 +234,98 @@ describe("ExpenseEditor automatic conversion preview", () => {
     expect(view.getByText("≈ 12.50 USD")).toBeTruthy();
     expect(view.getByText(/1 EUR = 1.25 USD/)).toBeTruthy();
     expect(view.queryByText("Frozen exchange rates")).toBeNull();
+  });
+
+  it("updates the expense icon while the description is entered", async () => {
+    const view = await renderEditor();
+    await act(async () => {});
+    const description = view.getByLabelText("Description");
+
+    expect(
+      view.getByLabelText("Change expense category. Automatic: Other"),
+    ).toBeTruthy();
+
+    await fireEvent.changeText(description, "Warmmiete Juli");
+    expect(
+      view.getByLabelText("Change expense category. Automatic: Housing"),
+    ).toBeTruthy();
+
+    await fireEvent.changeText(description, "Dinner im Restaurant");
+    expect(
+      view.getByLabelText("Change expense category. Automatic: Dining"),
+    ).toBeTruthy();
+  });
+
+  it("keeps a manual category until automatic detection is restored", async () => {
+    const view = await renderEditor();
+    await act(async () => {});
+    const description = view.getByLabelText("Description");
+    const picker = view.getByTestId("expense-icon-picker");
+
+    await fireEvent.changeText(description, "Warmmiete Juli");
+    await fireEvent(picker, "pressAction", {
+      nativeEvent: { event: "travel" },
+    });
+
+    expect(
+      view.getByLabelText("Change expense category. Travel"),
+    ).toBeTruthy();
+
+    await fireEvent.changeText(description, "Dinner im Restaurant");
+    expect(
+      view.getByLabelText("Change expense category. Travel"),
+    ).toBeTruthy();
+
+    await fireEvent(
+      view.getByTestId("expense-icon-picker"),
+      "pressAction",
+      {
+        nativeEvent: { event: "other" },
+      },
+    );
+    expect(
+      view.getByLabelText("Change expense category. Other"),
+    ).toBeTruthy();
+
+    await fireEvent(
+      view.getByTestId("expense-icon-picker"),
+      "pressAction",
+      {
+        nativeEvent: { event: "automatic" },
+      },
+    );
+    expect(
+      view.getByLabelText("Change expense category. Automatic: Dining"),
+    ).toBeTruthy();
+  });
+
+  it("submits the manual category as a persistent override", async () => {
+    const view = await renderEditor();
+    await act(async () => {});
+
+    await fireEvent.changeText(
+      view.getByLabelText("Description"),
+      "Warmmiete",
+    );
+    await fireEvent.changeText(view.getByLabelText("Amount"), "10.00");
+    await fireEvent(
+      view.getByTestId("expense-icon-picker"),
+      "pressAction",
+      {
+        nativeEvent: { event: "travel" },
+      },
+    );
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(450);
+    });
+    await fireEvent.press(view.getByText("Save expense"));
+
+    expect(mockCreateExpense).toHaveBeenCalledWith(
+      expect.objectContaining({
+        description: "Warmmiete",
+        iconKey: "travel",
+        iconManuallySet: true,
+      }),
+    );
   });
 });

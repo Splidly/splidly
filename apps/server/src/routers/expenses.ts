@@ -14,11 +14,13 @@ import {
 } from "@splidly/db";
 import {
   allocateByWeights,
+  detectExpenseIconKey,
   expenseMutationSchema,
   rateSnapshotSchema,
   splitInputSchema,
   splitSourceAmount,
   type CurrencyCode,
+  type ExpenseIconKey,
   type ExpenseMutation,
   type RateSnapshot,
 } from "@splidly/shared";
@@ -43,6 +45,8 @@ import {
 
 interface PreparedExpense {
   input: ExpenseMutation;
+  iconKey: ExpenseIconKey;
+  iconManuallySet: boolean;
   contextId: string;
   canonicalCurrency: CurrencyCode;
   sourceShares: Map<string, bigint>;
@@ -139,9 +143,12 @@ async function prepareExpense(
       canonicalAmounts[index] ?? 0n,
     ]),
   );
+  const manualIconKey = input.iconManuallySet ? input.iconKey : undefined;
 
   return {
     input,
+    iconKey: manualIconKey ?? detectExpenseIconKey(input.description),
+    iconManuallySet: manualIconKey !== undefined,
     contextId,
     canonicalCurrency,
     sourceShares,
@@ -231,6 +238,8 @@ function revisionSnapshot(prepared: PreparedExpense) {
   return {
     context: prepared.input.context,
     description: prepared.input.description,
+    iconKey: prepared.iconKey,
+    iconManuallySet: prepared.iconManuallySet,
     notes: prepared.input.notes,
     occurredAt: prepared.input.occurredAt,
     payerId: prepared.input.payerId,
@@ -366,6 +375,8 @@ export const expensesRouter = router({
             createdBy: ctx.session.user.id,
             payerId: input.payerId,
             description: input.description,
+            iconKey: prepared.iconKey,
+            iconManuallySet: prepared.iconManuallySet,
             notes: input.notes,
             occurredAt: new Date(input.occurredAt),
             sourceCurrency: input.amount.currency,
@@ -452,6 +463,8 @@ export const expensesRouter = router({
                 : null,
             payerId: input.payerId,
             description: input.description,
+            iconKey: prepared.iconKey,
+            iconManuallySet: prepared.iconManuallySet,
             notes: input.notes,
             occurredAt: new Date(input.occurredAt),
             sourceCurrency: input.amount.currency,

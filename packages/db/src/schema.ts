@@ -1,3 +1,4 @@
+import type { ExpenseIconKey } from "@splidly/shared";
 import {
   bigint,
   boolean,
@@ -130,6 +131,7 @@ export const groups = pgTable("expense_group", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   iconKey: text("icon_key").notNull().default("default"),
+  color: text("color").notNull().default("#4745B8"),
   currency: text("currency").notNull(),
   simplifyDebts: boolean("simplify_debts").notNull().default(true),
   createdBy: text("created_by")
@@ -223,6 +225,11 @@ export const expenses = pgTable(
       .notNull()
       .references(() => users.id),
     description: text("description").notNull(),
+    iconKey: text("icon_key")
+      .$type<ExpenseIconKey>()
+      .notNull()
+      .default("other"),
+    iconManuallySet: boolean("icon_manually_set").notNull().default(false),
     notes: text("notes").notNull().default(""),
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
     sourceCurrency: text("source_currency").notNull(),

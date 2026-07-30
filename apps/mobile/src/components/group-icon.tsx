@@ -8,7 +8,7 @@ import {
   type MenuAction,
 } from "@expo/ui/community/menu";
 import { StyleSheet, useColorScheme, View } from "react-native";
-import { avatarColorsFor } from "../lib/avatar-colors";
+import { groupIconColorsFor } from "../lib/group-colors";
 
 const groupIconOptions = [
   {
@@ -156,10 +156,15 @@ export function normalizeGroupIconKey(value: unknown): GroupIconKey {
     : "default";
 }
 
+export function groupIconGlyphSize(iconKey: GroupIconKey, size: number) {
+  return Math.round(size * (iconKey === "default" ? 0.41 : 0.49));
+}
+
 export function GroupIcon({
   iconKey,
   name,
   colorKey,
+  color,
   size = 44,
   accessibilityRole,
   accessibilityLabel,
@@ -167,17 +172,19 @@ export function GroupIcon({
   iconKey: GroupIconKey;
   name: string;
   colorKey?: string | undefined;
+  color?: string | null | undefined;
   size?: number;
   accessibilityRole?: "button" | "image";
   accessibilityLabel?: string;
 }) {
   const colorScheme = useColorScheme() === "dark" ? "dark" : "light";
-  const colors = avatarColorsFor(
-    `group:${colorKey ?? name.trim().toLowerCase()}`,
+  const colors = groupIconColorsFor(
+    color,
+    colorKey ?? name.trim().toLowerCase(),
     colorScheme,
   );
   const option = optionsByKey.get(iconKey) ?? groupIconOptions[0];
-  const glyphSize = Math.round(size * 0.49);
+  const glyphSize = groupIconGlyphSize(iconKey, size);
 
   return (
     <View
@@ -215,12 +222,14 @@ export function GroupIconPicker({
   onValueChange,
   name,
   colorKey,
+  color,
   size = 44,
 }: {
   value: GroupIconKey;
   onValueChange: (value: GroupIconKey) => void;
   name: string;
   colorKey?: string | undefined;
+  color?: string | null | undefined;
   size?: number;
 }) {
   const actions: MenuAction[] = groupIconOptions.map((option) => ({
@@ -244,6 +253,7 @@ export function GroupIconPicker({
         iconKey={value}
         name={name}
         colorKey={colorKey}
+        color={color}
         size={size}
         accessibilityRole="button"
         accessibilityLabel="Change group icon"

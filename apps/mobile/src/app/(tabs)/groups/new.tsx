@@ -1,11 +1,13 @@
 import type {
   CurrencyCode,
+  GroupColor,
   GroupIconKey,
 } from "@splidly/shared";
 import { router } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { CurrencyField } from "../../../components/currency-field";
+import { GroupColorPicker } from "../../../components/group-color-picker";
 import { GroupIconPicker } from "../../../components/group-icon";
 import {
   ErrorState,
@@ -16,6 +18,7 @@ import {
   SheetCloseButton,
 } from "../../../components/ui";
 import { api } from "../../../lib/trpc";
+import { randomGroupColor } from "../../../lib/group-colors";
 import { spacing, useTheme } from "../../../theme";
 
 export default function NewGroupScreen() {
@@ -24,6 +27,7 @@ export default function NewGroupScreen() {
   const utils = api.useUtils();
   const [name, setName] = useState("");
   const [iconKey, setIconKey] = useState<GroupIconKey>("default");
+  const [color, setColor] = useState<GroupColor>(() => randomGroupColor());
   const [currency, setCurrency] = useState<CurrencyCode>();
   const create = api.groups.create.useMutation({
     async onSuccess(group) {
@@ -39,7 +43,6 @@ export default function NewGroupScreen() {
 
   return (
     <Screen
-      scroll={false}
       background="sheet"
       contentContainerStyle={styles.content}
     >
@@ -60,22 +63,26 @@ export default function NewGroupScreen() {
         </View>
       </View>
 
+      <GroupColorPicker value={color} onValueChange={setColor} />
+
       <FormSection footer="The accounting currency locks after the first expense or settlement.">
         <Field
-          label="Name"
           leading={
             <GroupIconPicker
               value={iconKey}
               onValueChange={setIconKey}
               name={name || "New group"}
               colorKey="new-group"
+              color={color}
             />
           }
           value={name}
           onChangeText={setName}
-          placeholder="Lisbon weekend"
+          accessibilityLabel="Group name"
+          placeholder="Group name"
           returnKeyType="done"
           submitBehavior="blurAndSubmit"
+          style={styles.nameInput}
         />
         <CurrencyField
           label="Currency"
@@ -92,6 +99,7 @@ export default function NewGroupScreen() {
             create.mutate({
               name: name.trim(),
               iconKey,
+              color,
               currency: selectedCurrency,
             })
           }
@@ -105,7 +113,7 @@ export default function NewGroupScreen() {
 const styles = StyleSheet.create({
   content: {
     paddingTop: spacing.xl,
-    gap: spacing.xl,
+    gap: spacing.lg,
   },
   hero: {
     alignItems: "center",
@@ -131,5 +139,8 @@ const styles = StyleSheet.create({
   },
   footer: {
     gap: spacing.sm,
+  },
+  nameInput: {
+    textAlign: "left",
   },
 });

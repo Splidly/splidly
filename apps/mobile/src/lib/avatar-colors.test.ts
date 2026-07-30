@@ -1,4 +1,8 @@
-import { avatarColorOptions, avatarColorsFor } from "./avatar-colors";
+import {
+  avatarColorOptions,
+  avatarColorsFor,
+  semanticIconColorsFor,
+} from "./avatar-colors";
 
 describe("avatarColorsFor", () => {
   it("offers enough paired colors to keep lists varied", () => {
@@ -28,5 +32,19 @@ describe("avatarColorsFor", () => {
     );
 
     expect(selections.size).toBeGreaterThanOrEqual(12);
+  });
+
+  it("inverts only light semantic icons to use the saturated tile color", () => {
+    const lightAvatar = avatarColorsFor("group:group-1", "light");
+    const lightIcon = semanticIconColorsFor("group:group-1", "light");
+    const darkAvatar = avatarColorsFor("group:group-1", "dark");
+    const darkIcon = semanticIconColorsFor("group:group-1", "dark");
+
+    expect(lightIcon).toEqual({
+      name: lightAvatar.name,
+      background: lightAvatar.foreground,
+      foreground: lightAvatar.background,
+    });
+    expect(darkIcon).toEqual(darkAvatar);
   });
 });

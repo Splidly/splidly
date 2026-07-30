@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { fireEvent, render } from "@testing-library/react-native";
 import type { GroupIconKey } from "@splidly/shared";
 import {
+  groupIconGlyphSize,
   GroupIconPicker,
   normalizeGroupIconKey,
 } from "./group-icon";
@@ -56,7 +57,12 @@ describe("GroupIconPicker", () => {
         .getByTestId("group-icon-picker")
         .props.actions.find(
           (action: { id: string }) => action.id === "trip",
-        ).state,
+      ).state,
     ).toBe("on");
+  });
+
+  it("gives the wide default people symbol additional breathing room", () => {
+    expect(groupIconGlyphSize("default", 60)).toBe(25);
+    expect(groupIconGlyphSize("trip", 60)).toBe(29);
   });
 });

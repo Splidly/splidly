@@ -1,5 +1,8 @@
 import { Stack } from "expo-router";
-import { inlineLargeTitleOptions } from "../../../lib/navigation";
+import {
+  inlineLargeTitleOptions,
+  nativeHeaderOptions,
+} from "../../../lib/navigation";
 import { useTheme } from "../../../theme";
 
 export default function FriendsStackLayout() {
@@ -7,7 +10,7 @@ export default function FriendsStackLayout() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: theme.background },
+        ...nativeHeaderOptions(theme.background),
         headerTintColor: theme.text,
         headerShadowVisible: false,
         contentStyle: { backgroundColor: theme.background },

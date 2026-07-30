@@ -61,6 +61,7 @@ export default function InviteScreen() {
             iconKey={normalizeGroupIconKey(preview.data.group?.iconKey)}
             name={subject}
             colorKey={preview.data.group?.id}
+            color={preview.data.group?.color}
             size={82}
           />
         ) : (

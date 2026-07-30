@@ -11,6 +11,7 @@ import {
   Screen,
   Section,
 } from "../../../components/ui";
+import { ExpenseIcon } from "../../../components/expense-icon";
 import { api } from "../../../lib/trpc";
 import { useTheme } from "../../../theme";
 
@@ -81,6 +82,12 @@ export default function ExpenseDetailScreen() {
     <>
       <Screen>
         <View style={{ alignItems: "center", gap: 7, paddingVertical: 12 }}>
+          <ExpenseIcon
+            iconKey={expense.iconKey}
+            name={expense.description}
+            size={64}
+            useNameFallback={!expense.iconManuallySet}
+          />
           <Text
             style={{
               color: theme.text,

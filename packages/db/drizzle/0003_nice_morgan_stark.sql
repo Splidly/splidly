@@ -1,0 +1,1 @@
+ALTER TABLE "expense" ADD COLUMN "icon_key" text DEFAULT 'other' NOT NULL;

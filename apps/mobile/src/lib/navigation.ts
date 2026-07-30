@@ -1,8 +1,31 @@
+import type { NativeStackNavigationOptions } from "expo-router";
 import type { ColorValue } from "react-native";
+
+type NativeHeaderOptions = Pick<
+  NativeStackNavigationOptions,
+  "headerStyle" | "headerTransparent"
+>;
+
+export function nativeHeaderOptions(
+  backgroundColor: ColorValue,
+): NativeHeaderOptions {
+  if (process.env.EXPO_OS !== "ios") {
+    return {
+      headerStyle: { backgroundColor },
+    };
+  }
+
+  return {
+    // This is the Expo Router Notes/Mail pattern. UIKit owns the automatic
+    // scroll-edge treatment while the first-child ScrollView underlaps the bar.
+    headerTransparent: true,
+  };
+}
 
 export function formSheetOptions(backgroundColor: ColorValue) {
   return {
     presentation: "formSheet",
+    headerTransparent: false,
     headerStyle: { backgroundColor },
     contentStyle: { backgroundColor },
   } as const;

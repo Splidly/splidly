@@ -1,9 +1,11 @@
 import {
   convertMinor,
+  detectExpenseIconKey,
   formatMinor,
   parseDecimalToMinor,
   type CurrencyCode,
   type ExpenseContext,
+  type ExpenseIconKey,
   type RateSnapshot,
 } from "@splidly/shared";
 import * as Crypto from "expo-crypto";
@@ -14,6 +16,7 @@ import { api } from "../lib/trpc";
 import { useTheme } from "../theme";
 import { CurrencyField } from "./currency-field";
 import { DateField } from "./date-field";
+import { ExpenseIconPicker } from "./expense-icon";
 import {
   ErrorState,
   Field,
@@ -168,6 +171,7 @@ export function ExpenseEditor({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [payerId, setPayerId] = useState("");
   const [description, setDescription] = useState("");
+  const [manualIconKey, setManualIconKey] = useState<ExpenseIconKey>();
   const [notes, setNotes] = useState("");
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState<CurrencyCode>("EUR");
@@ -185,6 +189,11 @@ export function ExpenseEditor({
   const [formError, setFormError] = useState<string>();
   const initialized = useRef<string | undefined>(undefined);
   const rateRequest = useRef(0);
+  const detectedIconKey = useMemo(
+    () => detectExpenseIconKey(description),
+    [description],
+  );
+  const iconKey = manualIconKey ?? detectedIconKey;
 
   const canonicalCurrency =
     context?.type === "group"
@@ -275,6 +284,9 @@ export function ExpenseEditor({
     setSelectedIds(initialSelectedIds);
     setPayerId(expense.payerId);
     setDescription(expense.description);
+    setManualIconKey(
+      expense.iconManuallySet ? expense.iconKey : undefined,
+    );
     setNotes(expense.notes);
     setAmount(formatMinor(expense.sourceAmountMinor, initialCurrency));
     setCurrency(initialCurrency);
@@ -435,6 +447,8 @@ export function ExpenseEditor({
         context,
         clientMutationId: Crypto.randomUUID(),
         description: description.trim(),
+        iconKey,
+        iconManuallySet: manualIconKey !== undefined,
         notes: notes.trim(),
         occurredAt: new Date(
           date.getFullYear(),
@@ -495,12 +509,28 @@ export function ExpenseEditor({
           The original amount and every displayed conversion are frozen when you
           save.
         </Intro>
-        <FormSection title="Expense">
+        <FormSection
+          title="Expense"
+          footer={
+            manualIconKey
+              ? "The category is fixed. Tap its icon to change it or restore Automatic."
+              : "The category follows the description. Tap its icon to choose manually."
+          }
+        >
           <Field
             label="Description"
             value={description}
             onChangeText={setDescription}
             placeholder="Dinner"
+            leading={
+              <ExpenseIconPicker
+                value={iconKey}
+                automatic={manualIconKey === undefined}
+                onValueChange={setManualIconKey}
+                name={description}
+                size={36}
+              />
+            }
           />
           <Field
             label="Amount"

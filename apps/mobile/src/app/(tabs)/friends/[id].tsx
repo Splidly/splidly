@@ -14,6 +14,7 @@ import {
   Screen,
   Section,
 } from "../../../components/ui";
+import { ExpenseIcon } from "../../../components/expense-icon";
 import { api } from "../../../lib/trpc";
 import { useTheme } from "../../../theme";
 
@@ -125,6 +126,13 @@ export default function FriendDetailScreen() {
                     expense.sourceAmountMinor,
                     expense.sourceCurrency as CurrencyCode,
                   )} ${expense.sourceCurrency}`}
+                  leading={
+                    <ExpenseIcon
+                      iconKey={expense.iconKey}
+                      name={expense.description}
+                      useNameFallback={!expense.iconManuallySet}
+                    />
+                  }
                   onPress={() =>
                     router.push(`/expense/${expense.id}` as Href)
                   }

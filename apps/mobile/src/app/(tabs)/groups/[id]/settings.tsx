@@ -18,6 +18,7 @@ import {
   Section,
 } from "../../../../components/ui";
 import { shareInvite } from "../../../../lib/share-invite";
+import { normalizeGroupColor } from "../../../../lib/group-colors";
 import { api } from "../../../../lib/trpc";
 
 export default function GroupSettingsScreen() {
@@ -88,6 +89,7 @@ export default function GroupSettingsScreen() {
         iconKey={normalizeGroupIconKey(group.iconKey)}
         name={group.name}
         colorKey={group.id}
+        color={group.color}
         lines={[
           {
             key: "currency",
@@ -118,6 +120,7 @@ export default function GroupSettingsScreen() {
                   expectedVersion: group.version,
                   name: group.name,
                   iconKey: normalizeGroupIconKey(group.iconKey),
+                  color: normalizeGroupColor(group.color, group.id),
                   currency: group.currency as CurrencyCode,
                   simplifyDebts: nextValue,
                 });

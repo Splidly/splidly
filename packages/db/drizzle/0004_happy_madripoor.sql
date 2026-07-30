@@ -1,0 +1,1 @@
+ALTER TABLE "expense" ADD COLUMN "icon_manually_set" boolean DEFAULT false NOT NULL;

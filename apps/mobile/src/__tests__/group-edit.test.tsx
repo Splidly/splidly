@@ -34,6 +34,7 @@ jest.mock("../lib/trpc", () => ({
               id: "group-1",
               name: "Lisbon",
               iconKey: "trip",
+              color: "#1764B0",
               currency: "EUR",
               simplifyDebts: true,
               version: 3,
@@ -69,7 +70,7 @@ describe("EditGroupScreen", () => {
       </SafeAreaInsetsContext.Provider>,
     );
 
-    await fireEvent.changeText(view.getByLabelText("Name"), "Porto");
+    await fireEvent.changeText(view.getByLabelText("Group name"), "Porto");
     await fireEvent.press(view.getByText("Save changes"));
 
     expect(mockUpdateMutate).toHaveBeenCalledWith({
@@ -77,6 +78,7 @@ describe("EditGroupScreen", () => {
       expectedVersion: 3,
       name: "Porto",
       iconKey: "trip",
+      color: "#1764B0",
       currency: "EUR",
       simplifyDebts: true,
     });

@@ -1,7 +1,6 @@
 import type { GroupIconKey } from "@splidly/shared";
-import { Host, Icon } from "@expo/ui";
+import { Button, Host } from "@expo/ui";
 import {
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -9,11 +8,6 @@ import {
 } from "react-native";
 import { useTheme } from "../theme";
 import { GroupIcon } from "./group-icon";
-
-const EDIT_ICON = Icon.select({
-  ios: "pencil",
-  android: import("@expo/material-symbols/edit.xml"),
-});
 
 type GroupSummaryLine = {
   key: string;
@@ -25,12 +19,14 @@ export function GroupSummaryHeader({
   iconKey,
   name,
   colorKey,
+  color,
   lines,
   onEdit,
 }: {
   iconKey: GroupIconKey;
   name: string;
   colorKey: string;
+  color?: string | null | undefined;
   lines: readonly GroupSummaryLine[];
   onEdit?: (() => void) | undefined;
 }) {
@@ -48,6 +44,7 @@ export function GroupSummaryHeader({
         iconKey={iconKey}
         name={name}
         colorKey={colorKey}
+        color={color}
         size={58}
       />
       <View style={styles.copy}>
@@ -76,33 +73,17 @@ export function GroupSummaryHeader({
         ))}
       </View>
       {onEdit ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Edit ${name}`}
-          hitSlop={8}
-          onPress={onEdit}
-          style={({ pressed }) => [
-            styles.editButton,
-            {
-              backgroundColor: theme.elevated,
-              borderColor: theme.border,
-              opacity: pressed ? 0.65 : 1,
-            },
-          ]}
+        <Host
+          matchContents
+          seedColor={theme.primary}
         >
-          <Host
-            matchContents
-            ignoreSafeArea="all"
-            style={styles.editIcon}
-          >
-            <Icon
-              name={EDIT_ICON}
-              size={22}
-              color={theme.primary}
-              accessibilityLabel="Edit"
-            />
-          </Host>
-        </Pressable>
+          <Button
+            label="Edit"
+            variant="outlined"
+            testID="edit-group"
+            onPress={onEdit}
+          />
+        </Host>
       ) : null}
     </View>
   );
@@ -127,17 +108,5 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 13,
     fontVariant: ["tabular-nums"],
-  },
-  editButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  editIcon: {
-    width: 22,
-    height: 22,
   },
 });

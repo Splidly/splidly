@@ -22,6 +22,27 @@
       "when": 1785286819638,
       "tag": "0002_gigantic_cardiac",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785369064718,
+      "tag": "0003_nice_morgan_stark",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785369809628,
+      "tag": "0004_happy_madripoor",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785371996093,
+      "tag": "0005_bumpy_gunslinger",
+      "breakpoints": true
     }
   ]
 }

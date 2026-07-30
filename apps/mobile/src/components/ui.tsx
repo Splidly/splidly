@@ -1,8 +1,10 @@
 import type { CurrencyCode, Money } from "@splidly/shared";
 import { formatMinor } from "@splidly/shared";
+import { HeaderHeightContext } from "expo-router/build/react-navigation/elements/Header/HeaderHeightContext";
 import {
   Children,
   Fragment,
+  use,
   useEffect,
   useState,
   type PropsWithChildren,
@@ -17,6 +19,7 @@ import {
   TextInput,
   useColorScheme,
   View,
+  type ColorValue,
   type ScrollViewProps,
   type TextInputProps,
 } from "react-native";
@@ -25,8 +28,15 @@ import { avatarColorsFor } from "../lib/avatar-colors";
 import { spacing, useTheme } from "../theme";
 import { AppIcon } from "./app-icon";
 
-function useScrollViewportFill(accountForTopInset = false) {
+function useScrollViewportFill({
+  accountForTopInset = false,
+  underlapsHeader = false,
+}: {
+  accountForTopInset?: boolean;
+  underlapsHeader?: boolean;
+} = {}) {
   const insets = useSafeAreaInsets();
+  const headerHeight = use(HeaderHeightContext) ?? 0;
   const [viewportHeight, setViewportHeight] = useState(0);
   const [contentMeasurement, setContentMeasurement] = useState({
     height: 0,
@@ -37,7 +47,11 @@ function useScrollViewportFill(accountForTopInset = false) {
     0,
     viewportHeight -
       insets.bottom -
-      (accountForTopInset ? insets.top : 0),
+      (underlapsHeader && process.env.EXPO_OS === "ios"
+        ? headerHeight
+        : accountForTopInset
+          ? insets.top
+          : 0),
   );
 
   useEffect(() => {
@@ -84,19 +98,24 @@ export function Screen({
   bounces = true,
   background = "default",
   accountForTopInset = false,
+  underlapsHeader,
   contentContainerStyle,
 }: PropsWithChildren<{
   scroll?: boolean;
   bounces?: boolean;
   background?: "default" | "sheet";
   accountForTopInset?: boolean;
+  underlapsHeader?: boolean;
   contentContainerStyle?: ScrollViewProps["contentContainerStyle"];
 }>) {
   const theme = useTheme();
   const backgroundColor =
     background === "sheet" ? theme.sheet : theme.background;
-  const { fillStyle, onLayout, onContentSizeChange } =
-    useScrollViewportFill(accountForTopInset);
+  const { fillStyle, onLayout, onContentSizeChange } = useScrollViewportFill({
+    accountForTopInset,
+    underlapsHeader:
+      underlapsHeader ?? (background === "default" && !accountForTopInset),
+  });
   if (!scroll) {
     return (
       <View
@@ -139,8 +158,9 @@ export function CollectionScreen({
   children,
 }: PropsWithChildren<{ isEmpty?: boolean }>) {
   const theme = useTheme();
-  const { fillStyle, onLayout, onContentSizeChange } =
-    useScrollViewportFill();
+  const { fillStyle, onLayout, onContentSizeChange } = useScrollViewportFill({
+    underlapsHeader: true,
+  });
   return (
     <ScrollView
       style={[styles.screen, { backgroundColor: theme.background }]}
@@ -375,28 +395,34 @@ export function PrimaryButton({
   disabled,
   tone = "primary",
   compact = false,
+  backgroundColor: customBackgroundColor,
+  foregroundColor: customForegroundColor,
 }: {
   label: string;
   onPress: () => void;
   disabled?: boolean;
   tone?: "primary" | "secondary" | "danger" | "plain";
   compact?: boolean;
+  backgroundColor?: ColorValue;
+  foregroundColor?: ColorValue;
 }) {
   const theme = useTheme();
   const backgroundColor =
-    tone === "danger"
+    customBackgroundColor ??
+    (tone === "danger"
       ? theme.negativeSurface
       : tone === "secondary"
         ? theme.elevated
         : tone === "plain"
           ? "transparent"
-          : theme.primary;
+          : theme.primary);
   const color =
-    tone === "danger"
+    customForegroundColor ??
+    (tone === "danger"
       ? theme.negative
       : tone === "secondary" || tone === "plain"
         ? theme.primary
-        : theme.primaryText;
+        : theme.primaryText);
   return (
     <Pressable
       accessibilityRole="button"
@@ -497,7 +523,7 @@ export function Field({
   leading,
   ...props
 }: TextInputProps & {
-  label: string;
+  label?: string;
   hint?: string;
   leading?: ReactNode;
 }) {
@@ -514,12 +540,16 @@ export function Field({
       ]}
     >
       {leading}
-      <Text style={[styles.label, { color: theme.text }]}>
-        {label}
-      </Text>
+      {label ? (
+        <Text style={[styles.label, { color: theme.text }]}>
+          {label}
+        </Text>
+      ) : null}
       <TextInput
         {...props}
-        accessibilityLabel={props.accessibilityLabel ?? label}
+        accessibilityLabel={
+          props.accessibilityLabel ?? label ?? props.placeholder
+        }
         placeholderTextColor={theme.subtle}
         selectionColor={theme.primary}
         clearButtonMode={props.clearButtonMode ?? "never"}

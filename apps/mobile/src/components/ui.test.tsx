@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { fireEvent, render } from "@testing-library/react-native";
+import { HeaderHeightContext } from "expo-router/build/react-navigation/elements/Header/HeaderHeightContext";
 import { StyleSheet, Text } from "react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import { CollectionScreen, EmptyState, Field, Screen } from "./ui";
@@ -51,6 +52,22 @@ describe("Field", () => {
     expect(
       StyleSheet.flatten(view.getByLabelText("Amount").props.style).textAlign,
     ).toBe("right");
+  });
+
+  it("supports a label-free, left-aligned name input", async () => {
+    const view = await render(
+      <Field
+        accessibilityLabel="Group name"
+        placeholder="Group name"
+        value=""
+        onChangeText={jest.fn()}
+        style={{ textAlign: "left" }}
+      />,
+    );
+    const input = view.getByLabelText("Group name");
+
+    expect(input.props.placeholder).toBe("Group name");
+    expect(StyleSheet.flatten(input.props.style).textAlign).toBe("left");
   });
 });
 
@@ -154,6 +171,39 @@ describe("Screen", () => {
     expect(contentStyle.minHeight).toBe(736);
     expect(resizedScrollView?.props.bounces).toBe(false);
     expect(resizedScrollView?.props.scrollEnabled).toBeUndefined();
+  });
+
+  it("removes the measured native header from an underlapping viewport fill", async () => {
+    const view = await render(
+      <HeaderHeightContext.Provider value={120}>
+        <SafeAreaInsetsContext.Provider
+          value={{ top: 44, right: 0, bottom: 20, left: 0 }}
+        >
+          <Screen underlapsHeader>
+            <Text>Underlapping content</Text>
+          </Screen>
+        </SafeAreaInsetsContext.Provider>
+      </HeaderHeightContext.Provider>,
+    );
+    const [scrollView] = view.container.queryAll(
+      (instance) =>
+        instance.props.contentInsetAdjustmentBehavior === "automatic",
+    );
+    if (!scrollView) throw new Error("ScrollView was not rendered");
+
+    await fireEvent(scrollView, "layout", {
+      nativeEvent: { layout: { height: 800 } },
+    });
+    const [resizedScrollView] = view.container.queryAll(
+      (instance) =>
+        instance.props.contentInsetAdjustmentBehavior === "automatic",
+    );
+    const contentStyle = StyleSheet.flatten(
+      resizedScrollView?.props.contentContainerStyle,
+    );
+
+    expect(contentStyle.minHeight).toBe(660);
+    expect(contentStyle.paddingBottom).toBeUndefined();
   });
 });
 

@@ -39,6 +39,7 @@ jest.mock("../lib/trpc", () => ({
               id: "group-1",
               name: "Lisbon",
               iconKey: "trip",
+              color: "#1764B0",
               currency: "EUR",
               simplifyDebts: true,
               version: 3,
@@ -118,7 +119,7 @@ describe("GroupSettingsScreen", () => {
     expect(view.queryByText(/All settled up/)).toBeNull();
     expect(view.queryByLabelText("Name")).toBeNull();
 
-    await fireEvent.press(view.getByLabelText("Edit Lisbon"));
+    await fireEvent.press(view.getByTestId("edit-group"));
 
     expect(mockPush).toHaveBeenCalledWith("/groups/group-1/edit");
   });
@@ -143,6 +144,7 @@ describe("GroupSettingsScreen", () => {
       expectedVersion: 3,
       name: "Lisbon",
       iconKey: "trip",
+      color: "#1764B0",
       currency: "EUR",
       simplifyDebts: false,
     });

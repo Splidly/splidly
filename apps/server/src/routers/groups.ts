@@ -18,6 +18,8 @@ import {
 } from "@splidly/db";
 import {
   currencyCodeSchema,
+  groupColorPresets,
+  groupColorSchema,
   groupIconKeySchema,
   money,
 } from "@splidly/shared";
@@ -159,6 +161,7 @@ export const groupsRouter = router({
       z.object({
         name: z.string().trim().min(1).max(120),
         iconKey: groupIconKeySchema.default("default"),
+        color: groupColorSchema.optional(),
         currency: currencyCodeSchema,
       }),
     )
@@ -169,6 +172,11 @@ export const groupsRouter = router({
           .values({
             name: input.name,
             iconKey: input.iconKey,
+            color:
+              input.color ??
+              groupColorPresets[
+                Math.floor(Math.random() * groupColorPresets.length)
+              ],
             currency: input.currency,
             simplifyDebts: true,
             createdBy: ctx.session.user.id,
@@ -263,6 +271,7 @@ export const groupsRouter = router({
         expectedVersion: z.number().int().positive(),
         name: z.string().trim().min(1).max(120),
         iconKey: groupIconKeySchema.optional(),
+        color: groupColorSchema.optional(),
         currency: currencyCodeSchema,
         simplifyDebts: z.boolean(),
       }),
@@ -305,6 +314,7 @@ export const groupsRouter = router({
         .set({
           name: input.name,
           ...(input.iconKey ? { iconKey: input.iconKey } : {}),
+          color: input.color ?? current.color,
           currency: input.currency,
           simplifyDebts: input.simplifyDebts,
           version: current.version + 1,

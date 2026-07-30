@@ -114,3 +114,17 @@ export function avatarColorsFor(
     ...option[scheme],
   };
 }
+
+export function semanticIconColorsFor(
+  key: string,
+  scheme: AvatarColorScheme,
+) {
+  const colors = avatarColorsFor(key, scheme);
+  if (scheme === "dark") return colors;
+
+  return {
+    name: colors.name,
+    background: colors.foreground,
+    foreground: colors.background,
+  };
+}

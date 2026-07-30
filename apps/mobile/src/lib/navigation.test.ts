@@ -1,11 +1,24 @@
-import { formSheetOptions, inlineLargeTitleOptions } from "./navigation";
+import {
+  formSheetOptions,
+  inlineLargeTitleOptions,
+  nativeHeaderOptions,
+} from "./navigation";
 
 describe("formSheetOptions", () => {
-  it("uses one elevated color for the native sheet and its header", () => {
+  it("keeps elevated sheet chrome opaque and out of the content flow", () => {
     expect(formSheetOptions("#1c1c1e")).toEqual({
       presentation: "formSheet",
+      headerTransparent: false,
       headerStyle: { backgroundColor: "#1c1c1e" },
       contentStyle: { backgroundColor: "#1c1c1e" },
+    });
+  });
+});
+
+describe("nativeHeaderOptions", () => {
+  it("lets the first-child ScrollView drive UIKit's automatic scroll edge", () => {
+    expect(nativeHeaderOptions("#000000")).toEqual({
+      headerTransparent: true,
     });
   });
 });
