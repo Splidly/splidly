@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  customImageDataUrlSchema,
   groupColorPresets,
   groupColorSchema,
   groupIconKeys,
@@ -8,6 +9,23 @@ import {
   paymentInputSchema,
   splitInputSchema,
 } from "../src";
+
+describe("customImageDataUrlSchema", () => {
+  it("accepts bounded JPEG data and rejects remote or oversized values", () => {
+    expect(
+      customImageDataUrlSchema.parse("data:image/jpeg;base64,AA=="),
+    ).toBe("data:image/jpeg;base64,AA==");
+    expect(
+      customImageDataUrlSchema.safeParse("https://example.com/photo.jpg")
+        .success,
+    ).toBe(false);
+    expect(
+      customImageDataUrlSchema.safeParse(
+        `data:image/jpeg;base64,${"A".repeat(700_000)}`,
+      ).success,
+    ).toBe(false);
+  });
+});
 
 describe("groupIconKeySchema", () => {
   it("accepts every supported semantic group icon", () => {

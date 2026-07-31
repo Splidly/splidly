@@ -31,6 +31,7 @@ export function GroupSummaryHeader({
   name,
   colorKey,
   color,
+  imageUrl,
   lines,
   onEdit,
 }: {
@@ -38,6 +39,7 @@ export function GroupSummaryHeader({
   name: string;
   colorKey: string;
   color?: string | null | undefined;
+  imageUrl?: string | null | undefined;
   lines?: readonly GroupSummaryLine[];
   onEdit?: (() => void) | undefined;
 }) {
@@ -50,6 +52,7 @@ export function GroupSummaryHeader({
         name={name}
         colorKey={colorKey}
         color={color}
+        imageUrl={imageUrl}
         size={52}
       />
       <View style={styles.copy}>

@@ -79,6 +79,7 @@ describe("EditGroupScreen", () => {
       name: "Porto",
       iconKey: "trip",
       color: "#1764B0",
+      imageUrl: null,
       currency: "EUR",
       simplifyDebts: true,
     });

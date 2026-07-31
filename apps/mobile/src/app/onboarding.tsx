@@ -106,6 +106,7 @@ export default function OnboardingScreen() {
         <Avatar
           name={displayName || "Splidly"}
           colorKey={profile.data?.userId}
+          imageUrl={profile.data?.avatarUrl}
           size={72}
         />
         <View style={styles.heroCopy}>

@@ -91,6 +91,7 @@ export default function GroupSettingsScreen() {
         name={group.name}
         colorKey={group.id}
         color={group.color}
+        imageUrl={group.imageUrl}
         lines={[
           {
             key: "currency",
@@ -163,6 +164,7 @@ export default function GroupSettingsScreen() {
                   <Avatar
                     name={member.displayName}
                     colorKey={member.userId}
+                    imageUrl={member.avatarUrl}
                   />
                 }
                 valueTone="negative"

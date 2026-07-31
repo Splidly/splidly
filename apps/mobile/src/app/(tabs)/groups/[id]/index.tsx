@@ -61,6 +61,7 @@ export default function GroupDetailScreen() {
           name={group.name}
           colorKey={group.id}
           color={group.color}
+          imageUrl={group.imageUrl}
         />
         <View style={{ flexDirection: "row", gap: 10 }}>
           <View style={{ flex: 1 }}>
@@ -112,6 +113,7 @@ export default function GroupDetailScreen() {
                       <Avatar
                         name={memberBalance.displayName}
                         colorKey={memberBalance.userId}
+                        imageUrl={memberBalance.avatarUrl}
                       />
                     }
                     trailing={

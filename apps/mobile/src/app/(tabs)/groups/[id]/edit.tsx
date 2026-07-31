@@ -1,5 +1,6 @@
 import type {
   CurrencyCode,
+  CustomImageDataUrl,
   GroupColor,
   GroupIconKey,
 } from "@splidly/shared";
@@ -9,9 +10,11 @@ import { StyleSheet, Text, View } from "react-native";
 import { CurrencyField } from "../../../../components/currency-field";
 import { GroupColorPicker } from "../../../../components/group-color-picker";
 import {
+  GroupIcon,
   GroupIconPicker,
   normalizeGroupIconKey,
 } from "../../../../components/group-icon";
+import { PictureEditor } from "../../../../components/picture-editor";
 import {
   ErrorState,
   Field,
@@ -36,6 +39,7 @@ export default function EditGroupScreen() {
   const [name, setName] = useState("");
   const [iconKey, setIconKey] = useState<GroupIconKey>("default");
   const [color, setColor] = useState<GroupColor>("#4745B8");
+  const [imageUrl, setImageUrl] = useState<CustomImageDataUrl | null>(null);
   const [currency, setCurrency] = useState<CurrencyCode>("EUR");
 
   useEffect(() => {
@@ -43,6 +47,7 @@ export default function EditGroupScreen() {
     setName(group.name);
     setIconKey(normalizeGroupIconKey(group.iconKey));
     setColor(normalizeGroupColor(group.color, group.id));
+    setImageUrl((group.imageUrl as CustomImageDataUrl | null) ?? null);
     setCurrency(group.currency as CurrencyCode);
   }, [group?.id, group?.version]);
 
@@ -97,18 +102,47 @@ export default function EditGroupScreen() {
         </Text>
       </View>
 
-      <GroupColorPicker value={color} onValueChange={setColor} />
+      <PictureEditor
+        label="group photo"
+        imageUrl={imageUrl}
+        disabled={update.isPending}
+        onImageChange={setImageUrl}
+        preview={
+          <GroupIcon
+            iconKey={iconKey}
+            name={name || group.name}
+            colorKey={group.id}
+            color={color}
+            imageUrl={imageUrl}
+            size={88}
+          />
+        }
+      />
+
+      {imageUrl ? null : (
+        <GroupColorPicker value={color} onValueChange={setColor} />
+      )}
 
       <FormSection footer="The accounting currency locks after the first expense or settlement.">
         <Field
           leading={
-            <GroupIconPicker
-              value={iconKey}
-              onValueChange={setIconKey}
-              name={name || group.name}
-              colorKey={group.id}
-              color={color}
-            />
+            imageUrl ? (
+              <GroupIcon
+                iconKey={iconKey}
+                name={name || group.name}
+                colorKey={group.id}
+                color={color}
+                imageUrl={imageUrl}
+              />
+            ) : (
+              <GroupIconPicker
+                value={iconKey}
+                onValueChange={setIconKey}
+                name={name || group.name}
+                colorKey={group.id}
+                color={color}
+              />
+            )
           }
           value={name}
           onChangeText={setName}
@@ -136,6 +170,7 @@ export default function EditGroupScreen() {
               name: name.trim(),
               iconKey,
               color,
+              imageUrl,
               currency,
               simplifyDebts: group.simplifyDebts,
             })

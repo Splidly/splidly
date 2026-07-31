@@ -7,6 +7,8 @@ import {
   MenuView,
   type MenuAction,
 } from "@expo/ui/community/menu";
+import { Image } from "expo-image";
+import { useEffect, useState } from "react";
 import { StyleSheet, useColorScheme, View } from "react-native";
 import { groupIconColorsFor } from "../lib/group-colors";
 
@@ -165,6 +167,7 @@ export function GroupIcon({
   name,
   colorKey,
   color,
+  imageUrl,
   size = 44,
   accessibilityRole,
   accessibilityLabel,
@@ -173,10 +176,13 @@ export function GroupIcon({
   name: string;
   colorKey?: string | undefined;
   color?: string | null | undefined;
+  imageUrl?: string | null | undefined;
   size?: number;
   accessibilityRole?: "button" | "image";
   accessibilityLabel?: string;
 }) {
+  const [failedImageUrl, setFailedImageUrl] = useState<string>();
+  useEffect(() => setFailedImageUrl(undefined), [imageUrl]);
   const colorScheme = useColorScheme() === "dark" ? "dark" : "light";
   const colors = groupIconColorsFor(
     color,
@@ -185,12 +191,16 @@ export function GroupIcon({
   );
   const option = optionsByKey.get(iconKey) ?? groupIconOptions[0];
   const glyphSize = groupIconGlyphSize(iconKey, size);
+  const showImage = Boolean(imageUrl && imageUrl !== failedImageUrl);
 
   return (
     <View
       accessible
       accessibilityRole={accessibilityRole ?? "image"}
-      accessibilityLabel={accessibilityLabel ?? `${option.label} group icon`}
+      accessibilityLabel={
+        accessibilityLabel ??
+        (showImage ? `${name} group picture` : `${option.label} group icon`)
+      }
       style={[
         styles.container,
         {
@@ -201,18 +211,29 @@ export function GroupIcon({
         },
       ]}
     >
-      <Host
-        matchContents
-        ignoreSafeArea="all"
-        style={{ width: glyphSize, height: glyphSize }}
-      >
-        <Icon
-          name={option.image}
-          size={glyphSize}
-          color={colors.foreground}
-          accessibilityLabel={option.label}
+      {showImage ? (
+        <Image
+          source={imageUrl!}
+          contentFit="cover"
+          recyclingKey={imageUrl ?? null}
+          transition={120}
+          onError={() => setFailedImageUrl(imageUrl ?? undefined)}
+          style={{ width: size, height: size }}
         />
-      </Host>
+      ) : (
+        <Host
+          matchContents
+          ignoreSafeArea="all"
+          style={{ width: glyphSize, height: glyphSize }}
+        >
+          <Icon
+            name={option.image}
+            size={glyphSize}
+            color={colors.foreground}
+            accessibilityLabel={option.label}
+          />
+        </Host>
+      )}
     </View>
   );
 }

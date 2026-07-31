@@ -1,5 +1,6 @@
 import type {
   CurrencyCode,
+  CustomImageDataUrl,
   GroupColor,
   GroupIconKey,
 } from "@splidly/shared";
@@ -8,7 +9,11 @@ import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { CurrencyField } from "../../../components/currency-field";
 import { GroupColorPicker } from "../../../components/group-color-picker";
-import { GroupIconPicker } from "../../../components/group-icon";
+import {
+  GroupIcon,
+  GroupIconPicker,
+} from "../../../components/group-icon";
+import { PictureEditor } from "../../../components/picture-editor";
 import {
   ErrorState,
   Field,
@@ -28,6 +33,7 @@ export default function NewGroupScreen() {
   const [name, setName] = useState("");
   const [iconKey, setIconKey] = useState<GroupIconKey>("default");
   const [color, setColor] = useState<GroupColor>(() => randomGroupColor());
+  const [imageUrl, setImageUrl] = useState<CustomImageDataUrl | null>(null);
   const [currency, setCurrency] = useState<CurrencyCode>();
   const create = api.groups.create.useMutation({
     async onSuccess(group) {
@@ -63,18 +69,47 @@ export default function NewGroupScreen() {
         </View>
       </View>
 
-      <GroupColorPicker value={color} onValueChange={setColor} />
+      <PictureEditor
+        label="group photo"
+        imageUrl={imageUrl}
+        disabled={create.isPending}
+        onImageChange={setImageUrl}
+        preview={
+          <GroupIcon
+            iconKey={iconKey}
+            name={name || "New group"}
+            colorKey="new-group"
+            color={color}
+            imageUrl={imageUrl}
+            size={88}
+          />
+        }
+      />
+
+      {imageUrl ? null : (
+        <GroupColorPicker value={color} onValueChange={setColor} />
+      )}
 
       <FormSection footer="The accounting currency locks after the first expense or settlement.">
         <Field
           leading={
-            <GroupIconPicker
-              value={iconKey}
-              onValueChange={setIconKey}
-              name={name || "New group"}
-              colorKey="new-group"
-              color={color}
-            />
+            imageUrl ? (
+              <GroupIcon
+                iconKey={iconKey}
+                name={name || "New group"}
+                colorKey="new-group"
+                color={color}
+                imageUrl={imageUrl}
+              />
+            ) : (
+              <GroupIconPicker
+                value={iconKey}
+                onValueChange={setIconKey}
+                name={name || "New group"}
+                colorKey="new-group"
+                color={color}
+              />
+            )
           }
           value={name}
           onChangeText={setName}
@@ -100,6 +135,7 @@ export default function NewGroupScreen() {
               name: name.trim(),
               iconKey,
               color,
+              imageUrl,
               currency: selectedCurrency,
             })
           }

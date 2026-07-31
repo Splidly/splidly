@@ -56,6 +56,16 @@ export const groupColorSchema = z
 
 export type GroupColor = z.infer<typeof groupColorSchema>;
 
+export const customImageDataUrlSchema = z
+  .string()
+  .max(700_000, "Image is too large")
+  .regex(
+    /^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/,
+    "Use a JPEG image",
+  );
+
+export type CustomImageDataUrl = z.infer<typeof customImageDataUrlSchema>;
+
 export const expenseIconKeySchema = z.enum(expenseIconKeys);
 
 export const moneySchema = z.object({

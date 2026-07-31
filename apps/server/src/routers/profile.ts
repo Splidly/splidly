@@ -15,7 +15,10 @@ import {
   sql,
   users,
 } from "@splidly/db";
-import { currencyCodeSchema } from "@splidly/shared";
+import {
+  currencyCodeSchema,
+  customImageDataUrlSchema,
+} from "@splidly/shared";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { requireProfile } from "../domain/helpers";
@@ -30,7 +33,7 @@ export const profileRouter = router({
     .input(
       z.object({
         displayName: z.string().trim().min(1).max(80),
-        avatarUrl: z.string().url().nullable().optional(),
+        avatarUrl: customImageDataUrlSchema.nullable().optional(),
         homeCurrency: currencyCodeSchema,
       }),
     )

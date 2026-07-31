@@ -38,6 +38,7 @@ export function GroupListRow({
   name,
   iconKey,
   color,
+  imageUrl,
   balance,
   memberBalances,
   onPress,
@@ -46,6 +47,7 @@ export function GroupListRow({
   name: string;
   iconKey: GroupIconKey;
   color?: string | null | undefined;
+  imageUrl?: string | null | undefined;
   balance: Money;
   memberBalances: GroupMemberBalance[];
   onPress: () => void;
@@ -139,6 +141,7 @@ export function GroupListRow({
         name={name}
         colorKey={id}
         color={color}
+        imageUrl={imageUrl}
         size={52}
       />
       <View style={[styles.copy, isSettled ? styles.copyCentered : null]}>

@@ -180,6 +180,7 @@ export default function NewSettlementScreen() {
         <Avatar
           name={friendName}
           colorKey={counterparty.userId}
+          imageUrl={counterparty.avatarUrl}
           size={68}
         />
         <Text

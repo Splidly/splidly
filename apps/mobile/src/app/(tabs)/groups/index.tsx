@@ -51,6 +51,7 @@ export default function GroupsScreen() {
                     name={group.name}
                     iconKey={normalizeGroupIconKey(group.iconKey)}
                     color={group.color}
+                    imageUrl={group.imageUrl}
                     balance={group.balance}
                     memberBalances={group.memberBalances}
                     onPress={() => router.push(`/groups/${group.id}`)}

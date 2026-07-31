@@ -1,9 +1,13 @@
-import type { CurrencyCode } from "@splidly/shared";
+import type {
+  CurrencyCode,
+  CustomImageDataUrl,
+} from "@splidly/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Linking, Text } from "react-native";
 import {
+  Avatar,
   ErrorState,
   Field,
   FormSection,
@@ -13,6 +17,7 @@ import {
   Section,
 } from "../../../components/ui";
 import { CurrencyField } from "../../../components/currency-field";
+import { PictureEditor } from "../../../components/picture-editor";
 import { authClient } from "../../../lib/auth-client";
 import { APP_URL } from "../../../lib/env";
 import {
@@ -25,6 +30,7 @@ import { useTheme } from "../../../theme";
 type SavedProfile = {
   displayName: string;
   homeCurrency: CurrencyCode;
+  avatarUrl: string | null;
 };
 
 const ACTIVE_GROUPS_ERROR = "Leave all groups before deleting your account";
@@ -37,6 +43,7 @@ export default function ProfileScreen() {
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [currency, setCurrency] = useState<CurrencyCode>("EUR");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const initializedUser = useRef<string | undefined>(undefined);
   const saved = useRef<SavedProfile | undefined>(undefined);
   const lastAttempted = useRef<string | undefined>(undefined);
@@ -46,11 +53,13 @@ export default function ProfileScreen() {
     const initial = {
       displayName: profile.data.displayName,
       homeCurrency: profile.data.homeCurrency as CurrencyCode,
+      avatarUrl: profile.data.avatarUrl ?? null,
     };
     initializedUser.current = profile.data.userId;
     saved.current = initial;
     setName(initial.displayName);
     setCurrency(initial.homeCurrency);
+    setAvatarUrl(initial.avatarUrl);
   }, [profile.data]);
 
   const update = api.profile.update.useMutation({
@@ -59,6 +68,7 @@ export default function ProfileScreen() {
       saved.current = {
         displayName: updated.displayName,
         homeCurrency: updated.homeCurrency as CurrencyCode,
+        avatarUrl: updated.avatarUrl,
       };
       lastAttempted.current = undefined;
       utils.profile.me.setData(undefined, updated);
@@ -73,21 +83,28 @@ export default function ProfileScreen() {
     if (!initializedUser.current || update.isPending) return;
     const displayName = name.trim();
     const current = saved.current;
-    const draftKey = `${displayName}\u0000${currency}`;
+    const draftKey = `${displayName}\u0000${currency}\u0000${avatarUrl ?? ""}`;
     if (
       displayName.length === 0 ||
       lastAttempted.current === draftKey ||
       (current?.displayName === displayName &&
-        current.homeCurrency === currency)
+        current.homeCurrency === currency &&
+        current.avatarUrl === avatarUrl)
     ) {
       return;
     }
     const timer = setTimeout(() => {
       lastAttempted.current = draftKey;
-      update.mutate({ displayName, homeCurrency: currency });
+      update.mutate({
+        displayName,
+        homeCurrency: currency,
+        ...(current?.avatarUrl !== avatarUrl
+          ? { avatarUrl: avatarUrl as CustomImageDataUrl | null }
+          : {}),
+      });
     }, 500);
     return () => clearTimeout(timer);
-  }, [currency, name, update.isPending]);
+  }, [avatarUrl, currency, name, update.isPending]);
 
   const remove = api.profile.deleteAccount.useMutation({
     async onSuccess() {
@@ -174,6 +191,20 @@ export default function ProfileScreen() {
         title="Profile"
         footer="Currency changes apply to new entries only. Historical balances stay in their original buckets."
       >
+        <PictureEditor
+          label="profile photo"
+          imageUrl={avatarUrl}
+          disabled={update.isPending}
+          onImageChange={setAvatarUrl}
+          preview={
+            <Avatar
+              name={name || profile.data?.displayName || "Splidly"}
+              colorKey={profile.data?.userId}
+              imageUrl={avatarUrl}
+              size={88}
+            />
+          }
+        />
         <Field
           label="Display name"
           value={name}

@@ -337,6 +337,7 @@ export function ExpenseSplitEditor() {
                     key={person.userId}
                     userId={person.userId}
                     name={person.displayName}
+                    imageUrl={person.avatarUrl}
                     selected={selected}
                     selectionLabel={`Include ${person.displayName}`}
                     onSelectedChange={(enabled) =>

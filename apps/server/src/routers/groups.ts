@@ -20,6 +20,7 @@ import {
 import {
   convertMinor,
   currencyCodeSchema,
+  customImageDataUrlSchema,
   groupColorPresets,
   groupColorSchema,
   groupIconKeySchema,
@@ -128,6 +129,7 @@ export const groupsRouter = router({
           .select({
             userId: groupMembers.userId,
             displayName: profiles.displayName,
+            avatarUrl: profiles.avatarUrl,
           })
           .from(groupMembers)
           .innerJoin(profiles, eq(profiles.userId, groupMembers.userId))
@@ -145,6 +147,9 @@ export const groupsRouter = router({
         ).map((member) => ({
           userId: member.userId,
           displayName: member.displayName,
+          avatarUrl:
+            members.find((candidate) => candidate.userId === member.userId)
+              ?.avatarUrl ?? null,
           balance: money(group.currency, member.amountMinor),
         }));
         return {
@@ -165,6 +170,7 @@ export const groupsRouter = router({
         name: z.string().trim().min(1).max(120),
         iconKey: groupIconKeySchema.default("default"),
         color: groupColorSchema.optional(),
+        imageUrl: customImageDataUrlSchema.nullable().optional(),
         currency: currencyCodeSchema,
       }),
     )
@@ -180,6 +186,7 @@ export const groupsRouter = router({
               groupColorPresets[
                 Math.floor(Math.random() * groupColorPresets.length)
               ],
+            imageUrl: input.imageUrl,
             currency: input.currency,
             simplifyDebts: true,
             createdBy: ctx.session.user.id,
@@ -274,6 +281,9 @@ export const groupsRouter = router({
       ).map((member) => ({
         userId: member.userId,
         displayName: member.displayName,
+        avatarUrl:
+          members.find((candidate) => candidate.userId === member.userId)
+            ?.avatarUrl ?? null,
         balance: money(group.currency, member.amountMinor),
       }));
       const expenseActivity = activity.reverse().map((expense) => {
@@ -318,6 +328,7 @@ export const groupsRouter = router({
         name: z.string().trim().min(1).max(120),
         iconKey: groupIconKeySchema.optional(),
         color: groupColorSchema.optional(),
+        imageUrl: customImageDataUrlSchema.nullable().optional(),
         currency: currencyCodeSchema,
         simplifyDebts: z.boolean(),
       }),
@@ -361,6 +372,9 @@ export const groupsRouter = router({
           name: input.name,
           ...(input.iconKey ? { iconKey: input.iconKey } : {}),
           color: input.color ?? current.color,
+          ...(input.imageUrl !== undefined
+            ? { imageUrl: input.imageUrl }
+            : {}),
           currency: input.currency,
           simplifyDebts: input.simplifyDebts,
           version: current.version + 1,

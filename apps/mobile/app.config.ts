@@ -35,6 +35,14 @@ const config: ExpoConfig = {
     "expo-apple-authentication",
     "expo-notifications",
     "expo-image",
+    [
+      "expo-image-picker",
+      {
+        photosPermission:
+          "Splidly uses your selected photo as a profile or group picture.",
+        microphonePermission: false,
+      },
+    ],
     "expo-localization",
     "./plugins/with-google-signin-modular-headers",
     [

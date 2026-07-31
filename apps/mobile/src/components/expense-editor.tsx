@@ -146,6 +146,7 @@ export function ExpenseEditor({
                     userId: profile.data.userId,
                     displayName: profile.data.displayName,
                     homeCurrency: profile.data.homeCurrency,
+                    avatarUrl: profile.data.avatarUrl,
                   },
                 ]
               : []),
@@ -155,6 +156,7 @@ export function ExpenseEditor({
                     userId: friend.data.friend.userId,
                     displayName: friend.data.friend.displayName,
                     homeCurrency: friend.data.friend.homeCurrency,
+                    avatarUrl: friend.data.friend.avatarUrl,
                   },
                 ]
               : []),

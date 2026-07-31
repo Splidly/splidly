@@ -16,7 +16,7 @@ functionality:
 | --------------------- | -------------------------------------------------------------------------------- |
 | Name                  | Apple/Google account and editable display name                                   |
 | Email Address         | Apple/Google account authentication                                              |
-| Photos or Videos      | Provider profile-image URL, when supplied                                        |
+| Photos or Videos      | Provider profile image and user-selected profile or group pictures               |
 | Other Financial Info  | Expenses, balances, splits, settlements, currencies, and exchange-rate snapshots |
 | Other User Content    | Group names, expense descriptions, and notes                                     |
 | User ID               | Splidly, Apple, and Google account identifiers                                   |

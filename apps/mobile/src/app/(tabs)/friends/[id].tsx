@@ -37,6 +37,7 @@ export default function FriendDetailScreen() {
           <Avatar
             name={name}
             colorKey={detail.data.friend?.userId ?? id}
+            imageUrl={detail.data.friend?.avatarUrl}
             size={76}
           />
           <Text style={{ color: theme.text, fontSize: 28, fontWeight: "700", letterSpacing: -0.6 }}>

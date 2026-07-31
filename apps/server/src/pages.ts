@@ -54,17 +54,17 @@ export function privacyPage(): string {
   return layout(
     "Privacy · Splidly",
     `<h1>Privacy Policy</h1>
-     <p><small>Effective July 28, 2026</small></p>
+     <p><small>Effective July 31, 2026</small></p>
      <p>Splidly is a shared-expense ledger. It records who paid, how a cost was split, and the settlements people record themselves. Splidly does not move money, show advertising, sell personal data, or use personal data for advertising tracking.</p>
 
      <h2>Data Splidly collects</h2>
      <ul>
-       <li><strong>Account and profile data:</strong> the account identifier, name, email address, and profile-image URL provided by Apple or Google; your display name and home currency; and authentication tokens needed to keep you signed in.</li>
-       <li><strong>Shared-ledger data:</strong> friendships, groups and memberships, invitations, expense descriptions and notes, dates, amounts, currencies, payers, splits, exchange-rate snapshots, settlements, and the resulting ledger history.</li>
+       <li><strong>Account and profile data:</strong> the account identifier, name, email address, and profile-image URL provided by Apple or Google; your display name, home currency, and profile picture you choose; and authentication tokens needed to keep you signed in.</li>
+       <li><strong>Shared-ledger data:</strong> friendships, groups and memberships, group pictures, invitations, expense descriptions and notes, dates, amounts, currencies, payers, splits, exchange-rate snapshots, settlements, and the resulting ledger history.</li>
        <li><strong>Security and session data:</strong> session identifiers and expiry times, IP address, and user-agent information used to authenticate requests and protect the service.</li>
        <li><strong>On-device data:</strong> the app stores session credentials, pending invitation details, and recently selected currencies in protected device storage.</li>
      </ul>
-     <p>Names, expense details, notes, balances, and settlements are visible to the other people who participate in the applicable friendship or group.</p>
+     <p>Names, profile and group pictures, expense details, notes, balances, and settlements are visible to the other people who participate in the applicable friendship or group.</p>
 
      <h2>How the data is used</h2>
      <p>Splidly uses this data only to create and secure accounts, synchronize shared ledgers, calculate balances and currency conversions, process invitations, provide account support, and maintain the reliability and security of the service.</p>
@@ -82,7 +82,7 @@ export function privacyPage(): string {
      <p>Splidly may retain limited information for longer when required by law or reasonably necessary to resolve abuse, fraud, security, or legal issues.</p>
 
      <h2>Your choices</h2>
-     <p>You can edit your display name and home currency, sign out, or start account deletion from Profile. You can also revoke Splidly’s access through your Apple or Google account settings. For access, correction, a portable copy of your data, or another privacy request, email <a href="mailto:privacy@splidly.site">privacy@splidly.site</a>.</p>
+     <p>You can edit or remove your profile picture, display name, and home currency; edit or remove a group picture while you are a member; sign out; or start account deletion from Profile. You can also revoke Splidly’s access through your Apple or Google account settings. For access, correction, a portable copy of your data, or another privacy request, email <a href="mailto:privacy@splidly.site">privacy@splidly.site</a>.</p>
 
      <h2>Security</h2>
      <p>Splidly uses HTTPS in transit, protected device storage for session credentials, and access controls for servers, databases, and backups. No internet service can guarantee absolute security.</p>

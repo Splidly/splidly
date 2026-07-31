@@ -62,12 +62,14 @@ export default function InviteScreen() {
             name={subject}
             colorKey={preview.data.group?.id}
             color={preview.data.group?.color}
+            imageUrl={preview.data.group?.imageUrl}
             size={82}
           />
         ) : (
           <Avatar
             name={subject}
             colorKey={preview.data.inviter?.userId}
+            imageUrl={preview.data.inviter?.avatarUrl}
             size={82}
           />
         )}

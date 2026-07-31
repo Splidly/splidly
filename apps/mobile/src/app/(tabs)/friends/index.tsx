@@ -66,6 +66,7 @@ export default function FriendsScreen() {
                       <Avatar
                         name={name}
                         colorKey={friend?.userId ?? friendship.id}
+                        imageUrl={friend?.avatarUrl}
                       />
                     }
                     onPress={() => router.push(`/friends/${friendship.id}`)}

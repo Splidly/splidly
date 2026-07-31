@@ -203,6 +203,7 @@ export const groups = pgTable("expense_group", {
   name: text("name").notNull(),
   iconKey: text("icon_key").notNull().default("default"),
   color: text("color").notNull().default("#4745B8"),
+  imageUrl: text("image_url"),
   currency: text("currency").notNull(),
   simplifyDebts: boolean("simplify_debts").notNull().default(true),
   createdBy: text("created_by")

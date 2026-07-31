@@ -136,6 +136,7 @@ export function ExpensePaymentEditor() {
                   key={person.userId}
                   userId={person.userId}
                   name={person.displayName}
+                  imageUrl={person.avatarUrl}
                   selected={selected}
                   selectionLabel={`${person.displayName} paid`}
                   onSelectedChange={(enabled) =>

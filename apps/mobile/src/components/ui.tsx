@@ -1,4 +1,5 @@
 import type { CurrencyCode, Money } from "@splidly/shared";
+import { Image } from "expo-image";
 import { HeaderHeightContext } from "expo-router/build/react-navigation/elements/Header/HeaderHeightContext";
 import {
   Children,
@@ -429,14 +430,18 @@ export function ListRow({
 export function Avatar({
   name,
   colorKey,
+  imageUrl,
   size = 44,
   variant = "person",
 }: {
   name: string;
   colorKey?: string | undefined;
+  imageUrl?: string | null | undefined;
   size?: number;
   variant?: "person" | "group";
 }) {
+  const [failedImageUrl, setFailedImageUrl] = useState<string>();
+  useEffect(() => setFailedImageUrl(undefined), [imageUrl]);
   const colorScheme = useColorScheme() === "dark" ? "dark" : "light";
   const colors = avatarColorsFor(
     `${variant}:${colorKey ?? name.trim().toLowerCase()}`,
@@ -448,28 +453,46 @@ export function Avatar({
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("");
+  const borderRadius =
+    variant === "person" ? size / 2 : Math.round(size * 0.28);
+  const showImage = Boolean(imageUrl && imageUrl !== failedImageUrl);
   return (
     <View
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={`${name} picture`}
       style={{
         width: size,
         height: size,
-        borderRadius: variant === "person" ? size / 2 : Math.round(size * 0.28),
+        borderRadius,
         borderCurve: "continuous",
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: colors.background,
+        overflow: "hidden",
       }}
     >
-      <Text
-        style={{
-          color: colors.foreground,
-          fontSize: size * 0.36,
-          fontWeight: "700",
-          letterSpacing: -0.3,
-        }}
-      >
-        {initials || "?"}
-      </Text>
+      {showImage ? (
+        <Image
+          source={imageUrl!}
+          contentFit="cover"
+          recyclingKey={imageUrl ?? null}
+          transition={120}
+          onError={() => setFailedImageUrl(imageUrl ?? undefined)}
+          style={{ width: size, height: size }}
+        />
+      ) : (
+        <Text
+          style={{
+            color: colors.foreground,
+            fontSize: size * 0.36,
+            fontWeight: "700",
+            letterSpacing: -0.3,
+          }}
+        >
+          {initials || "?"}
+        </Text>
+      )}
     </View>
   );
 }

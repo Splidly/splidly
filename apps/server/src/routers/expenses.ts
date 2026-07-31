@@ -370,6 +370,7 @@ export const expensesRouter = router({
           userId: expenseSplits.userId,
           sourceAmountMinor: expenseSplits.sourceAmountMinor,
           displayName: profiles.displayName,
+          avatarUrl: profiles.avatarUrl,
           homeCurrency: profiles.homeCurrency,
         })
         .from(expenseSplits)
@@ -379,6 +380,7 @@ export const expensesRouter = router({
         .select({
           userId: profiles.userId,
           displayName: profiles.displayName,
+          avatarUrl: profiles.avatarUrl,
           homeCurrency: profiles.homeCurrency,
         })
         .from(profiles)
@@ -389,6 +391,7 @@ export const expensesRouter = router({
           userId: expensePayments.userId,
           sourceAmountMinor: expensePayments.sourceAmountMinor,
           displayName: profiles.displayName,
+          avatarUrl: profiles.avatarUrl,
           homeCurrency: profiles.homeCurrency,
         })
         .from(expensePayments)

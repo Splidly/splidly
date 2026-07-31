@@ -67,12 +67,14 @@ export function SelectionControl({
   label,
   name,
   colorKey,
+  imageUrl,
   onValueChange,
 }: {
   selected: boolean;
   label: string;
   name: string;
   colorKey: string;
+  imageUrl?: string | null | undefined;
   onValueChange: (selected: boolean) => void;
 }) {
   const theme = useTheme();
@@ -89,7 +91,12 @@ export function SelectionControl({
         opacity: pressed ? 0.6 : selected ? 1 : 0.62,
       })}
     >
-      <Avatar name={name} colorKey={colorKey} size={36} />
+      <Avatar
+        name={name}
+        colorKey={colorKey}
+        imageUrl={imageUrl}
+        size={36}
+      />
       <View
         style={{
           position: "absolute",
@@ -220,6 +227,7 @@ export function AllocationList({
 export function AllocationRow({
   userId,
   name,
+  imageUrl,
   selected,
   onSelectedChange,
   amount,
@@ -233,6 +241,7 @@ export function AllocationRow({
 }: {
   userId: string;
   name: string;
+  imageUrl?: string | null | undefined;
   selected: boolean;
   onSelectedChange: (selected: boolean) => void;
   amount?: string;
@@ -260,6 +269,7 @@ export function AllocationRow({
         selected={selected}
         name={name}
         colorKey={userId}
+        imageUrl={imageUrl}
         label={
           selectionLabel ?? `${selected ? "Remove" : "Select"} ${name}`
         }

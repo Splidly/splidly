@@ -11,6 +11,7 @@ export type SplitParticipant = {
   userId: string;
   displayName: string;
   homeCurrency: string;
+  avatarUrl?: string | null | undefined;
 };
 
 export type ExpenseSplitMode = SplitInput["mode"];

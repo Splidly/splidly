@@ -1,0 +1,1 @@
+ALTER TABLE "expense_group" ADD COLUMN "image_url" text;

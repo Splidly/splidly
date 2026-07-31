@@ -65,6 +65,7 @@ export const invitesRouter = router({
               name: groups.name,
               iconKey: groups.iconKey,
               color: groups.color,
+              imageUrl: groups.imageUrl,
               currency: groups.currency,
             })
             .from(groups)
