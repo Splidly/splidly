@@ -9,6 +9,7 @@ import {
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { createAppleClientSecretFromFile } from "./apple-client-secret";
 import type { Env } from "./env";
+import type { Logger } from "./logger";
 
 const demoEmail = "demo@local.splidly.invalid";
 
@@ -21,7 +22,11 @@ export interface Auth {
   };
 }
 
-export async function createAuth(db: Database, env: Env): Promise<Auth> {
+export async function createAuth(
+  db: Database,
+  env: Env,
+  logger: Logger,
+): Promise<Auth> {
   const socialProviders: Record<
     string,
     {
@@ -76,6 +81,16 @@ export async function createAuth(db: Database, env: Env): Promise<Auth> {
         trustedProviders: ["google", "apple"],
       },
     },
+    logger: {
+      disableColors: true,
+      level: env.LOG_LEVEL === "fatal" ? "error" : env.LOG_LEVEL,
+      log(level, message, ...args) {
+        logger[level]("auth.internal", {
+          authMessage: message,
+          ...(args.length > 0 ? { details: args } : {}),
+        });
+      },
+    },
     databaseHooks: {
       user: {
         create: {
@@ -95,12 +110,18 @@ export async function createAuth(db: Database, env: Env): Promise<Auth> {
                 onboardedAt: new Date(),
               })
               .onConflictDoNothing();
+            logger.info("auth.demo-profile.ensured", { userId: user.id });
           },
         },
       },
     },
     plugins: [expo()],
   };
+
+  logger.info("auth.configured", {
+    emailAndPasswordEnabled: env.NODE_ENV === "development",
+    providers: Object.keys(socialProviders),
+  });
 
   return betterAuth(options);
 }

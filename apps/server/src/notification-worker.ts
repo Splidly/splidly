@@ -12,6 +12,7 @@ import {
 } from "@splidly/db";
 import { createApnsClientFromFile, type ApnsResponse } from "./apns";
 import type { Env } from "./env";
+import { durationMs, type Logger } from "./logger";
 
 const batchSize = 50;
 const lockTimeoutMs = 5 * 60 * 1_000;
@@ -53,13 +54,19 @@ function errorMessage(response: ApnsResponse) {
   return `APNs ${response.status}${response.reason ? `: ${response.reason}` : ""}`;
 }
 
-export async function startNotificationWorker(db: Database, env: Env) {
+export async function startNotificationWorker(
+  db: Database,
+  env: Env,
+  logger: Logger,
+) {
   if (
     !env.APNS_ENVIRONMENT ||
     !env.APNS_KEY_ID ||
     !env.APNS_PRIVATE_KEY_PATH
   ) {
-    console.log("APNs delivery disabled; credentials are not configured");
+    logger.warn("notifications.disabled", {
+      reason: "credentials-not-configured",
+    });
     return { stop() {} };
   }
   const environment = env.APNS_ENVIRONMENT;
@@ -71,17 +78,28 @@ export async function startNotificationWorker(db: Database, env: Env) {
     teamId: env.IOS_TEAM_ID,
     topic: env.IOS_APP_ID,
   });
+  logger.info("notifications.started", {
+    batchSize,
+    environment,
+    pollIntervalMs,
+  });
   let running = false;
   let stopped = false;
   let lastCleanupAt = 0;
 
   async function processBatch() {
-    if (running || stopped) return;
+    if (running || stopped) {
+      logger.debug("notifications.batch.skipped", {
+        reason: stopped ? "stopped" : "already-running",
+      });
+      return;
+    }
     running = true;
+    const batchStartedAt = performance.now();
     try {
       const now = new Date();
       if (now.getTime() - lastCleanupAt >= cleanupIntervalMs) {
-        await db
+        const deleted = await db
           .delete(notificationOutbox)
           .where(
             and(
@@ -93,6 +111,9 @@ export async function startNotificationWorker(db: Database, env: Env) {
             ),
           );
         lastCleanupAt = now.getTime();
+        logger.info("notifications.cleanup.completed", {
+          deletedCount: deleted.rowCount ?? 0,
+        });
       }
       const staleBefore = new Date(now.getTime() - lockTimeoutMs);
       const candidates = await db
@@ -126,7 +147,15 @@ export async function startNotificationWorker(db: Database, env: Env) {
         )
         .limit(batchSize);
 
+      logger.debug("notifications.batch.loaded", {
+        candidateCount: candidates.length,
+      });
+
       for (const candidate of candidates) {
+        const deliveryLogger = logger.child({
+          installationId: candidate.installationId,
+          notificationId: candidate.id,
+        });
         const [claimed] = await db
           .update(notificationOutbox)
           .set({
@@ -147,9 +176,13 @@ export async function startNotificationWorker(db: Database, env: Env) {
             ),
           )
           .returning({ id: notificationOutbox.id });
-        if (!claimed) continue;
+        if (!claimed) {
+          deliveryLogger.debug("notifications.delivery.claim-lost");
+          continue;
+        }
 
         const attempts = candidate.attempts + 1;
+        const deliveryStartedAt = performance.now();
         try {
           const response = await apns.send(candidate.token, candidate.payload);
           const disposition = classifyApnsResponse(response);
@@ -176,6 +209,13 @@ export async function startNotificationWorker(db: Database, env: Env) {
                   inArray(notificationOutbox.status, ["pending", "processing"]),
                 ),
               );
+            deliveryLogger.warn("notifications.delivery.invalid-token", {
+              apnsId: response.apnsId,
+              attempts,
+              durationMs: durationMs(deliveryStartedAt),
+              reason: response.reason,
+              status: response.status,
+            });
             continue;
           }
           if (disposition === "delivered") {
@@ -189,6 +229,12 @@ export async function startNotificationWorker(db: Database, env: Env) {
                 updatedAt: new Date(),
               })
               .where(eq(notificationOutbox.id, candidate.id));
+            deliveryLogger.info("notifications.delivery.completed", {
+              apnsId: response.apnsId,
+              attempts,
+              durationMs: durationMs(deliveryStartedAt),
+              status: response.status,
+            });
             continue;
           }
 
@@ -208,6 +254,14 @@ export async function startNotificationWorker(db: Database, env: Env) {
               updatedAt: new Date(),
             })
             .where(eq(notificationOutbox.id, candidate.id));
+          const outcome = shouldRetry ? "retry-scheduled" : "failed";
+          deliveryLogger.warn(`notifications.delivery.${outcome}`, {
+            apnsId: response.apnsId,
+            attempts,
+            durationMs: durationMs(deliveryStartedAt),
+            reason: response.reason,
+            status: response.status,
+          });
         } catch (cause) {
           const shouldRetry = attempts < maxAttempts;
           await db
@@ -226,10 +280,25 @@ export async function startNotificationWorker(db: Database, env: Env) {
               updatedAt: new Date(),
             })
             .where(eq(notificationOutbox.id, candidate.id));
+          deliveryLogger.error("notifications.delivery.error", {
+            attempts,
+            durationMs: durationMs(deliveryStartedAt),
+            error: cause,
+            retryScheduled: shouldRetry,
+          });
         }
       }
+      if (candidates.length > 0) {
+        logger.info("notifications.batch.completed", {
+          candidateCount: candidates.length,
+          durationMs: durationMs(batchStartedAt),
+        });
+      }
     } catch (cause) {
-      console.error("Notification worker failed", cause);
+      logger.error("notifications.batch.failed", {
+        durationMs: durationMs(batchStartedAt),
+        error: cause,
+      });
     } finally {
       running = false;
     }
@@ -241,6 +310,7 @@ export async function startNotificationWorker(db: Database, env: Env) {
     stop() {
       stopped = true;
       clearInterval(timer);
+      logger.info("notifications.stopped");
     },
   };
 }

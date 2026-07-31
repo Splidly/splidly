@@ -36,6 +36,27 @@ The development PostgreSQL container listens on host port `5433` by default
 to avoid conflicting with a locally installed PostgreSQL server. Override it
 with `POSTGRES_PORT` and update `DATABASE_URL` if needed.
 
+## Server logging
+
+The server writes newline-delimited structured JSON to stdout. Every HTTP
+request receives an `x-request-id`; a valid incoming ID is preserved so mobile,
+reverse-proxy, and server logs can be correlated. Request completion, tRPC
+procedure results, authenticated user IDs, database query shapes, auth setup,
+currency-provider calls, notification delivery/retries, pool failures, startup,
+and shutdown are logged. Secret-bearing fields are redacted and request bodies,
+cookies, authorization headers, APNs tokens, and SQL parameter values are never
+logged.
+
+Set `LOG_LEVEL` to `debug`, `info`, `warn`, `error`, or `fatal`. Local defaults
+use `debug`, while the production example uses `info`. Debug logging includes
+SQL text with placeholders and pool lifecycle events; use it temporarily in
+production when diagnosing a problem:
+
+```sh
+LOG_LEVEL=debug docker compose up -d server
+docker compose logs -f server
+```
+
 The native auth and linking modules require development builds; Expo Go is not supported:
 
 ```sh

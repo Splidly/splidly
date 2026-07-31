@@ -17,6 +17,13 @@ const baseEnv = {
 };
 
 describe("server environment", () => {
+  it("defaults to info logging and accepts debug logging", () => {
+    expect(readEnv(baseEnv).LOG_LEVEL).toBe("info");
+    expect(readEnv({ ...baseEnv, LOG_LEVEL: "debug" }).LOG_LEVEL).toBe(
+      "debug",
+    );
+  });
+
   it("accepts separately named Sign in with Apple and APNs credentials", () => {
     expect(
       readEnv({

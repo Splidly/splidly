@@ -6,7 +6,8 @@ import {
 } from "@splidly/shared";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { protectedProcedure, router } from "../trpc";
+import { durationMs } from "../logger";
+import { protectedProcedure, router, type TrpcContext } from "../trpc";
 
 const frankfurterRateSchema = z.object({
   date: z.string(),
@@ -21,9 +22,57 @@ const frankfurterCurrencySchema = z.object({
   symbol: z.string().nullable().optional(),
 });
 
+async function fetchCurrencyService(
+  ctx: TrpcContext,
+  url: string | URL,
+  operation: "currencies" | "rates",
+) {
+  const startedAt = performance.now();
+  const parsedUrl = new URL(url);
+  const fields = {
+    operation,
+    origin: parsedUrl.origin,
+    path: parsedUrl.pathname,
+  };
+  ctx.logger.debug("currency.service.request.started", fields);
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(5_000) });
+    const resultFields = {
+      ...fields,
+      durationMs: durationMs(startedAt),
+      status: response.status,
+    };
+    if (response.ok) {
+      ctx.logger.info("currency.service.request.completed", resultFields);
+    } else {
+      ctx.logger.warn("currency.service.request.failed", resultFields);
+    }
+    return response;
+  } catch (error) {
+    ctx.logger.error("currency.service.request.error", {
+      ...fields,
+      durationMs: durationMs(startedAt),
+      error,
+    });
+    throw error;
+  }
+}
+
 export const currencyRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
-    const response = await fetch(`${ctx.env.FRANKFURTER_URL}/v2/currencies`);
+    let response: Response;
+    try {
+      response = await fetchCurrencyService(
+        ctx,
+        `${ctx.env.FRANKFURTER_URL}/v2/currencies`,
+        "currencies",
+      );
+    } catch {
+      throw new TRPCError({
+        code: "BAD_GATEWAY",
+        message: "Currency service unavailable",
+      });
+    }
     if (!response.ok) {
       throw new TRPCError({
         code: "BAD_GATEWAY",
@@ -45,9 +94,7 @@ export const currencyRouter = router({
         url.searchParams.set("quotes", remoteTargets.join(","));
         let response: Response;
         try {
-          response = await fetch(url, {
-            signal: AbortSignal.timeout(5_000),
-          });
+          response = await fetchCurrencyService(ctx, url, "rates");
         } catch {
           throw new TRPCError({
             code: "BAD_GATEWAY",

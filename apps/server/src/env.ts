@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { logLevels } from "./logger";
 
 const optionalCredential = z
   .string()
@@ -22,6 +23,7 @@ const envSchema = z
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
+    LOG_LEVEL: z.enum(logLevels).default("info"),
     PORT: z.coerce.number().int().positive().default(4000),
     DATABASE_URL: z.string().url(),
     BETTER_AUTH_SECRET: z.string().min(32),
