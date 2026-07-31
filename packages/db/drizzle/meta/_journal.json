@@ -43,6 +43,20 @@
       "when": 1785371996093,
       "tag": "0005_bumpy_gunslinger",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785374300229,
+      "tag": "0006_fearless_mathemanic",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785465552627,
+      "tag": "0007_sticky_scream",
+      "breakpoints": true
     }
   ]
 }

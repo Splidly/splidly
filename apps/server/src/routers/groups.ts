@@ -2,6 +2,7 @@ import {
   and,
   eq,
   expenseSplits,
+  expensePayments,
   expenses,
   financialRevisions,
   groupMembers,
@@ -17,11 +18,13 @@ import {
   settlements,
 } from "@splidly/db";
 import {
+  convertMinor,
   currencyCodeSchema,
   groupColorPresets,
   groupColorSchema,
   groupIconKeySchema,
   money,
+  type CurrencyCode,
 } from "@splidly/shared";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -234,6 +237,23 @@ export const groupsRouter = router({
           ),
         )
         .orderBy(expenses.occurredAt);
+      const activityRates =
+        activity.length === 0
+          ? []
+          : await ctx.db
+              .select({
+                expenseId: rateSnapshots.expenseId,
+                base: rateSnapshots.base,
+                quote: rateSnapshots.quote,
+                rate: rateSnapshots.rate,
+              })
+              .from(rateSnapshots)
+              .where(
+                inArray(
+                  rateSnapshots.expenseId,
+                  activity.map((expense) => expense.id),
+                ),
+              );
       const groupEntries = await ctx.db
         .select()
         .from(ledgerEntries)
@@ -256,11 +276,37 @@ export const groupsRouter = router({
         displayName: member.displayName,
         balance: money(group.currency, member.amountMinor),
       }));
+      const expenseActivity = activity.reverse().map((expense) => {
+        const sourceCurrency = expense.sourceCurrency as CurrencyCode;
+        const canonicalCurrency = group.currency as CurrencyCode;
+        const rate = activityRates.find(
+          (candidate) =>
+            candidate.expenseId === expense.id &&
+            candidate.base === sourceCurrency &&
+            candidate.quote === canonicalCurrency,
+        );
+        const canonicalAmount =
+          sourceCurrency === canonicalCurrency
+            ? money(canonicalCurrency, expense.sourceAmountMinor)
+            : rate
+              ? money(
+                  canonicalCurrency,
+                  convertMinor(
+                    expense.sourceAmountMinor,
+                    sourceCurrency,
+                    canonicalCurrency,
+                    rate.rate,
+                  ),
+                )
+              : null;
+
+        return { ...expense, canonicalAmount };
+      });
       return {
         group,
         members,
         memberBalances,
-        expenses: activity.reverse(),
+        expenses: expenseActivity,
       };
     }),
 
@@ -468,6 +514,9 @@ export const groupsRouter = router({
           );
 
         if (expenseIds.length > 0) {
+          await tx
+            .delete(expensePayments)
+            .where(inArray(expensePayments.expenseId, expenseIds));
           await tx
             .delete(expenseSplits)
             .where(inArray(expenseSplits.expenseId, expenseIds));

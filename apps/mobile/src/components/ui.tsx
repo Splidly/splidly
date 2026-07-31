@@ -1,5 +1,4 @@
 import type { CurrencyCode, Money } from "@splidly/shared";
-import { formatMinor } from "@splidly/shared";
 import { HeaderHeightContext } from "expo-router/build/react-navigation/elements/Header/HeaderHeightContext";
 import {
   Children,
@@ -25,15 +24,21 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { avatarColorsFor } from "../lib/avatar-colors";
+import {
+  formatConvertedMoney,
+  formatMoney,
+} from "../lib/money-display";
 import { spacing, useTheme } from "../theme";
 import { AppIcon } from "./app-icon";
 
 function useScrollViewportFill({
   accountForTopInset = false,
   underlapsHeader = false,
+  reservedBottomHeight = 0,
 }: {
   accountForTopInset?: boolean;
   underlapsHeader?: boolean;
+  reservedBottomHeight?: number;
 } = {}) {
   const insets = useSafeAreaInsets();
   const headerHeight = use(HeaderHeightContext) ?? 0;
@@ -47,6 +52,7 @@ function useScrollViewportFill({
     0,
     viewportHeight -
       insets.bottom -
+      reservedBottomHeight -
       (underlapsHeader && process.env.EXPO_OS === "ios"
         ? headerHeight
         : accountForTopInset
@@ -58,19 +64,28 @@ function useScrollViewportFill({
     if (viewportHeight === 0 || contentMeasurement.height === 0) return;
     const unpaddedHeight =
       contentMeasurement.height -
-      (contentMeasurement.includesBottomSpacing ? spacing.md : 0);
+      (contentMeasurement.includesBottomSpacing
+        ? spacing.md + reservedBottomHeight
+        : 0);
     const nextHasBottomSpacing = unpaddedHeight > fillHeight + 1;
     setHasBottomSpacing((current) =>
       current === nextHasBottomSpacing ? current : nextHasBottomSpacing,
     );
-  }, [contentMeasurement, fillHeight, viewportHeight]);
+  }, [
+    contentMeasurement,
+    fillHeight,
+    reservedBottomHeight,
+    viewportHeight,
+  ]);
 
   return {
     fillStyle:
       viewportHeight > 0
         ? {
             minHeight: fillHeight,
-            paddingBottom: hasBottomSpacing ? spacing.md : undefined,
+            paddingBottom: hasBottomSpacing
+              ? spacing.md + reservedBottomHeight
+              : undefined,
           }
         : undefined,
     onLayout: ({
@@ -100,6 +115,8 @@ export function Screen({
   accountForTopInset = false,
   underlapsHeader,
   contentContainerStyle,
+  bottomOverlay,
+  bottomOverlayHeight = 62,
 }: PropsWithChildren<{
   scroll?: boolean;
   bounces?: boolean;
@@ -107,49 +124,95 @@ export function Screen({
   accountForTopInset?: boolean;
   underlapsHeader?: boolean;
   contentContainerStyle?: ScrollViewProps["contentContainerStyle"];
+  bottomOverlay?: ReactNode;
+  bottomOverlayHeight?: number;
 }>) {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const backgroundColor =
     background === "sheet" ? theme.sheet : theme.background;
   const { fillStyle, onLayout, onContentSizeChange } = useScrollViewportFill({
     accountForTopInset,
     underlapsHeader:
       underlapsHeader ?? (background === "default" && !accountForTopInset),
+    reservedBottomHeight: bottomOverlay ? bottomOverlayHeight : 0,
   });
   if (!scroll) {
     return (
-      <View
-        style={[
-          styles.screen,
-          styles.screenContent,
-          { backgroundColor },
-          contentContainerStyle,
-        ]}
-      >
-        {children}
-      </View>
+      <>
+        <View
+          style={[
+            styles.screen,
+            styles.screenContent,
+            { backgroundColor },
+            bottomOverlay
+              ? { paddingBottom: bottomOverlayHeight + insets.bottom }
+              : null,
+            contentContainerStyle,
+          ]}
+        >
+          {children}
+        </View>
+        {bottomOverlay ? (
+          <ScreenBottomOverlay height={bottomOverlayHeight}>
+            {bottomOverlay}
+          </ScreenBottomOverlay>
+        ) : null}
+      </>
     );
   }
   return (
-    <ScrollView
-      style={[styles.screen, { backgroundColor }]}
-      contentContainerStyle={[
-        styles.screenContent,
-        fillStyle,
-        contentContainerStyle,
-      ]}
-      contentInsetAdjustmentBehavior="automatic"
-      keyboardDismissMode="interactive"
-      keyboardShouldPersistTaps="handled"
-      alwaysBounceVertical={bounces}
-      bounces={bounces}
-      overScrollMode={bounces ? "auto" : "never"}
-      showsVerticalScrollIndicator={false}
-      onLayout={onLayout}
-      onContentSizeChange={onContentSizeChange}
+    <>
+      <ScrollView
+        style={[styles.screen, { backgroundColor }]}
+        contentContainerStyle={[
+          styles.screenContent,
+          fillStyle,
+          contentContainerStyle,
+        ]}
+        contentInsetAdjustmentBehavior="automatic"
+        keyboardDismissMode="interactive"
+        keyboardShouldPersistTaps="handled"
+        alwaysBounceVertical={bounces}
+        bounces={bounces}
+        overScrollMode={bounces ? "auto" : "never"}
+        showsVerticalScrollIndicator={false}
+        onLayout={onLayout}
+        onContentSizeChange={onContentSizeChange}
+      >
+        {children}
+      </ScrollView>
+      {bottomOverlay ? (
+        <ScreenBottomOverlay height={bottomOverlayHeight}>
+          {bottomOverlay}
+        </ScreenBottomOverlay>
+      ) : null}
+    </>
+  );
+}
+
+function ScreenBottomOverlay({
+  height,
+  children,
+}: PropsWithChildren<{ height: number }>) {
+  const insets = useSafeAreaInsets();
+  return (
+    <View
+      testID="screen-bottom-overlay"
+      style={{
+        position: "absolute",
+        right: 0,
+        bottom: 0,
+        left: 0,
+        height: height + insets.bottom,
+        paddingBottom: insets.bottom,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "transparent",
+      }}
     >
       {children}
-    </ScrollView>
+    </View>
   );
 }
 
@@ -260,22 +323,32 @@ export function ListRow({
   title,
   subtitle,
   value,
+  valueFallback,
   valueTone = "default",
   leading,
   trailing,
   onPress,
   destructive = false,
+  showsDisclosureIndicator = true,
 }: {
   title: string;
   subtitle?: string;
   value?: string;
+  valueFallback?: string;
   valueTone?: "default" | "muted" | "positive" | "negative";
   leading?: ReactNode;
   trailing?: ReactNode;
   onPress?: () => void;
   destructive?: boolean;
+  showsDisclosureIndicator?: boolean;
 }) {
   const theme = useTheme();
+  const [usesValueFallback, setUsesValueFallback] = useState(false);
+  useEffect(() => {
+    setUsesValueFallback(false);
+  }, [value, valueFallback]);
+  const displayedValue =
+    usesValueFallback && valueFallback ? valueFallback : value;
   const valueColor =
     valueTone === "positive"
       ? theme.positive
@@ -306,16 +379,28 @@ export function ListRow({
           </Text>
         ) : null}
       </View>
-      {value ? (
+      {displayedValue ? (
         <Text
-          numberOfLines={1}
+          accessibilityLabel={value}
+          numberOfLines={
+            valueFallback && !usesValueFallback ? undefined : 1
+          }
+          onTextLayout={
+            valueFallback && !usesValueFallback
+              ? (event) => {
+                  if (event.nativeEvent.lines.length > 1) {
+                    setUsesValueFallback(true);
+                  }
+                }
+              : undefined
+          }
           style={[styles.rowValue, { color: valueColor }]}
         >
-          {value}
+          {displayedValue}
         </Text>
       ) : null}
       {trailing}
-      {onPress && !trailing ? (
+      {onPress && !trailing && showsDisclosureIndicator ? (
         <Text
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
@@ -595,8 +680,10 @@ export function BalanceText({
       ]}
     >
       {prefix}
-      {formatMinor(minor < 0n ? -minor : minor, value.currency as CurrencyCode)}{" "}
-      {value.currency}
+      {formatConvertedMoney(
+        minor < 0n ? -minor : minor,
+        value.currency as CurrencyCode,
+      )}
     </Text>
   );
 }
@@ -613,7 +700,7 @@ export function MoneyValue({
     <Text
       style={[styles.moneyValue, { color: theme.text }]}
     >
-      {formatMinor(BigInt(minor), currency as CurrencyCode)} {currency}
+      {formatMoney(BigInt(minor), currency as CurrencyCode)}
     </Text>
   );
 }

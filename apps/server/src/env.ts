@@ -6,9 +6,15 @@ const optionalCredential = z
   .transform((value) => value || undefined);
 
 const appleCredentialKeys = [
-  "APPLE_CLIENT_ID",
-  "APPLE_KEY_ID",
-  "APPLE_PRIVATE_KEY_PATH",
+  "APPLE_SIGN_IN_CLIENT_ID",
+  "APPLE_SIGN_IN_KEY_ID",
+  "APPLE_SIGN_IN_PRIVATE_KEY_PATH",
+] as const;
+
+const apnsCredentialKeys = [
+  "APNS_ENVIRONMENT",
+  "APNS_KEY_ID",
+  "APNS_PRIVATE_KEY_PATH",
 ] as const;
 
 const envSchema = z
@@ -22,9 +28,15 @@ const envSchema = z
     API_PUBLIC_URL: z.string().url(),
     APP_PUBLIC_URL: z.string().url(),
     APP_SCHEME: z.string().default("splidly"),
-    APPLE_CLIENT_ID: optionalCredential,
-    APPLE_KEY_ID: optionalCredential,
-    APPLE_PRIVATE_KEY_PATH: optionalCredential,
+    APPLE_SIGN_IN_CLIENT_ID: optionalCredential,
+    APPLE_SIGN_IN_KEY_ID: optionalCredential,
+    APPLE_SIGN_IN_PRIVATE_KEY_PATH: optionalCredential,
+    APNS_ENVIRONMENT: z.preprocess(
+      (value) => value || undefined,
+      z.enum(["development", "production"]).optional(),
+    ),
+    APNS_KEY_ID: optionalCredential,
+    APNS_PRIVATE_KEY_PATH: optionalCredential,
     GOOGLE_CLIENT_ID: optionalCredential,
     GOOGLE_CLIENT_SECRET: optionalCredential,
     FRANKFURTER_URL: z.string().url(),
@@ -40,19 +52,33 @@ const envSchema = z
       (key) => env[key],
     ).length;
     if (
-      configuredCount === 0 ||
-      configuredCount === appleCredentialKeys.length
+      configuredCount !== 0 &&
+      configuredCount !== appleCredentialKeys.length
     ) {
-      return;
+      for (const key of appleCredentialKeys) {
+        if (env[key]) continue;
+        ctx.addIssue({
+          code: "custom",
+          message: `${key} is required when Sign in with Apple is configured`,
+          path: [key],
+        });
+      }
     }
-
-    for (const key of appleCredentialKeys) {
-      if (env[key]) continue;
-      ctx.addIssue({
-        code: "custom",
-        message: `${key} is required when Sign in with Apple is configured`,
-        path: [key],
-      });
+    const apnsConfiguredCount = apnsCredentialKeys.filter(
+      (key) => env[key],
+    ).length;
+    if (
+      apnsConfiguredCount !== 0 &&
+      apnsConfiguredCount !== apnsCredentialKeys.length
+    ) {
+      for (const key of apnsCredentialKeys) {
+        if (env[key]) continue;
+        ctx.addIssue({
+          code: "custom",
+          message: `${key} is required when APNs delivery is configured`,
+          path: [key],
+        });
+      }
     }
   });
 

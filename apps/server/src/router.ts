@@ -5,10 +5,12 @@ import { friendsRouter } from "./routers/friends";
 import { groupsRouter } from "./routers/groups";
 import { invitesRouter } from "./routers/invites";
 import { profileRouter } from "./routers/profile";
+import { pushRouter } from "./routers/push";
 import { settlementsRouter } from "./routers/settlements";
 
 export const appRouter = router({
   profile: profileRouter,
+  push: pushRouter,
   friends: friendsRouter,
   groups: groupsRouter,
   invites: invitesRouter,
@@ -18,4 +20,3 @@ export const appRouter = router({
 });
 
 export type AppRouter = typeof appRouter;
-

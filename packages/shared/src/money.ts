@@ -1,4 +1,4 @@
-import type { CurrencyCode, Money } from "./contracts";
+import type { CurrencyCode, Money, SplitInput } from "./contracts";
 
 const MINOR_UNIT_OVERRIDES: Record<string, number> = {
   BHD: 3,
@@ -146,19 +146,12 @@ export function allocateByWeights(
 
 export function splitSourceAmount(
   totalMinor: bigint,
-  input:
-    | { mode: "equal"; participantIds: string[] }
-    | { mode: "exact"; shares: { userId: string; amountMinor: string }[] },
+  input: SplitInput,
 ): Map<string, bigint> {
-  const ids =
-    input.mode === "equal"
-      ? input.participantIds
-      : input.shares.map((share) => share.userId);
-  if (new Set(ids).size !== ids.length) {
-    throw new Error("A participant may only appear once");
-  }
-
   if (input.mode === "equal") {
+    if (new Set(input.participantIds).size !== input.participantIds.length) {
+      throw new Error("A participant may only appear once");
+    }
     const amounts = allocateByWeights(
       totalMinor,
       input.participantIds.map(() => 1n),
@@ -168,12 +161,84 @@ export function splitSourceAmount(
     );
   }
 
-  const shares = input.shares.map((share) => BigInt(share.amountMinor));
-  if (shares.reduce((sum, share) => sum + share, 0n) !== totalMinor) {
-    throw new Error("Exact shares must equal the expense total");
+  if (input.mode === "itemized") {
+    const itemTotal = input.items.reduce(
+      (sum, item) => sum + BigInt(item.amountMinor),
+      0n,
+    );
+    if (itemTotal !== totalMinor) {
+      throw new Error("Itemized amounts must equal the expense total");
+    }
+    const result = new Map<string, bigint>();
+    for (const item of input.items) {
+      if (
+        new Set(item.participantIds).size !== item.participantIds.length
+      ) {
+        throw new Error("A participant may only appear once per item");
+      }
+      const amounts = allocateByWeights(
+        BigInt(item.amountMinor),
+        item.participantIds.map(() => 1n),
+      );
+      item.participantIds.forEach((userId, index) => {
+        result.set(
+          userId,
+          (result.get(userId) ?? 0n) + (amounts[index] ?? 0n),
+        );
+      });
+    }
+    return result;
   }
+
+  const ids = input.shares.map((share) => share.userId);
+  if (new Set(ids).size !== ids.length) {
+    throw new Error("A participant may only appear once");
+  }
+
+  if (input.mode === "exact") {
+    const amounts = input.shares.map((share) => BigInt(share.amountMinor));
+    if (amounts.reduce((sum, share) => sum + share, 0n) !== totalMinor) {
+      throw new Error("Exact shares must equal the expense total");
+    }
+    return new Map(
+      input.shares.map((share) => [
+        share.userId,
+        BigInt(share.amountMinor),
+      ]),
+    );
+  }
+
+  if (input.mode === "shares") {
+    const weights = input.shares.map((share) => BigInt(share.shares));
+    const amounts = allocateByWeights(totalMinor, weights);
+    return new Map(
+      input.shares.map((share, index) => [
+        share.userId,
+        amounts[index] ?? 0n,
+      ]),
+    );
+  }
+
+  const decimals = input.shares.map((share) => {
+    const [, fraction = ""] = share.percentage.split(".");
+    return { value: share.percentage, digits: fraction.length };
+  });
+  const scale = Math.max(0, ...decimals.map((value) => value.digits));
+  const weights = decimals.map(({ value, digits }) =>
+    BigInt(value.replace(".", "")) * 10n ** BigInt(scale - digits),
+  );
+  if (
+    weights.reduce((sum, weight) => sum + weight, 0n) !==
+    100n * 10n ** BigInt(scale)
+  ) {
+    throw new Error("Percentages must add up to 100%");
+  }
+  const amounts = allocateByWeights(totalMinor, weights);
   return new Map(
-    input.shares.map((share) => [share.userId, BigInt(share.amountMinor)]),
+    input.shares.map((share, index) => [
+      share.userId,
+      amounts[index] ?? 0n,
+    ]),
   );
 }
 

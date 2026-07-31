@@ -14,6 +14,9 @@ import {
 } from "../lib/navigation";
 import { ApiProvider } from "../lib/trpc";
 import { useTheme } from "../theme";
+import { ExpensePaymentSessionProvider } from "../components/expense-payment-session";
+import { ExpenseSplitSessionProvider } from "../components/expense-split-session";
+import { NotificationCoordinator } from "../components/notification-coordinator";
 
 function Navigation() {
   const theme = useTheme();
@@ -64,6 +67,20 @@ function Navigation() {
           }}
         />
         <Stack.Screen
+          name="expense/payment"
+          options={{
+            title: "Paid by",
+            presentation: "fullScreenModal",
+          }}
+        />
+        <Stack.Screen
+          name="expense/split"
+          options={{
+            title: "Split expense",
+            presentation: "fullScreenModal",
+          }}
+        />
+        <Stack.Screen
           name="settlement/new"
           options={{
             title: "Settle Up",
@@ -92,7 +109,12 @@ export default function RootLayout() {
       style={{ flex: 1, backgroundColor: theme.background }}
     >
       <ApiProvider>
-        <Navigation />
+        <NotificationCoordinator />
+        <ExpensePaymentSessionProvider>
+          <ExpenseSplitSessionProvider>
+            <Navigation />
+          </ExpenseSplitSessionProvider>
+        </ExpensePaymentSessionProvider>
       </ApiProvider>
     </GestureHandlerRootView>
   );

@@ -1,4 +1,4 @@
-import { formatMinor, type CurrencyCode } from "@splidly/shared";
+import type { CurrencyCode } from "@splidly/shared";
 import { router, Stack, useLocalSearchParams, type Href } from "expo-router";
 import { Alert, Text, View } from "react-native";
 import {
@@ -12,6 +12,11 @@ import {
   Section,
 } from "../../../components/ui";
 import { ExpenseIcon } from "../../../components/expense-icon";
+import { expenseSplitModeLabels } from "../../../lib/expense-split";
+import {
+  currencySymbol,
+  formatMoney,
+} from "../../../lib/money-display";
 import { api } from "../../../lib/trpc";
 import { useTheme } from "../../../theme";
 
@@ -54,7 +59,7 @@ export default function ExpenseDetailScreen() {
     );
   }
 
-  const { expense, payer, rates, splits } = detail.data;
+  const { expense, payers, rates, split, splits } = detail.data;
   const currency = expense.sourceCurrency as CurrencyCode;
   const editExpense = () =>
     router.push(`/expense/${expense.id}/edit` as Href);
@@ -96,7 +101,7 @@ export default function ExpenseDetailScreen() {
               letterSpacing: -1,
             }}
           >
-            {formatMinor(expense.sourceAmountMinor, currency)} {currency}
+            {formatMoney(expense.sourceAmountMinor, currency)}
           </Text>
           <Text
             style={{
@@ -111,8 +116,6 @@ export default function ExpenseDetailScreen() {
         </View>
 
         <Section title="Details">
-          <ListRow title="Paid by" value={payer?.displayName ?? "Unknown"} />
-          <RowDivider inset={16} />
           <ListRow
             title="Date"
             value={expense.occurredAt.toLocaleDateString(undefined, {
@@ -128,6 +131,26 @@ export default function ExpenseDetailScreen() {
                 : "Direct expense"
             }
           />
+        </Section>
+
+        <Section title="Paid by">
+          {payers.map((payer, index) => (
+            <View key={payer.userId}>
+              {index > 0 ? <RowDivider inset={16} /> : null}
+              <ListRow
+                title={payer.displayName}
+                subtitle={`Home currency · ${currencySymbol(
+                  payer.homeCurrency as CurrencyCode,
+                )}`}
+                trailing={
+                  <MoneyValue
+                    minor={payer.sourceAmountMinor}
+                    currency={currency}
+                  />
+                }
+              />
+            </View>
+          ))}
         </Section>
 
         {expense.notes ? (
@@ -146,12 +169,19 @@ export default function ExpenseDetailScreen() {
         ) : null}
 
         <Section title="Split">
+          <ListRow
+            title="Method"
+            value={expenseSplitModeLabels[split.mode]}
+          />
+          <RowDivider inset={16} />
           {splits.map((split, index) => (
             <View key={split.userId}>
               {index > 0 ? <RowDivider inset={16} /> : null}
               <ListRow
                 title={split.displayName}
-                subtitle={`Home currency · ${split.homeCurrency}`}
+                subtitle={`Home currency · ${currencySymbol(
+                  split.homeCurrency as CurrencyCode,
+                )}`}
                 trailing={
                   <MoneyValue
                     minor={split.sourceAmountMinor}
@@ -162,6 +192,32 @@ export default function ExpenseDetailScreen() {
             </View>
           ))}
         </Section>
+
+        {split.mode === "itemized" ? (
+          <Section title="Items">
+            {split.items.map((item, index) => (
+              <View key={item.id}>
+                {index > 0 ? <RowDivider inset={16} /> : null}
+                <ListRow
+                  title={item.description}
+                  subtitle={item.participantIds
+                    .map(
+                      (userId) =>
+                        splits.find((person) => person.userId === userId)
+                          ?.displayName ?? "Unknown",
+                    )
+                    .join(", ")}
+                  trailing={
+                    <MoneyValue
+                      minor={BigInt(item.amountMinor)}
+                      currency={currency}
+                    />
+                  }
+                />
+              </View>
+            ))}
+          </Section>
+        ) : null}
 
         {rates.some((rate) => rate.base !== rate.quote) ? (
           <Section title="Frozen exchange rates">

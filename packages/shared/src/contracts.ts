@@ -83,10 +83,42 @@ export const expenseContextSchema = z.discriminatedUnion("type", [
 
 export type ExpenseContext = z.infer<typeof expenseContextSchema>;
 
+const uniqueParticipantIds = (
+  ids: readonly string[],
+  context: z.RefinementCtx,
+) => {
+  if (new Set(ids).size !== ids.length) {
+    context.addIssue({
+      code: "custom",
+      message: "A participant may only appear once",
+    });
+  }
+};
+
+export const paymentInputSchema = z
+  .array(
+    z.object({
+      userId: z.string().min(1),
+      amountMinor: z.string().regex(/^[1-9]\d*$/),
+    }),
+  )
+  .min(1)
+  .superRefine((payments, context) =>
+    uniqueParticipantIds(
+      payments.map((payment) => payment.userId),
+      context,
+    ),
+  );
+
+export type PaymentInput = z.infer<typeof paymentInputSchema>;
+
 export const splitInputSchema = z.discriminatedUnion("mode", [
   z.object({
     mode: z.literal("equal"),
-    participantIds: z.array(z.string().min(1)).min(1),
+    participantIds: z
+      .array(z.string().min(1))
+      .min(1)
+      .superRefine(uniqueParticipantIds),
   }),
   z.object({
     mode: z.literal("exact"),
@@ -95,6 +127,62 @@ export const splitInputSchema = z.discriminatedUnion("mode", [
         z.object({
           userId: z.string().min(1),
           amountMinor: z.string().regex(/^\d+$/),
+        }),
+      )
+      .min(1)
+      .superRefine((shares, context) =>
+        uniqueParticipantIds(
+          shares.map((share) => share.userId),
+          context,
+        ),
+      ),
+  }),
+  z.object({
+    mode: z.literal("percentage"),
+    shares: z
+      .array(
+        z.object({
+          userId: z.string().min(1),
+          percentage: z.string().regex(/^\d{1,3}(?:\.\d{1,4})?$/),
+        }),
+      )
+      .min(1)
+      .superRefine((shares, context) =>
+        uniqueParticipantIds(
+          shares.map((share) => share.userId),
+          context,
+        ),
+      ),
+  }),
+  z.object({
+    mode: z.literal("shares"),
+    shares: z
+      .array(
+        z.object({
+          userId: z.string().min(1),
+          shares: z.string().regex(/^\d+$/),
+        }),
+      )
+      .min(1)
+      .superRefine((shares, context) =>
+        uniqueParticipantIds(
+          shares.map((share) => share.userId),
+          context,
+        ),
+      ),
+  }),
+  z.object({
+    mode: z.literal("itemized"),
+    items: z
+      .array(
+        z.object({
+          id: z.string().min(1).max(100),
+          description: z.string().trim().min(1).max(160),
+          amountMinor: z.string().regex(/^\d+$/),
+          participantIds: z
+            .array(z.string().min(1))
+            .min(1)
+            .superRefine(uniqueParticipantIds),
         }),
       )
       .min(1),
@@ -125,23 +213,35 @@ export const quoteResultSchema = z.object({
 
 export type QuoteResult = z.infer<typeof quoteResultSchema>;
 
-export const expenseMutationSchema = z.object({
-  context: expenseContextSchema,
-  clientMutationId: z.uuid(),
-  expectedVersion: z.number().int().positive().optional(),
-  description: z.string().trim().min(1).max(160),
-  iconKey: expenseIconKeySchema.optional(),
-  iconManuallySet: z.boolean().default(false),
-  notes: z.string().trim().max(2_000).default(""),
-  occurredAt: z.iso.datetime(),
-  payerId: z.string().min(1),
-  amount: moneySchema.refine((value) => BigInt(value.minor) > 0n, {
-    message: "Expense amount must be positive",
-  }),
-  split: splitInputSchema,
-  quoteId: z.uuid().optional(),
-  rateOverrides: z.array(rateSnapshotSchema).default([]),
-});
+export const expenseMutationSchema = z
+  .object({
+    context: expenseContextSchema,
+    clientMutationId: z.uuid(),
+    expectedVersion: z.number().int().positive().optional(),
+    description: z.string().trim().min(1).max(160),
+    iconKey: expenseIconKeySchema.optional(),
+    iconManuallySet: z.boolean().default(false),
+    notes: z.string().trim().max(2_000).default(""),
+    occurredAt: z.iso.datetime(),
+    /** @deprecated Accepted for compatibility with older mobile clients. */
+    payerId: z.string().min(1).optional(),
+    payments: paymentInputSchema.optional(),
+    amount: moneySchema.refine((value) => BigInt(value.minor) > 0n, {
+      message: "Expense amount must be positive",
+    }),
+    split: splitInputSchema,
+    quoteId: z.uuid().optional(),
+    rateOverrides: z.array(rateSnapshotSchema).default([]),
+  })
+  .superRefine((value, context) => {
+    if (!value.payments && !value.payerId) {
+      context.addIssue({
+        code: "custom",
+        path: ["payments"],
+        message: "At least one payer is required",
+      });
+    }
+  });
 
 export type ExpenseMutation = z.infer<typeof expenseMutationSchema>;
 

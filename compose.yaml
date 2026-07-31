@@ -16,9 +16,12 @@ services:
       API_PUBLIC_URL: https://${APP_DOMAIN}
       APP_PUBLIC_URL: https://${APP_DOMAIN}
       APP_SCHEME: splidly
-      APPLE_CLIENT_ID: ${APPLE_CLIENT_ID:?Set APPLE_CLIENT_ID}
-      APPLE_KEY_ID: ${APPLE_KEY_ID:?Set APPLE_KEY_ID}
-      APPLE_PRIVATE_KEY_PATH: /run/secrets/apple_sign_in_key
+      APPLE_SIGN_IN_CLIENT_ID: ${APPLE_SIGN_IN_CLIENT_ID:?Set APPLE_SIGN_IN_CLIENT_ID}
+      APPLE_SIGN_IN_KEY_ID: ${APPLE_SIGN_IN_KEY_ID:?Set APPLE_SIGN_IN_KEY_ID}
+      APPLE_SIGN_IN_PRIVATE_KEY_PATH: /run/secrets/apple_sign_in_key
+      APNS_ENVIRONMENT: ${APNS_ENVIRONMENT:?Set APNS_ENVIRONMENT}
+      APNS_KEY_ID: ${APNS_KEY_ID:?Set APNS_KEY_ID}
+      APNS_PRIVATE_KEY_PATH: /run/secrets/apns_key
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       FRANKFURTER_URL: http://frankfurter:8080
@@ -40,6 +43,7 @@ services:
       retries: 10
     secrets:
       - apple_sign_in_key
+      - apns_key
     networks: [backend, egress]
 
   migrate:
@@ -107,4 +111,6 @@ volumes:
 
 secrets:
   apple_sign_in_key:
-    file: ${APPLE_PRIVATE_KEY_FILE:?Set APPLE_PRIVATE_KEY_FILE}
+    file: ${APPLE_SIGN_IN_PRIVATE_KEY_FILE:?Set APPLE_SIGN_IN_PRIVATE_KEY_FILE}
+  apns_key:
+    file: ${APNS_PRIVATE_KEY_FILE:?Set APNS_PRIVATE_KEY_FILE}

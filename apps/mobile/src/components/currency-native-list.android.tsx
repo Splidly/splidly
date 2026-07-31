@@ -11,6 +11,7 @@ import {
   testID,
 } from "@expo/ui/jetpack-compose/modifiers";
 import { useTheme } from "../theme";
+import { currencySymbolWithCode } from "../lib/money-display";
 import type {
   CurrencyNativeListProps,
   CurrencySection,
@@ -65,7 +66,7 @@ export function CurrencyNativeList({
                   <Text>{currency.name}</Text>
                 </ListItem.HeadlineContent>
                 <ListItem.SupportingContent>
-                  <Text>{currency.code}</Text>
+                  <Text>{currencySymbolWithCode(currency.code)}</Text>
                 </ListItem.SupportingContent>
                 {currency.code === value ? (
                   <ListItem.TrailingContent>

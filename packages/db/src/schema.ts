@@ -23,6 +23,17 @@ const timestamps = {
     .defaultNow(),
 };
 
+export type ApnsEnvironment = "development" | "production";
+
+export interface ExpenseNotificationPayload {
+  eventType: "expense.created" | "expense.updated" | "expense.deleted";
+  expenseId: string;
+  expenseVersion: number;
+  groupId: string;
+  title: string;
+  body: string;
+}
+
 export const users = pgTable("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -102,6 +113,66 @@ export const profiles = pgTable("profile", {
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
   ...timestamps,
 });
+
+export const pushInstallations = pgTable(
+  "push_installation",
+  {
+    id: uuid("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    platform: text("platform").notNull(),
+    environment: text("environment").$type<ApnsEnvironment>().notNull(),
+    token: text("token").notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    disabledAt: timestamp("disabled_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("push_installation_token_unique").on(table.token),
+    index("push_installation_user_idx").on(table.userId),
+    index("push_installation_delivery_idx").on(
+      table.environment,
+      table.disabledAt,
+    ),
+  ],
+);
+
+export const notificationOutbox = pgTable(
+  "notification_outbox",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    eventKey: text("event_key").notNull(),
+    installationId: uuid("installation_id")
+      .notNull()
+      .references(() => pushInstallations.id, { onDelete: "cascade" }),
+    recipientUserId: text("recipient_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    payload: jsonb("payload").$type<ExpenseNotificationPayload>().notNull(),
+    status: text("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    availableAt: timestamp("available_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    processingStartedAt: timestamp("processing_started_at", {
+      withTimezone: true,
+    }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("notification_outbox_event_unique").on(table.eventKey),
+    index("notification_outbox_pending_idx").on(
+      table.status,
+      table.availableAt,
+    ),
+    index("notification_outbox_installation_idx").on(table.installationId),
+  ],
+);
 
 export const friendships = pgTable(
   "friendship",
@@ -270,6 +341,25 @@ export const expenseSplits = pgTable(
   ],
 );
 
+export const expensePayments = pgTable(
+  "expense_payment",
+  {
+    expenseId: uuid("expense_id")
+      .notNull()
+      .references(() => expenses.id),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    sourceAmountMinor: bigint("source_amount_minor", {
+      mode: "bigint",
+    }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.expenseId, table.userId] }),
+    index("expense_payment_user_idx").on(table.userId),
+  ],
+);
+
 export const settlements = pgTable(
   "settlement",
   {
@@ -413,6 +503,8 @@ export const schema = {
   accounts,
   verifications,
   profiles,
+  pushInstallations,
+  notificationOutbox,
   friendships,
   groups,
   groupMembers,
@@ -420,6 +512,7 @@ export const schema = {
   currencyQuotes,
   expenses,
   expenseSplits,
+  expensePayments,
   settlements,
   rateSnapshots,
   ledgerEntries,

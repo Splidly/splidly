@@ -205,6 +205,58 @@ describe("Screen", () => {
     expect(contentStyle.minHeight).toBe(660);
     expect(contentStyle.paddingBottom).toBeUndefined();
   });
+
+  it("reserves a fixed overlay without creating short-screen scroll space", async () => {
+    const view = await render(
+      <HeaderHeightContext.Provider value={0}>
+        <SafeAreaInsetsContext.Provider
+          value={{ top: 0, right: 0, bottom: 20, left: 0 }}
+        >
+          <Screen
+            bottomOverlay={<Text>Progress</Text>}
+            bottomOverlayHeight={88}
+          >
+            <Text>Short content</Text>
+          </Screen>
+        </SafeAreaInsetsContext.Provider>
+      </HeaderHeightContext.Provider>,
+    );
+    const [scrollView] = view.container.queryAll(
+      (instance) =>
+        instance.props.contentInsetAdjustmentBehavior === "automatic",
+    );
+    if (!scrollView) throw new Error("ScrollView was not rendered");
+
+    await fireEvent(scrollView, "layout", {
+      nativeEvent: { layout: { height: 800 } },
+    });
+    const [resizedScrollView] = view.container.queryAll(
+      (instance) =>
+        instance.props.contentInsetAdjustmentBehavior === "automatic",
+    );
+    const shortStyle = StyleSheet.flatten(
+      resizedScrollView?.props.contentContainerStyle,
+    );
+    const overlayStyle = StyleSheet.flatten(
+      view.getByTestId("screen-bottom-overlay").props.style,
+    );
+
+    expect(shortStyle.minHeight).toBe(692);
+    expect(shortStyle.paddingBottom).toBeUndefined();
+    expect(overlayStyle.height).toBe(108);
+    expect(overlayStyle.paddingBottom).toBe(20);
+
+    if (!resizedScrollView) throw new Error("ScrollView was not resized");
+    await fireEvent(resizedScrollView, "contentSizeChange", 400, 1000);
+    const [overflowingScrollView] = view.container.queryAll(
+      (instance) =>
+        instance.props.contentInsetAdjustmentBehavior === "automatic",
+    );
+    const overflowingStyle = StyleSheet.flatten(
+      overflowingScrollView?.props.contentContainerStyle,
+    );
+    expect(overflowingStyle.paddingBottom).toBe(104);
+  });
 });
 
 describe("CollectionScreen", () => {

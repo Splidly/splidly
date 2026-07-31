@@ -19,6 +19,7 @@ import {
 } from "../../../../components/ui";
 import { shareInvite } from "../../../../lib/share-invite";
 import { normalizeGroupColor } from "../../../../lib/group-colors";
+import { currencySymbolWithCode } from "../../../../lib/money-display";
 import { api } from "../../../../lib/trpc";
 
 export default function GroupSettingsScreen() {
@@ -93,7 +94,12 @@ export default function GroupSettingsScreen() {
         lines={[
           {
             key: "currency",
-            text: group.currency,
+            label: currencySymbolWithCode(
+              group.currency as CurrencyCode,
+            ),
+            text: currencySymbolWithCode(
+              group.currency as CurrencyCode,
+            ),
             tone: "muted",
           },
         ]}
@@ -133,6 +139,7 @@ export default function GroupSettingsScreen() {
         <ListRow
           title={createInvite.isPending ? "Creating invitation…" : "Invite people"}
           subtitle="Share a link to join this group"
+          showsDisclosureIndicator={false}
           onPress={() =>
             createInvite.mutate({ kind: "group", groupId: id })
           }
@@ -144,7 +151,14 @@ export default function GroupSettingsScreen() {
               <RowDivider />
               <ListRow
                 title={member.displayName}
-                subtitle={isMe ? "You" : `Home currency · ${member.homeCurrency}`}
+                showsDisclosureIndicator={false}
+                subtitle={
+                  isMe
+                    ? "You"
+                    : `Home currency · ${currencySymbolWithCode(
+                        member.homeCurrency as CurrencyCode,
+                      )}`
+                }
                 leading={
                   <Avatar
                     name={member.displayName}
@@ -183,6 +197,7 @@ export default function GroupSettingsScreen() {
         <ListRow
           title="Leave group"
           destructive
+          showsDisclosureIndicator={false}
           onPress={() =>
             Alert.alert("Leave group?", "Your group balance must be zero.", [
               { text: "Cancel", style: "cancel" },
@@ -198,6 +213,7 @@ export default function GroupSettingsScreen() {
         <ListRow
           title="Archive group"
           destructive
+          showsDisclosureIndicator={false}
           onPress={() =>
             group &&
             Alert.alert(
@@ -224,6 +240,7 @@ export default function GroupSettingsScreen() {
             <ListRow
               title="Delete group permanently"
               destructive
+              showsDisclosureIndicator={false}
               onPress={() =>
                 Alert.alert(
                   "Delete group permanently?",

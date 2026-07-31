@@ -1,5 +1,6 @@
 import { Host, Icon, List, ListItem, Text } from "@expo/ui";
 import { useTheme } from "../theme";
+import { currencySymbolWithCode } from "../lib/money-display";
 import type {
   CurrencyNativeListProps,
   CurrencySection,
@@ -47,7 +48,7 @@ export function CurrencyNativeList({
               <ListItem
                 key={currency.code}
                 testID={`currency-${currency.code}`}
-                supportingText={currency.code}
+                supportingText={currencySymbolWithCode(currency.code)}
                 trailing={
                   currency.code === value ? (
                     <Icon

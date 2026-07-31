@@ -1,6 +1,7 @@
 import {
   and,
   eq,
+  expensePayments,
   expenseSplits,
   expenses,
   financialRevisions,
@@ -34,9 +35,17 @@ import {
   type DbTransaction,
 } from "../domain/finance";
 import {
+  allocateByUser,
+  expenseTransfers,
+} from "../domain/expense-allocation";
+import {
   requireActiveGroupMember,
   requireFriendshipParticipant,
 } from "../domain/helpers";
+import {
+  enqueueExpenseNotifications,
+  loadExpenseParticipantIds,
+} from "../domain/expense-notifications";
 import {
   protectedProcedure,
   router,
@@ -49,8 +58,16 @@ interface PreparedExpense {
   iconManuallySet: boolean;
   contextId: string;
   canonicalCurrency: CurrencyCode;
+  payments: Map<string, bigint>;
   sourceShares: Map<string, bigint>;
-  canonicalShares: Map<string, bigint>;
+  participantIds: string[];
+  transfers: {
+    debtorId: string;
+    creditorId: string;
+    canonicalAmountMinor: bigint;
+    debtorHomeAmountMinor: bigint;
+    creditorHomeAmountMinor: bigint;
+  }[];
   homeCurrencies: Map<string, CurrencyCode>;
   rates: Awaited<ReturnType<typeof resolveRates>>;
 }
@@ -62,11 +79,42 @@ async function prepareExpense(
 ): Promise<PreparedExpense> {
   const userId = ctx.session?.user.id;
   if (!userId) throw new TRPCError({ code: "UNAUTHORIZED" });
-  const participantIds =
-    input.split.mode === "equal"
-      ? input.split.participantIds
-      : input.split.shares.map((share) => share.userId);
-  const involvedIds = [...new Set([...participantIds, input.payerId])];
+  const sourceAmount = BigInt(input.amount.minor);
+  const paymentInputs =
+    input.payments ??
+    (input.payerId
+      ? [{ userId: input.payerId, amountMinor: input.amount.minor }]
+      : []);
+  const payments = new Map(
+    paymentInputs.map((payment) => [
+      payment.userId,
+      BigInt(payment.amountMinor),
+    ]),
+  );
+  if (
+    payments.size === 0 ||
+    payments.size !== paymentInputs.length ||
+    [...payments.values()].some((amount) => amount <= 0n) ||
+    [...payments.values()].reduce((sum, amount) => sum + amount, 0n) !==
+      sourceAmount
+  ) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Payer amounts must add up to the expense total",
+    });
+  }
+  let sourceShares: Map<string, bigint>;
+  try {
+    sourceShares = splitSourceAmount(sourceAmount, input.split);
+  } catch (cause) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: cause instanceof Error ? cause.message : "Invalid expense split",
+    });
+  }
+  const involvedIds = [
+    ...new Set([...sourceShares.keys(), ...payments.keys()]),
+  ];
 
   let contextId: string;
   let canonicalCurrency: CurrencyCode;
@@ -110,8 +158,6 @@ async function prepareExpense(
     });
   }
 
-  const sourceAmount = BigInt(input.amount.minor);
-  const sourceShares = splitSourceAmount(sourceAmount, input.split);
   const homeCurrencies = await loadHomeCurrencies(ctx.db, involvedIds);
   const targets = [
     canonicalCurrency,
@@ -132,17 +178,55 @@ async function prepareExpense(
     canonicalCurrency,
     rates,
   );
-  const sourceEntries = [...sourceShares.entries()];
-  const canonicalAmounts = allocateByWeights(
-    canonicalTotal,
-    sourceEntries.map(([, value]) => value),
-  );
-  const canonicalShares = new Map(
-    sourceEntries.map(([id], index) => [
-      id,
-      canonicalAmounts[index] ?? 0n,
-    ]),
-  );
+  const canonicalPayments = allocateByUser(canonicalTotal, payments);
+  const canonicalShares = allocateByUser(canonicalTotal, sourceShares);
+  const transfers = expenseTransfers(
+    canonicalPayments,
+    canonicalShares,
+  ).map((transfer) => ({
+    debtorId: transfer.debtorId,
+    creditorId: transfer.creditorId,
+    canonicalAmountMinor: transfer.sourceAmountMinor,
+    debtorHomeAmountMinor: 0n,
+    creditorHomeAmountMinor: 0n,
+  }));
+  for (const involvedId of involvedIds) {
+    const transferIndexes = transfers.flatMap((transfer, index) =>
+      transfer.debtorId === involvedId || transfer.creditorId === involvedId
+        ? [index]
+        : [],
+    );
+    if (transferIndexes.length === 0) continue;
+    const sourceNet =
+      (payments.get(involvedId) ?? 0n) -
+      (sourceShares.get(involvedId) ?? 0n);
+    const homeCurrency = homeCurrencies.get(involvedId);
+    if (!homeCurrency) {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    }
+    const homeNet = convertWithRates(
+      sourceNet < 0n ? -sourceNet : sourceNet,
+      input.amount.currency,
+      homeCurrency,
+      rates,
+    );
+    const homeAmounts = allocateByWeights(
+      homeNet,
+      transferIndexes.map(
+        (index) => transfers[index]?.canonicalAmountMinor ?? 0n,
+      ),
+    );
+    transferIndexes.forEach((transferIndex, allocationIndex) => {
+      const transfer = transfers[transferIndex];
+      if (!transfer) return;
+      const amount = homeAmounts[allocationIndex] ?? 0n;
+      if (transfer.debtorId === involvedId) {
+        transfer.debtorHomeAmountMinor = amount;
+      } else {
+        transfer.creditorHomeAmountMinor = amount;
+      }
+    });
+  }
   const manualIconKey = input.iconManuallySet ? input.iconKey : undefined;
 
   return {
@@ -151,8 +235,10 @@ async function prepareExpense(
     iconManuallySet: manualIconKey !== undefined,
     contextId,
     canonicalCurrency,
+    payments,
     sourceShares,
-    canonicalShares,
+    participantIds: involvedIds,
+    transfers,
     homeCurrencies,
     rates,
   };
@@ -170,6 +256,13 @@ async function writeExpenseFinancials(
       sourceAmountMinor,
     })),
   );
+  await tx.insert(expensePayments).values(
+    [...prepared.payments].map(([userId, sourceAmountMinor]) => ({
+      expenseId,
+      userId,
+      sourceAmountMinor,
+    })),
+  );
   await tx.insert(rateSnapshots).values(
     prepared.rates.map((rate) => ({
       expenseId,
@@ -182,9 +275,7 @@ async function writeExpenseFinancials(
     })),
   );
 
-  for (const [participantId, sourceShare] of prepared.sourceShares) {
-    if (participantId === prepared.input.payerId || sourceShare === 0n) continue;
-    const canonicalAmount = prepared.canonicalShares.get(participantId) ?? 0n;
+  for (const transfer of prepared.transfers) {
     const [entry] = await tx
       .insert(ledgerEntries)
       .values({
@@ -192,49 +283,38 @@ async function writeExpenseFinancials(
         sourceId: expenseId,
         contextType: prepared.input.context.type,
         contextId: prepared.contextId,
-        debtorId: participantId,
-        creditorId: prepared.input.payerId,
+        debtorId: transfer.debtorId,
+        creditorId: transfer.creditorId,
         canonicalCurrency: prepared.canonicalCurrency,
-        canonicalAmountMinor: canonicalAmount,
+        canonicalAmountMinor: transfer.canonicalAmountMinor,
       })
       .returning();
     if (!entry) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-    const debtorCurrency = prepared.homeCurrencies.get(participantId);
-    const creditorCurrency = prepared.homeCurrencies.get(
-      prepared.input.payerId,
-    );
+    const debtorCurrency = prepared.homeCurrencies.get(transfer.debtorId);
+    const creditorCurrency = prepared.homeCurrencies.get(transfer.creditorId);
     if (!debtorCurrency || !creditorCurrency) {
       throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     }
     await tx.insert(ledgerValuations).values([
       {
         ledgerEntryId: entry.id,
-        userId: participantId,
+        userId: transfer.debtorId,
         currency: debtorCurrency,
-        amountMinor: convertWithRates(
-          sourceShare,
-          prepared.input.amount.currency,
-          debtorCurrency,
-          prepared.rates,
-        ),
+        amountMinor: transfer.debtorHomeAmountMinor,
       },
       {
         ledgerEntryId: entry.id,
-        userId: prepared.input.payerId,
+        userId: transfer.creditorId,
         currency: creditorCurrency,
-        amountMinor: convertWithRates(
-          sourceShare,
-          prepared.input.amount.currency,
-          creditorCurrency,
-          prepared.rates,
-        ),
+        amountMinor: transfer.creditorHomeAmountMinor,
       },
     ]);
   }
 }
 
 function revisionSnapshot(prepared: PreparedExpense) {
+  const primaryPayerId = prepared.payments.keys().next().value;
   return {
     context: prepared.input.context,
     description: prepared.input.description,
@@ -242,7 +322,11 @@ function revisionSnapshot(prepared: PreparedExpense) {
     iconManuallySet: prepared.iconManuallySet,
     notes: prepared.input.notes,
     occurredAt: prepared.input.occurredAt,
-    payerId: prepared.input.payerId,
+    payerId: primaryPayerId,
+    payments: [...prepared.payments].map(([userId, amountMinor]) => ({
+      userId,
+      amountMinor: amountMinor.toString(),
+    })),
     amount: prepared.input.amount,
     split: prepared.input.split,
     rates: prepared.rates,
@@ -300,6 +384,27 @@ export const expensesRouter = router({
         .from(profiles)
         .where(eq(profiles.userId, expense.payerId))
         .limit(1);
+      const paymentRows = await ctx.db
+        .select({
+          userId: expensePayments.userId,
+          sourceAmountMinor: expensePayments.sourceAmountMinor,
+          displayName: profiles.displayName,
+          homeCurrency: profiles.homeCurrency,
+        })
+        .from(expensePayments)
+        .innerJoin(profiles, eq(profiles.userId, expensePayments.userId))
+        .where(eq(expensePayments.expenseId, expense.id));
+      const payers =
+        paymentRows.length > 0
+          ? paymentRows
+          : payer
+            ? [
+                {
+                  ...payer,
+                  sourceAmountMinor: expense.sourceAmountMinor,
+                },
+              ]
+            : [];
       const storedRates = await ctx.db
         .select()
         .from(rateSnapshots)
@@ -332,6 +437,7 @@ export const expensesRouter = router({
       return {
         expense,
         payer: payer ?? null,
+        payers,
         splits: splitRows,
         rates,
         split: storedSplit.success
@@ -361,6 +467,10 @@ export const expensesRouter = router({
         .limit(1);
       if (duplicate) return duplicate;
       const prepared = await prepareExpense(ctx, input);
+      const primaryPayerId = prepared.payments.keys().next().value;
+      if (!primaryPayerId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Payer required" });
+      }
       return ctx.db.transaction(async (tx) => {
         const [expense] = await tx
           .insert(expenses)
@@ -373,7 +483,7 @@ export const expensesRouter = router({
                 ? input.context.friendshipId
                 : null,
             createdBy: ctx.session.user.id,
-            payerId: input.payerId,
+            payerId: primaryPayerId,
             description: input.description,
             iconKey: prepared.iconKey,
             iconManuallySet: prepared.iconManuallySet,
@@ -394,16 +504,29 @@ export const expensesRouter = router({
           actorId: ctx.session.user.id,
           snapshot: revisionSnapshot(prepared),
         });
+        if (expense.groupId) {
+          await enqueueExpenseNotifications(tx, {
+            action: "create",
+            actorId: ctx.session.user.id,
+            description: expense.description,
+            expenseId: expense.id,
+            expenseVersion: expense.version,
+            groupId: expense.groupId,
+            participantIds: prepared.participantIds,
+          });
+        }
         return expense;
       });
     }),
 
   update: protectedProcedure
     .input(
-      expenseMutationSchema.extend({
-        expenseId: z.uuid(),
-        expectedVersion: z.number().int().positive(),
-      }),
+      expenseMutationSchema.and(
+        z.object({
+          expenseId: z.uuid(),
+          expectedVersion: z.number().int().positive(),
+        }),
+      ),
     )
     .mutation(async ({ ctx, input }) => {
       const [current] = await ctx.db
@@ -447,10 +570,25 @@ export const expensesRouter = router({
           }),
         ),
       );
+      const primaryPayerId = prepared.payments.keys().next().value;
+      if (!primaryPayerId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Payer required" });
+      }
       return ctx.db.transaction(async (tx) => {
+        const previousParticipantIds = await loadExpenseParticipantIds(
+          tx,
+          current.id,
+        );
         await reverseActiveEntries(tx, "expense", current.id);
-        await tx.delete(expenseSplits).where(eq(expenseSplits.expenseId, current.id));
-        await tx.delete(rateSnapshots).where(eq(rateSnapshots.expenseId, current.id));
+        await tx
+          .delete(expensePayments)
+          .where(eq(expensePayments.expenseId, current.id));
+        await tx
+          .delete(expenseSplits)
+          .where(eq(expenseSplits.expenseId, current.id));
+        await tx
+          .delete(rateSnapshots)
+          .where(eq(rateSnapshots.expenseId, current.id));
         const [updated] = await tx
           .update(expenses)
           .set({
@@ -461,7 +599,7 @@ export const expensesRouter = router({
               input.context.type === "friend"
                 ? input.context.friendshipId
                 : null,
-            payerId: input.payerId,
+            payerId: primaryPayerId,
             description: input.description,
             iconKey: prepared.iconKey,
             iconManuallySet: prepared.iconManuallySet,
@@ -489,6 +627,18 @@ export const expensesRouter = router({
           actorId: ctx.session.user.id,
           snapshot: revisionSnapshot(prepared),
         });
+        if (updated.groupId) {
+          await enqueueExpenseNotifications(tx, {
+            action: "update",
+            actorId: ctx.session.user.id,
+            description: updated.description,
+            expenseId: updated.id,
+            expenseVersion: updated.version,
+            groupId: updated.groupId,
+            previousParticipantIds,
+            participantIds: prepared.participantIds,
+          });
+        }
         return updated;
       });
     }),
@@ -521,6 +671,7 @@ export const expensesRouter = router({
         );
       }
       return ctx.db.transaction(async (tx) => {
+        const participantIds = await loadExpenseParticipantIds(tx, current.id);
         await reverseActiveEntries(tx, "expense", current.id);
         const [removed] = await tx
           .update(expenses)
@@ -545,6 +696,17 @@ export const expensesRouter = router({
           actorId: ctx.session.user.id,
           snapshot: { deletedAt: removed.deletedAt?.toISOString() },
         });
+        if (removed.groupId) {
+          await enqueueExpenseNotifications(tx, {
+            action: "delete",
+            actorId: ctx.session.user.id,
+            description: removed.description,
+            expenseId: removed.id,
+            expenseVersion: removed.version,
+            groupId: removed.groupId,
+            participantIds,
+          });
+        }
         return removed;
       });
     }),

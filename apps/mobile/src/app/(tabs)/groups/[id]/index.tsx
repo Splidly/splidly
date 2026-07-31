@@ -1,11 +1,15 @@
-import { formatMinor, type CurrencyCode } from "@splidly/shared";
+import type { CurrencyCode } from "@splidly/shared";
 import { Stack, router, useLocalSearchParams, type Href } from "expo-router";
 import { Alert, Text, View, useColorScheme } from "react-native";
 import {
   normalizeGroupIconKey,
 } from "../../../../components/group-icon";
-import { GroupSummaryHeader } from "../../../../components/group-summary-header";
+import {
+  GroupBalanceSummary,
+  GroupSummaryHeader,
+} from "../../../../components/group-summary-header";
 import { ExpenseIcon } from "../../../../components/expense-icon";
+import { ExpenseListAmount } from "../../../../components/expense-list-amount";
 import {
   Avatar,
   EmptyState,
@@ -21,6 +25,10 @@ import {
 import { api } from "../../../../lib/trpc";
 import { groupBalanceLines } from "../../../../lib/group-balance-summary";
 import { groupActionColorsFor } from "../../../../lib/group-colors";
+import {
+  formatConvertedMoney,
+  formatMoney,
+} from "../../../../lib/money-display";
 import { useTheme } from "../../../../theme";
 
 export default function GroupDetailScreen() {
@@ -53,7 +61,6 @@ export default function GroupDetailScreen() {
           name={group.name}
           colorKey={group.id}
           color={group.color}
-          lines={balanceLines}
         />
         <View style={{ flexDirection: "row", gap: 10 }}>
           <View style={{ flex: 1 }}>
@@ -84,6 +91,7 @@ export default function GroupDetailScreen() {
             />
           </View>
         </View>
+        <GroupBalanceSummary lines={balanceLines} />
         {memberBalances.length > 0 ? (
           <Section title="Open balances">
             {memberBalances.map((memberBalance, index) => {
@@ -96,10 +104,10 @@ export default function GroupDetailScreen() {
                     title={memberBalance.displayName}
                     subtitle={`${
                       minor < 0n ? "You owe" : "Owes you"
-                    } ${formatMinor(
+                    } ${formatConvertedMoney(
                       absolute,
                       memberBalance.balance.currency as CurrencyCode,
-                    )} ${memberBalance.balance.currency}`}
+                    )}`}
                     leading={
                       <Avatar
                         name={memberBalance.displayName}
@@ -142,32 +150,53 @@ export default function GroupDetailScreen() {
               message="Add the first shared cost in any supported currency."
             />
           ) : (
-            expenses.map((expense, index) => (
-              <View key={expense.id}>
-                {index > 0 ? <RowDivider inset={16} /> : null}
-                <ListRow
-                  title={expense.description}
-                  subtitle={new Date(expense.occurredAt).toLocaleDateString(
-                    undefined,
-                    { dateStyle: "medium" },
-                  )}
-                  value={`${formatMinor(
-                    expense.sourceAmountMinor,
-                    expense.sourceCurrency as CurrencyCode,
-                  )} ${expense.sourceCurrency}`}
-                  leading={
-                    <ExpenseIcon
-                      iconKey={expense.iconKey}
-                      name={expense.description}
-                      useNameFallback={!expense.iconManuallySet}
-                    />
-                  }
-                  onPress={() =>
-                    router.push(`/expense/${expense.id}` as Href)
-                  }
-                />
-              </View>
-            ))
+            expenses.map((expense, index) => {
+              const sourceCurrency =
+                expense.sourceCurrency as CurrencyCode;
+              const sourceAmount = formatMoney(
+                expense.sourceAmountMinor,
+                sourceCurrency,
+              );
+              const converted =
+                expense.canonicalAmount &&
+                expense.canonicalAmount.currency !== sourceCurrency
+                  ? formatConvertedMoney(
+                      expense.canonicalAmount.minor,
+                      expense.canonicalAmount.currency as CurrencyCode,
+                    )
+                  : null;
+              const date = new Date(
+                expense.occurredAt,
+              ).toLocaleDateString(undefined, { dateStyle: "medium" });
+
+              return (
+                <View key={expense.id}>
+                  {index > 0 ? <RowDivider inset={16} /> : null}
+                  <ListRow
+                    title={expense.description}
+                    subtitle={date}
+                    trailing={
+                      <ExpenseListAmount
+                        amount={converted ?? sourceAmount}
+                        {...(converted
+                          ? { originalAmount: sourceAmount }
+                          : {})}
+                      />
+                    }
+                    leading={
+                      <ExpenseIcon
+                        iconKey={expense.iconKey}
+                        name={expense.description}
+                        useNameFallback={!expense.iconManuallySet}
+                      />
+                    }
+                    onPress={() =>
+                      router.push(`/expense/${expense.id}` as Href)
+                    }
+                  />
+                </View>
+              );
+            })
           )}
         </Section>
       </Screen>

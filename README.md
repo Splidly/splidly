@@ -63,9 +63,9 @@ Then configure the server-only values in the root `.env` using the full
 absolute path (a path in an environment file does not expand `~`):
 
 ```dotenv
-APPLE_CLIENT_ID=com.example.splidly
-APPLE_KEY_ID=KEYID
-APPLE_PRIVATE_KEY_PATH="/Users/you/Library/Application Support/Splidly/Secrets/apple-sign-in.p8"
+APPLE_SIGN_IN_CLIENT_ID=com.example.splidly
+APPLE_SIGN_IN_KEY_ID=KEYID
+APPLE_SIGN_IN_PRIVATE_KEY_PATH="/Users/you/Library/Application Support/Splidly/Secrets/apple-sign-in.p8"
 IOS_TEAM_ID=TEAMID
 IOS_APP_ID=com.example.splidly
 ```
@@ -74,15 +74,45 @@ IOS_APP_ID=com.example.splidly
 
 1. Configure Google OAuth web, iOS, and Android clients. Add the web/iOS client IDs to the Expo public environment and the server client ID/secret to its private environment.
 2. Configure Sign in with Apple for the iOS bundle. For native-only testing,
-   `APPLE_CLIENT_ID` can be the bundle ID; for the production browser/Android
-   flow, create a Services ID and use that as `APPLE_CLIENT_ID`. Give the server
-   the key ID and path to the downloaded `.p8` private key. The server uses
+   `APPLE_SIGN_IN_CLIENT_ID` can be the bundle ID; for the production
+   browser/Android flow, create a Services ID and use that as
+   `APPLE_SIGN_IN_CLIENT_ID`. Give the server the key ID and path to the
+   downloaded `.p8` private key. The server uses
    `jose` to generate a fresh 180-day Apple client-secret JWT at startup and
    uses `IOS_APP_ID` as the accepted audience for native iOS identity tokens.
 3. Set the final iOS bundle ID, Apple Team ID, Android package, and Android signing SHA-256 fingerprint.
 4. Rebuild both native projects after changing identifiers, schemes, associated domains, or auth plugins.
 
 Provider accounts are linked only from an authenticated account. Emails returned by providers are never used for invites or surfaced as a product identifier.
+
+## Expense notifications
+
+Splidly sends iOS expense notifications directly through APNs. Create
+topic-specific Sandbox and Production APNs keys for `IOS_APP_ID`, download each
+`.p8` once, and keep both outside the repository. `expo-notifications` handles
+the native permission, token, and response APIs in the app; notification
+delivery does not use the Expo Push Service.
+
+A physical-device development build receives a development APNs token and
+therefore uses a local server configured with the Sandbox key:
+
+```dotenv
+APNS_ENVIRONMENT=development
+APNS_KEY_ID=SANDBOX_KEY_ID
+APNS_PRIVATE_KEY_PATH="/Users/you/Library/Application Support/Splidly/Secrets/apns-development.p8"
+```
+
+TestFlight and App Store builds receive production APNs tokens, so the deployed
+server must use `APNS_ENVIRONMENT=production` with the Production key. Each
+server instance intentionally accepts tokens from only its configured APNs
+environment.
+
+Native APNs tokens are registered only after an authenticated, onboarded user
+grants notification permission. Expense create, update, and delete transactions
+enqueue one durable delivery per active iOS installation; the server retries
+transient APNs failures and disables tokens rejected as unregistered. Apply the
+database migrations and make a fresh native build after adding notification
+support—the JavaScript bundle alone cannot add the iOS push entitlement.
 
 ## Universal and app links
 
@@ -130,17 +160,19 @@ Install the Apple private key on the production host before starting Compose:
 sudo install -d -m 700 /etc/splidly/secrets
 sudo install -m 600 /path/to/AuthKey_KEYID.p8 \
   /etc/splidly/secrets/apple-sign-in.p8
+sudo install -m 600 /path/to/AuthKey_APNS_KEYID.p8 \
+  /etc/splidly/secrets/apns-production.p8
 ```
 
-Set `APPLE_PRIVATE_KEY_FILE=/etc/splidly/secrets/apple-sign-in.p8` in the
-production `.env`. Compose grants only the API service access and mounts it
-read-only at `/run/secrets/apple_sign_in_key`; the key contents never enter the
-container environment or image. Verify that the non-root API user can read the
-mount without printing it:
+Set `APPLE_SIGN_IN_PRIVATE_KEY_FILE=/etc/splidly/secrets/apple-sign-in.p8` and
+`APNS_PRIVATE_KEY_FILE=/etc/splidly/secrets/apns-production.p8` in the
+production `.env`. Compose grants only the API service access and mounts both
+read-only; the key contents never enter the container environment or image.
+Verify that the non-root API user can read the mounts without printing them:
 
 ```sh
 docker compose run --rm --no-deps server \
-  sh -c 'test -r /run/secrets/apple_sign_in_key'
+  sh -c 'test -r /run/secrets/apple_sign_in_key && test -r /run/secrets/apns_key'
 ```
 
 If that check fails on Linux because the source file ownership is preserved by
@@ -148,7 +180,9 @@ the bind mount, make it readable only by the container's numeric `node` user:
 
 ```sh
 sudo chown 1000:1000 /etc/splidly/secrets/apple-sign-in.p8
-sudo chmod 400 /etc/splidly/secrets/apple-sign-in.p8
+sudo chown 1000:1000 /etc/splidly/secrets/apns-production.p8
+sudo chmod 400 /etc/splidly/secrets/apple-sign-in.p8 \
+  /etc/splidly/secrets/apns-production.p8
 ```
 
 ### Backups

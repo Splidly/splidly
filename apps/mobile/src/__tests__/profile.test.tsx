@@ -26,6 +26,10 @@ jest.mock("expo-router", () => ({
   },
 }));
 
+jest.mock("expo-notifications", () => ({
+  unregisterForNotificationsAsync: jest.fn(),
+}));
+
 jest.mock("../lib/auth-client", () => ({
   authClient: {
     signOut: jest.fn(),
@@ -82,6 +86,11 @@ jest.mock("../lib/trpc", () => ({
         useQuery: () => ({
           data: mockGroups,
         }),
+      },
+    },
+    push: {
+      unregister: {
+        useMutation: () => ({ mutateAsync: jest.fn() }),
       },
     },
     useUtils: () => ({

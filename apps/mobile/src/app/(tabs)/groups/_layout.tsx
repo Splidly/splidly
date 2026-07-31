@@ -30,7 +30,7 @@ export default function GroupsStackLayout() {
         options={{
           headerShown: false,
           ...formSheetOptions(theme.sheet),
-          sheetAllowedDetents: [0.48],
+          sheetAllowedDetents: "fitToContents",
           sheetInitialDetentIndex: 0,
           sheetGrabberVisible: false,
           sheetCornerRadius: 30,
@@ -45,7 +45,7 @@ export default function GroupsStackLayout() {
         options={{
           headerShown: false,
           ...formSheetOptions(theme.sheet),
-          sheetAllowedDetents: [0.48],
+          sheetAllowedDetents: "fitToContents",
           sheetInitialDetentIndex: 0,
           sheetGrabberVisible: false,
           sheetCornerRadius: 30,

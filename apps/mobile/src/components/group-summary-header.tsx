@@ -1,19 +1,30 @@
 import type { GroupIconKey } from "@splidly/shared";
 import { Button, Host } from "@expo/ui";
-import {
-  StyleSheet,
-  Text,
-  View,
-  type ColorValue,
-} from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import type { GroupBalanceLine } from "../lib/group-balance-summary";
 import { useTheme } from "../theme";
+import { BalanceSummaryLine } from "./balance-summary-line";
 import { GroupIcon } from "./group-icon";
 
-type GroupSummaryLine = {
-  key: string;
-  text: string;
-  tone?: "positive" | "negative" | "muted";
-};
+type GroupSummaryLine = GroupBalanceLine;
+
+export function GroupBalanceSummary({
+  lines,
+}: {
+  lines: readonly GroupSummaryLine[];
+}) {
+  return (
+    <View style={styles.summary}>
+      {lines.map((line) => (
+        <BalanceSummaryLine
+          key={line.key}
+          line={line}
+          style={styles.summaryLine}
+        />
+      ))}
+    </View>
+  );
+}
 
 export function GroupSummaryHeader({
   iconKey,
@@ -27,16 +38,10 @@ export function GroupSummaryHeader({
   name: string;
   colorKey: string;
   color?: string | null | undefined;
-  lines: readonly GroupSummaryLine[];
+  lines?: readonly GroupSummaryLine[];
   onEdit?: (() => void) | undefined;
 }) {
   const theme = useTheme();
-
-  function lineColor(tone: GroupSummaryLine["tone"]): ColorValue {
-    if (tone === "positive") return theme.positive;
-    if (tone === "negative") return theme.negative;
-    return theme.muted;
-  }
 
   return (
     <View style={styles.row}>
@@ -45,37 +50,27 @@ export function GroupSummaryHeader({
         name={name}
         colorKey={colorKey}
         color={color}
-        size={58}
+        size={52}
       />
       <View style={styles.copy}>
         <Text
-          selectable
           numberOfLines={1}
           style={[styles.name, { color: theme.text }]}
         >
           {name}
         </Text>
-        {lines.map((line) => (
-          <Text
+        {(lines ?? []).map((line) => (
+          <BalanceSummaryLine
             key={line.key}
-            selectable
-            numberOfLines={1}
-            style={[
-              styles.subtitle,
-              {
-                color: lineColor(line.tone),
-                fontWeight: line.tone === "muted" ? "400" : "500",
-              },
-            ]}
-          >
-            {line.text}
-          </Text>
+            line={line}
+            style={styles.subtitle}
+          />
         ))}
       </View>
       {onEdit ? (
         <Host
           matchContents
-          seedColor={theme.primary}
+          seedColor={color ?? theme.primary}
         >
           <Button
             label="Edit"
@@ -98,7 +93,7 @@ const styles = StyleSheet.create({
   },
   copy: {
     flex: 1,
-    gap: 3,
+    gap: 0,
   },
   name: {
     fontSize: 24,
@@ -107,6 +102,16 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 13,
+    lineHeight: 17,
+    fontVariant: ["tabular-nums"],
+  },
+  summary: {
+    paddingHorizontal: 4,
+    gap: 4,
+  },
+  summaryLine: {
+    fontSize: 15,
+    lineHeight: 20,
     fontVariant: ["tabular-nums"],
   },
 });

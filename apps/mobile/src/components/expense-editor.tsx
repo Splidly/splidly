@@ -11,18 +11,30 @@ import {
 import * as Crypto from "expo-crypto";
 import { router, Stack } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Switch, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { api } from "../lib/trpc";
+import { formatConvertedMoney } from "../lib/money-display";
+import { expensePaymentStatus } from "../lib/expense-payments";
+import {
+  createExpenseSplitDraft,
+  expenseSplitDraftFromInput,
+  expenseSplitParticipantIds,
+  expenseSplitStatus,
+  expenseSplitSummary,
+  type ExpenseSplitDraft,
+  type SplitParticipant,
+} from "../lib/expense-split";
 import { useTheme } from "../theme";
 import { CurrencyField } from "./currency-field";
 import { DateField } from "./date-field";
 import { ExpenseIconPicker } from "./expense-icon";
+import { useExpensePaymentSession } from "./expense-payment-session";
+import { useExpenseSplitSession } from "./expense-split-session";
 import {
   ErrorState,
   Field,
   FormSection,
   HeaderButton,
-  Intro,
   ListRow,
   LoadingState,
   PrimaryButton,
@@ -31,24 +43,19 @@ import {
   Section,
 } from "./ui";
 
-type Participant = {
-  userId: string;
-  displayName: string;
-  homeCurrency: string;
-};
-
 function requiredRateTargets(
   canonicalCurrency: CurrencyCode | undefined,
-  participants: Participant[],
+  participants: SplitParticipant[],
   selectedIds: string[],
-  payerId: string,
+  payerIds: string[],
 ) {
   return [
     canonicalCurrency,
     ...participants
       .filter(
         (person) =>
-          selectedIds.includes(person.userId) || person.userId === payerId,
+          selectedIds.includes(person.userId) ||
+          payerIds.includes(person.userId),
       )
       .map((person) => person.homeCurrency as CurrencyCode),
   ].filter((value): value is CurrencyCode => Boolean(value));
@@ -66,6 +73,8 @@ export function ExpenseEditor({
   newContext?: ExpenseContext;
 }) {
   const theme = useTheme();
+  const paymentSession = useExpensePaymentSession();
+  const splitSession = useExpenseSplitSession();
   const editing = Boolean(expenseId);
   const detail = api.expenses.detail.useQuery(
     { expenseId: expenseId ?? "" },
@@ -126,7 +135,7 @@ export function ExpenseEditor({
     onSuccess: finishSaving,
   });
 
-  const participants = useMemo<Participant[]>(() => {
+  const participants = useMemo<SplitParticipant[]>(() => {
     const active =
       context?.type === "group"
         ? (group.data?.members ?? [])
@@ -150,34 +159,37 @@ export function ExpenseEditor({
                 ]
               : []),
           ];
-    const known = new Map<string, Participant>();
+    const known = new Map<string, SplitParticipant>();
     for (const person of detail.data?.splits ?? []) {
       known.set(person.userId, person);
     }
     if (detail.data?.payer) {
       known.set(detail.data.payer.userId, detail.data.payer);
     }
+    for (const person of detail.data?.payers ?? []) {
+      known.set(person.userId, person);
+    }
     for (const person of active) known.set(person.userId, person);
     return [...known.values()];
   }, [
     context?.type,
     detail.data?.payer,
+    detail.data?.payers,
     detail.data?.splits,
     friend.data?.friend,
     group.data?.members,
     profile.data,
   ]);
 
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [payerId, setPayerId] = useState("");
+  const [payerIds, setPayerIds] = useState<string[]>([]);
+  const [payerAmounts, setPayerAmounts] = useState<Record<string, string>>({});
   const [description, setDescription] = useState("");
   const [manualIconKey, setManualIconKey] = useState<ExpenseIconKey>();
   const [notes, setNotes] = useState("");
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState<CurrencyCode>("EUR");
   const [date, setDate] = useState(() => new Date());
-  const [splitMode, setSplitMode] = useState<"equal" | "exact">("equal");
-  const [exact, setExact] = useState<Record<string, string>>({});
+  const [splitDraft, setSplitDraft] = useState<ExpenseSplitDraft>();
   const [frozenRates, setFrozenRates] = useState<RateSnapshot[]>([]);
   const [quoteId, setQuoteId] = useState<string>();
   const [quoteExpiresAt, setQuoteExpiresAt] = useState<string>();
@@ -206,17 +218,6 @@ export function ExpenseEditor({
       ? group.data?.group.currency
       : friend.data?.friend?.homeCurrency
   ) as CurrencyCode | undefined;
-  const rateTargets = useMemo(
-    () =>
-      requiredRateTargets(
-        canonicalCurrency,
-        participants,
-        selectedIds,
-        payerId,
-      ),
-    [canonicalCurrency, participants, payerId, selectedIds],
-  );
-  const currentRateBasis = rateBasis(currency, rateTargets);
   const sourceMinor = useMemo(() => {
     try {
       const parsed = parseDecimalToMinor(amount, currency);
@@ -225,10 +226,48 @@ export function ExpenseEditor({
       return undefined;
     }
   }, [amount, currency]);
+  const effectiveSplitDraft = useMemo(
+    () =>
+      splitDraft ??
+      createExpenseSplitDraft(
+        participants,
+        sourceMinor ?? 0n,
+        currency,
+      ),
+    [currency, participants, sourceMinor, splitDraft],
+  );
+  const selectedIds = useMemo(
+    () => expenseSplitParticipantIds(effectiveSplitDraft),
+    [effectiveSplitDraft],
+  );
+  const paymentStatus = expensePaymentStatus(
+    payerIds,
+    payerAmounts,
+    sourceMinor ?? 0n,
+    currency,
+  );
+  const splitStatus = expenseSplitStatus(
+    effectiveSplitDraft,
+    sourceMinor ?? 0n,
+    currency,
+  );
+  const paymentReady = sourceMinor !== undefined && paymentStatus.valid;
+  const splitReady = sourceMinor !== undefined && splitStatus.valid;
+  const rateTargets = useMemo(
+    () =>
+      requiredRateTargets(
+        canonicalCurrency,
+        participants,
+        selectedIds,
+        payerIds,
+      ),
+    [canonicalCurrency, participants, payerIds, selectedIds],
+  );
+  const currentRateBasis = rateBasis(currency, rateTargets);
   const conversionReady =
     sourceMinor !== undefined &&
     selectedIds.length > 0 &&
-    payerId.length > 0 &&
+    payerIds.length > 0 &&
     frozenRates.length > 0 &&
     previewBasis.length > 0 &&
     previewBasis === currentRateBasis;
@@ -261,10 +300,9 @@ export function ExpenseEditor({
           ? group.data?.group.currency
           : profile.data?.homeCurrency
       ) as CurrencyCode | undefined;
-      setSelectedIds(participants.map((person) => person.userId));
-      setPayerId(
+      setPayerIds([
         profile.data?.userId ?? participants[0]?.userId ?? "",
-      );
+      ].filter(Boolean));
       setCurrency(initialCurrency ?? "EUR");
       initialized.current = key;
       return;
@@ -272,17 +310,42 @@ export function ExpenseEditor({
 
     if (!detail.data) return;
     const expense = detail.data.expense;
-    const initialSelectedIds =
-      detail.data.split.mode === "equal"
-        ? detail.data.split.participantIds
-        : detail.data.split.shares.map((share) => share.userId);
     const initialCurrency = expense.sourceCurrency as CurrencyCode;
+    const initialSplitDraft = expenseSplitDraftFromInput(
+      detail.data.split,
+      participants,
+      expense.sourceAmountMinor,
+      initialCurrency,
+    );
+    const initialSelectedIds =
+      expenseSplitParticipantIds(initialSplitDraft);
+    const storedPayers = detail.data.payers ?? [];
+    const initialPayers =
+      storedPayers.length > 0
+        ? storedPayers
+        : detail.data.payer
+          ? [
+              {
+                ...detail.data.payer,
+                sourceAmountMinor: expense.sourceAmountMinor,
+              },
+            ]
+          : [];
+    const initialPayerIds = initialPayers.map((payer) => payer.userId);
     const initialCanonicalCurrency =
       context.type === "group"
         ? (group.data?.group.currency as CurrencyCode)
         : initialCurrency;
-    setSelectedIds(initialSelectedIds);
-    setPayerId(expense.payerId);
+    setSplitDraft(initialSplitDraft);
+    setPayerIds(initialPayerIds);
+    setPayerAmounts(
+      Object.fromEntries(
+        initialPayers.map((payer) => [
+          payer.userId,
+          formatMinor(payer.sourceAmountMinor, initialCurrency),
+        ]),
+      ),
+    );
     setDescription(expense.description);
     setManualIconKey(
       expense.iconManuallySet ? expense.iconKey : undefined,
@@ -291,15 +354,6 @@ export function ExpenseEditor({
     setAmount(formatMinor(expense.sourceAmountMinor, initialCurrency));
     setCurrency(initialCurrency);
     setDate(expense.occurredAt);
-    setSplitMode(detail.data.split.mode);
-    setExact(
-      Object.fromEntries(
-        detail.data.splits.map((split) => [
-          split.userId,
-          formatMinor(split.sourceAmountMinor, initialCurrency),
-        ]),
-      ),
-    );
     setFrozenRates(detail.data.rates);
     setQuoteExpiresAt(undefined);
     setPreviewBasis(
@@ -309,7 +363,7 @@ export function ExpenseEditor({
           initialCanonicalCurrency,
           participants,
           initialSelectedIds,
-          expense.payerId,
+          initialPayerIds,
         ),
       ),
     );
@@ -331,7 +385,7 @@ export function ExpenseEditor({
     if (
       sourceMinor === undefined ||
       selectedIds.length === 0 ||
-      payerId.length === 0 ||
+      payerIds.length === 0 ||
       rateTargets.length === 0
     ) {
       rateRequest.current += 1;
@@ -401,7 +455,7 @@ export function ExpenseEditor({
     conversionReady,
     currency,
     currentRateBasis,
-    payerId,
+    payerIds,
     rateTargets,
     requestQuote,
     selectedIds.length,
@@ -422,27 +476,25 @@ export function ExpenseEditor({
 
   function submit() {
     setFormError(undefined);
-    if (!conversionReady || !context) {
+    if (!context || sourceMinor === undefined) {
+      setFormError("Enter a valid positive expense amount");
+      return;
+    }
+    if (!paymentStatus.valid || !paymentStatus.payments) {
+      setFormError(paymentStatus.message);
+      return;
+    }
+    if (!splitStatus.valid || !splitStatus.input) {
+      setFormError(splitStatus.message);
+      return;
+    }
+    if (!conversionReady) {
       setFormError(
         rateError ?? "Wait for the currency conversion to finish updating",
       );
       return;
     }
     try {
-      const validatedSourceMinor = parseDecimalToMinor(amount, currency);
-      const split =
-        splitMode === "equal"
-          ? { mode: "equal" as const, participantIds: selectedIds }
-          : {
-              mode: "exact" as const,
-              shares: selectedIds.map((userId) => ({
-                userId,
-                amountMinor: parseDecimalToMinor(
-                  exact[userId] ?? "0",
-                  currency,
-                ).toString(),
-              })),
-            };
       const mutation = {
         context,
         clientMutationId: Crypto.randomUUID(),
@@ -456,12 +508,12 @@ export function ExpenseEditor({
           date.getDate(),
           12,
         ).toISOString(),
-        payerId,
+        payments: paymentStatus.payments,
         amount: {
           currency,
-          minor: validatedSourceMinor.toString(),
+          minor: sourceMinor.toString(),
         },
-        split,
+        split: splitStatus.input,
         ...(quoteId ? { quoteId } : {}),
         rateOverrides: [],
       };
@@ -502,13 +554,24 @@ export function ExpenseEditor({
 
   const saving = create.isPending || update.isPending;
   const saveError = create.error ?? update.error;
+  const payerNames = payerIds
+    .map(
+      (payerId) =>
+        participants.find((person) => person.userId === payerId)?.displayName,
+    )
+    .filter((name): name is string => Boolean(name));
+  const paymentSummary =
+    payerNames.length === 0
+      ? "Choose who paid"
+      : payerNames.length === 1
+        ? `${payerNames[0]} paid`
+        : payerNames.length === 2
+          ? `${payerNames[0]} and ${payerNames[1]} paid`
+          : `${payerNames[0]} and ${payerNames.length - 1} others paid`;
+
   return (
     <>
       <Screen background="sheet">
-        <Intro>
-          The original amount and every displayed conversion are frozen when you
-          save.
-        </Intro>
         <FormSection
           title="Expense"
           footer={
@@ -565,7 +628,7 @@ export function ExpenseEditor({
                 Updating exchange rates…
               </Text>
             ) : rateStatus === "error" ? (
-              <Text selectable style={{ color: theme.negative, fontSize: 14 }}>
+              <Text style={{ color: theme.negative, fontSize: 14 }}>
                 {rateError ?? "Could not load exchange rates"}
               </Text>
             ) : sourceMinor === undefined ? (
@@ -584,7 +647,6 @@ export function ExpenseEditor({
               convertedAmounts.map((rate) => (
                 <View key={`${rate.base}:${rate.quote}`} style={{ gap: 2 }}>
                   <Text
-                    selectable
                     style={{
                       color: theme.text,
                       fontSize: 16,
@@ -592,10 +654,9 @@ export function ExpenseEditor({
                       fontVariant: ["tabular-nums"],
                     }}
                   >
-                    ≈ {formatMinor(rate.amountMinor, rate.quote)} {rate.quote}
+                    ≈ {formatConvertedMoney(rate.amountMinor, rate.quote)}
                   </Text>
                   <Text
-                    selectable
                     style={{
                       color: theme.muted,
                       fontSize: 12,
@@ -609,6 +670,90 @@ export function ExpenseEditor({
               ))
             ) : null}
           </View>
+        </FormSection>
+        <Section title="Allocation">
+          <ListRow
+            title="Paid by"
+            subtitle={
+              sourceMinor === undefined
+                ? "Enter an amount first"
+                : paymentSummary
+            }
+            value={
+              sourceMinor === undefined
+                ? "Not set"
+                : paymentReady
+                  ? "Complete"
+                  : "Incomplete"
+            }
+            valueTone={
+              sourceMinor === undefined
+                ? "muted"
+                : paymentReady
+                  ? "positive"
+                  : "negative"
+            }
+            onPress={() => {
+              if (sourceMinor === undefined) {
+                setFormError(
+                  "Enter a valid expense amount before assigning payment",
+                );
+                return;
+              }
+              setFormError(undefined);
+              paymentSession.open({
+                currency,
+                totalMinor: sourceMinor,
+                participants,
+                draft: { payerIds, payerAmounts },
+                onSave: (draft) => {
+                  setPayerIds(draft.payerIds);
+                  setPayerAmounts(draft.payerAmounts);
+                },
+              });
+              router.push("/expense/payment");
+            }}
+          />
+          <RowDivider inset={16} />
+          <ListRow
+            title="Split"
+            subtitle={
+              sourceMinor === undefined
+                ? "Enter an amount first"
+                : expenseSplitSummary(effectiveSplitDraft)
+            }
+            value={
+              sourceMinor === undefined
+                ? "Not set"
+                : splitReady
+                  ? "Complete"
+                  : "Incomplete"
+            }
+            valueTone={
+              sourceMinor === undefined
+                ? "muted"
+                : splitReady
+                  ? "positive"
+                  : "negative"
+            }
+            onPress={() => {
+              if (sourceMinor === undefined) {
+                setFormError("Enter a valid expense amount before splitting it");
+                return;
+              }
+              setFormError(undefined);
+              splitSession.open({
+                currency,
+                totalMinor: sourceMinor,
+                participants,
+                draft: effectiveSplitDraft,
+                onSave: setSplitDraft,
+              });
+              router.push("/expense/split");
+            }}
+          />
+        </Section>
+        <FormSection title="Details">
           <DateField value={date} onValueChange={setDate} />
           <Field
             label="Notes"
@@ -618,112 +763,17 @@ export function ExpenseEditor({
             multiline
           />
         </FormSection>
-        <Section title="Paid by">
-          {participants.map((person, index) => (
-            <View key={person.userId}>
-              {index > 0 ? <RowDivider inset={16} /> : null}
-              <ListRow
-                title={person.displayName}
-                subtitle={`Home currency · ${person.homeCurrency}`}
-                onPress={() => setPayerId(person.userId)}
-                trailing={
-                  payerId === person.userId ? (
-                    <Text
-                      accessibilityLabel="Selected"
-                      style={{
-                        color: theme.primary,
-                        fontSize: 20,
-                        fontWeight: "700",
-                      }}
-                    >
-                      ✓
-                    </Text>
-                  ) : null
-                }
-              />
-            </View>
-          ))}
-        </Section>
-        <Section title="Shared with">
-          {participants.map((person, index) => {
-            const included = selectedIds.includes(person.userId);
-            return (
-              <View key={person.userId}>
-                {index > 0 ? <RowDivider inset={16} /> : null}
-                <ListRow
-                  title={person.displayName}
-                  subtitle={`Home currency · ${person.homeCurrency}`}
-                  trailing={
-                    <Switch
-                      accessibilityLabel={`Include ${person.displayName}`}
-                      value={included}
-                      onValueChange={(enabled) =>
-                        setSelectedIds((current) =>
-                          enabled
-                            ? [...new Set([...current, person.userId])]
-                            : current.filter((id) => id !== person.userId),
-                        )
-                      }
-                    />
-                  }
-                />
-              </View>
-            );
-          })}
-        </Section>
-        <Section
-          title="Split"
-          footer={
-            splitMode === "equal"
-              ? "The total is divided evenly, with remainder cents distributed deterministically."
-              : "Exact shares must add up to the expense total."
-          }
-        >
-          <ListRow
-            title="Split equally"
-            subtitle={
-              splitMode === "equal" ? "Equal shares" : "Enter exact shares"
-            }
-            trailing={
-              <Switch
-                accessibilityLabel="Split equally"
-                value={splitMode === "equal"}
-                onValueChange={(enabled) =>
-                  setSplitMode(enabled ? "equal" : "exact")
-                }
-              />
-            }
-          />
-          {splitMode === "exact"
-            ? participants
-                .filter((person) => selectedIds.includes(person.userId))
-                .map((person) => (
-                  <View key={person.userId}>
-                    <RowDivider inset={16} />
-                    <Field
-                      label={`${person.displayName} · ${currency}`}
-                      value={exact[person.userId] ?? ""}
-                      onChangeText={(value) =>
-                        setExact((current) => ({
-                          ...current,
-                          [person.userId]: value,
-                        }))
-                      }
-                      keyboardType="decimal-pad"
-                      placeholder="0.00"
-                    />
-                  </View>
-                ))
-            : null}
-        </Section>
         <PrimaryButton
           label={saving ? "Saving…" : editing ? "Save changes" : "Save expense"}
           onPress={submit}
           disabled={
             saving ||
             !conversionReady ||
+            !paymentStatus.valid ||
+            !splitStatus.valid ||
             description.trim().length === 0 ||
-            selectedIds.length === 0
+            selectedIds.length === 0 ||
+            payerIds.length === 0
           }
         />
         {formError ? <ErrorState message={formError} /> : null}

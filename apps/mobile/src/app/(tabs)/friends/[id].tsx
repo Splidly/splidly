@@ -1,4 +1,4 @@
-import { formatMinor, type CurrencyCode } from "@splidly/shared";
+import type { CurrencyCode } from "@splidly/shared";
 import { Stack, router, useLocalSearchParams, type Href } from "expo-router";
 import { Text, View } from "react-native";
 import {
@@ -16,6 +16,7 @@ import {
 } from "../../../components/ui";
 import { ExpenseIcon } from "../../../components/expense-icon";
 import { api } from "../../../lib/trpc";
+import { formatMoney } from "../../../lib/money-display";
 import { useTheme } from "../../../theme";
 
 export default function FriendDetailScreen() {
@@ -100,12 +101,7 @@ export default function FriendDetailScreen() {
               </View>
             ))}
           </Section>
-        ) : (
-          <EmptyState
-            title="You’re all settled"
-            message={`There are no open balances between you and ${name}.`}
-          />
-        )}
+        ) : null}
         <Section title="Activity">
           {detail.data.expenses.length === 0 ? (
             <EmptyState
@@ -122,10 +118,10 @@ export default function FriendDetailScreen() {
                     undefined,
                     { dateStyle: "medium" },
                   )}
-                  value={`${formatMinor(
+                  value={formatMoney(
                     expense.sourceAmountMinor,
                     expense.sourceCurrency as CurrencyCode,
-                  )} ${expense.sourceCurrency}`}
+                  )}
                   leading={
                     <ExpenseIcon
                       iconKey={expense.iconKey}

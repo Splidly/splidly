@@ -115,9 +115,20 @@ describe("GroupSettingsScreen", () => {
     );
 
     expect(view.getByText("Lisbon")).toBeTruthy();
-    expect(view.getAllByText("EUR").length).toBeGreaterThan(0);
+    expect(view.getByText("€ · EUR")).toBeTruthy();
+    let editAncestor = view.getByTestId("edit-group").parent;
+    let usesGroupColor = false;
+    while (editAncestor) {
+      if (editAncestor.props.seedColor === "#1764B0") {
+        usesGroupColor = true;
+        break;
+      }
+      editAncestor = editAncestor.parent;
+    }
+    expect(usesGroupColor).toBe(true);
     expect(view.queryByText(/All settled up/)).toBeNull();
     expect(view.queryByLabelText("Name")).toBeNull();
+    expect(view.queryByText("›")).toBeNull();
 
     await fireEvent.press(view.getByTestId("edit-group"));
 

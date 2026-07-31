@@ -15,6 +15,10 @@ import {
 import { CurrencyField } from "../../../components/currency-field";
 import { authClient } from "../../../lib/auth-client";
 import { APP_URL } from "../../../lib/env";
+import {
+  getExistingPushInstallationId,
+  unregisterNativePushNotifications,
+} from "../../../lib/push-installation";
 import { api } from "../../../lib/trpc";
 import { useTheme } from "../../../theme";
 
@@ -87,6 +91,7 @@ export default function ProfileScreen() {
 
   const remove = api.profile.deleteAccount.useMutation({
     async onSuccess() {
+      await unregisterNativePushNotifications().catch(() => {});
       queryClient.clear();
       await authClient.signOut();
       router.replace("/sign-in");
@@ -97,8 +102,19 @@ export default function ProfileScreen() {
       }
     },
   });
+  const unregisterPush = api.push.unregister.useMutation();
 
   async function signOut() {
+    const installationId = await getExistingPushInstallationId();
+    if (installationId) {
+      await unregisterPush.mutateAsync({ installationId }).catch(() => {
+        // Signing out must still succeed while offline.
+      });
+    }
+    await unregisterNativePushNotifications().catch(() => {
+      // APNs invalidates the token when possible. The server also disables it
+      // after APNs rejects a delivery to a signed-out installation.
+    });
     queryClient.clear();
     await authClient.signOut();
     router.replace("/sign-in");

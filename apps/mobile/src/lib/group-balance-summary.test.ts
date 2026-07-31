@@ -11,7 +11,7 @@ describe("groupBalanceLines", () => {
         [
           {
             userId: "alex",
-            displayName: "Alex",
+            displayName: "Lasse Petzel",
             balance: { currency: "EUR", minor: "-1250" },
           },
           {
@@ -25,13 +25,19 @@ describe("groupBalanceLines", () => {
       ),
     ).toEqual([
       {
-        key: "owes",
-        text: "You owe Alex 12.50 EUR",
+        key: "negative-alex",
+        label: "You owe Lasse Petzel",
+        compactLabel: "You owe L.P.",
+        text: "You owe Lasse Petzel 12.50 €",
+        amount: "12.50 €",
         tone: "negative",
       },
       {
-        key: "owed",
-        text: "Sam owes you 8.25 EUR",
+        key: "positive-sam",
+        label: "Sam owes you",
+        compactLabel: "S. owes you",
+        text: "Sam owes you 8.25 €",
+        amount: "8.25 €",
         tone: "positive",
       },
     ]);
@@ -41,7 +47,8 @@ describe("groupBalanceLines", () => {
     expect(groupBalanceLines([], 4, "USD")).toEqual([
       {
         key: "settled",
-        text: "All settled up · 4 members · USD",
+        label: "All settled up · 4 members · $",
+        text: "All settled up · 4 members · $",
         tone: "muted",
       },
     ]);
@@ -65,26 +72,26 @@ describe("groupListBalanceLines", () => {
       ]),
     ).toEqual([
       {
-        key: "owes",
-        text: "You owe Alex 12.50 EUR",
+        key: "negative-alex",
+        label: "You owe Alex",
+        compactLabel: "You owe A.",
+        text: "You owe Alex 12.50 €",
+        amount: "12.50 €",
         tone: "negative",
       },
       {
-        key: "owed",
-        text: "Sam owes you 8.25 EUR",
+        key: "positive-sam",
+        label: "Sam owes you",
+        compactLabel: "S. owes you",
+        text: "Sam owes you 8.25 €",
+        amount: "8.25 €",
         tone: "positive",
       },
     ]);
   });
 
-  it("uses a plain settled subtitle when no payments remain", () => {
-    expect(groupListBalanceLines([])).toEqual([
-      {
-        key: "settled",
-        text: "All settled up",
-        tone: "muted",
-      },
-    ]);
+  it("omits a redundant subtitle when the trailing status is settled", () => {
+    expect(groupListBalanceLines([])).toEqual([]);
   });
 });
 
@@ -119,17 +126,23 @@ describe("overallGroupBalanceLines", () => {
     ).toEqual([
       {
         key: "owes-EUR",
-        text: "You owe 12.00 EUR",
+        label: "You owe",
+        text: "You owe 12.00 €",
+        amount: "12.00 €",
         tone: "negative",
       },
       {
         key: "owed-EUR",
-        text: "You are owed 5.00 EUR",
+        label: "You are owed",
+        text: "You are owed 5.00 €",
+        amount: "5.00 €",
         tone: "positive",
       },
       {
         key: "owed-USD",
-        text: "You are owed 8.00 USD",
+        label: "You are owed",
+        text: "You are owed $8.00",
+        amount: "$8.00",
         tone: "positive",
       },
     ]);
@@ -144,6 +157,7 @@ describe("overallGroupBalanceLines", () => {
     ).toEqual([
       {
         key: "settled",
+        label: "All groups are settled up",
         text: "All groups are settled up",
         tone: "muted",
       },

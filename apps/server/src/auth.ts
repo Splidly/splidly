@@ -37,16 +37,16 @@ export async function createAuth(db: Database, env: Env): Promise<Auth> {
     };
   }
   if (
-    env.APPLE_CLIENT_ID &&
-    env.APPLE_KEY_ID &&
-    env.APPLE_PRIVATE_KEY_PATH
+    env.APPLE_SIGN_IN_CLIENT_ID &&
+    env.APPLE_SIGN_IN_KEY_ID &&
+    env.APPLE_SIGN_IN_PRIVATE_KEY_PATH
   ) {
     socialProviders.apple = {
-      clientId: env.APPLE_CLIENT_ID,
+      clientId: env.APPLE_SIGN_IN_CLIENT_ID,
       clientSecret: await createAppleClientSecretFromFile({
-        clientId: env.APPLE_CLIENT_ID,
-        keyId: env.APPLE_KEY_ID,
-        privateKeyPath: env.APPLE_PRIVATE_KEY_PATH,
+        clientId: env.APPLE_SIGN_IN_CLIENT_ID,
+        keyId: env.APPLE_SIGN_IN_KEY_ID,
+        privateKeyPath: env.APPLE_SIGN_IN_PRIVATE_KEY_PATH,
         teamId: env.IOS_TEAM_ID,
       }),
       appBundleIdentifier: env.IOS_APP_ID,

@@ -3,11 +3,13 @@ import { createDatabase } from "@splidly/db";
 import { createApp } from "./app";
 import { createAuth } from "./auth";
 import { readEnv } from "./env";
+import { startNotificationWorker } from "./notification-worker";
 
 const env = readEnv();
 const { db, pool } = createDatabase(env.DATABASE_URL);
 const auth = await createAuth(db, env);
 const app = createApp({ auth, db, env });
+const notificationWorker = await startNotificationWorker(db, env);
 
 const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   console.log(`Splidly server listening on http://localhost:${info.port}`);
@@ -15,6 +17,7 @@ const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
 
 async function shutdown(signal: string) {
   console.log(`Received ${signal}; shutting down`);
+  notificationWorker.stop();
   server.close();
   await pool.end();
   process.exit(0);

@@ -1,52 +1,33 @@
 import {
-  formatMinor,
   type CurrencyCode,
   type GroupIconKey,
   type Money,
 } from "@splidly/shared";
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  type ColorValue,
-} from "react-native";
+import { useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import {
   groupListBalanceLines,
   type GroupMemberBalance,
   type GroupListSummaryLine,
 } from "../lib/group-balance-summary";
-import { useTheme } from "../theme";
+import { formatConvertedMoney } from "../lib/money-display";
+import { spacing, useTheme } from "../theme";
+import { BalanceSummaryLine } from "./balance-summary-line";
 import { GroupIcon } from "./group-icon";
-
-function toneColor(
-  tone: "positive" | "negative" | "muted",
-  theme: ReturnType<typeof useTheme>,
-): ColorValue {
-  if (tone === "positive") return theme.positive;
-  if (tone === "negative") return theme.negative;
-  return theme.muted;
-}
 
 export function GroupListSummary({
   lines,
 }: {
   lines: readonly GroupListSummaryLine[];
 }) {
-  const theme = useTheme();
   return (
     <View style={styles.summary}>
       {lines.map((line) => (
-        <Text
+        <BalanceSummaryLine
           key={line.key}
-          selectable
-          style={[
-            styles.summaryText,
-            { color: toneColor(line.tone, theme) },
-          ]}
-        >
-          {line.text}
-        </Text>
+          line={line}
+          style={styles.summaryLine}
+        />
       ))}
     </View>
   );
@@ -70,10 +51,12 @@ export function GroupListRow({
   onPress: () => void;
 }) {
   const theme = useTheme();
+  const [trailingWidth, setTrailingWidth] = useState(96);
   const lines = groupListBalanceLines(memberBalances);
   const minor = BigInt(balance.minor);
   const absoluteMinor = minor < 0n ? -minor : minor;
   const hasOpenPayments = memberBalances.length > 0;
+  const isSettled = !hasOpenPayments && minor === 0n;
   const tone =
     minor > 0n ? "positive" : minor < 0n ? "negative" : "muted";
   const status =
@@ -84,10 +67,58 @@ export function GroupListRow({
         : hasOpenPayments
           ? "Net balance"
           : "Settled up";
-  const amount = `${formatMinor(
+  const amount = formatConvertedMoney(
     absoluteMinor,
     balance.currency as CurrencyCode,
-  )} ${balance.currency}`;
+  );
+  const trailing = (
+    <View
+      onLayout={
+        isSettled
+          ? undefined
+          : (event) => setTrailingWidth(event.nativeEvent.layout.width)
+      }
+      style={[
+        styles.trailing,
+        isSettled ? null : styles.trailingOverlay,
+      ]}
+    >
+      <Text
+        numberOfLines={1}
+        style={[
+          styles.status,
+          {
+            color:
+              tone === "positive"
+                ? theme.positive
+                : tone === "negative"
+                  ? theme.negative
+                  : theme.muted,
+          },
+        ]}
+      >
+        {status}
+      </Text>
+      {hasOpenPayments || minor !== 0n ? (
+        <Text
+          numberOfLines={1}
+          style={[
+            styles.amount,
+            {
+              color:
+                tone === "positive"
+                  ? theme.positive
+                  : tone === "negative"
+                    ? theme.negative
+                    : theme.muted,
+            },
+          ]}
+        >
+          {amount}
+        </Text>
+      ) : null}
+    </View>
+  );
 
   return (
     <Pressable
@@ -108,54 +139,37 @@ export function GroupListRow({
         name={name}
         colorKey={id}
         color={color}
-        size={60}
+        size={52}
       />
-      <View style={styles.copy}>
-        <Text
-          selectable
-          numberOfLines={1}
-          style={[styles.name, { color: theme.text }]}
+      <View style={[styles.copy, isSettled ? styles.copyCentered : null]}>
+        <View
+          style={[styles.heading, isSettled ? styles.headingCentered : null]}
         >
-          {name}
-        </Text>
-        <View style={styles.subtitles}>
-          {lines.map((line) => (
-            <Text
-              key={line.key}
-              selectable
-              numberOfLines={2}
-              style={[
-                styles.subtitle,
-                { color: toneColor(line.tone, theme) },
-              ]}
-            >
-              {line.text}
-            </Text>
-          ))}
-        </View>
-      </View>
-      <View style={styles.trailing}>
-        <Text
-          numberOfLines={1}
-          style={[
-            styles.status,
-            { color: toneColor(tone, theme) },
-          ]}
-        >
-          {status}
-        </Text>
-        {hasOpenPayments || minor !== 0n ? (
           <Text
-            selectable
             numberOfLines={1}
             style={[
-              styles.amount,
-              { color: toneColor(tone, theme) },
+              styles.name,
+              { color: theme.text },
+              isSettled ? null : { paddingRight: trailingWidth + 8 },
             ]}
           >
-            {amount}
+            {name}
           </Text>
-        ) : null}
+          {isSettled ? trailing : null}
+        </View>
+        {isSettled ? null : trailing}
+        <View style={styles.subtitles}>
+          {lines.map((line, index) => (
+            <BalanceSummaryLine
+              key={line.key}
+              line={line}
+              style={[
+                styles.subtitle,
+                index === 0 ? { paddingRight: trailingWidth + 8 } : null,
+              ]}
+            />
+          ))}
+        </View>
       </View>
     </Pressable>
   );
@@ -165,60 +179,77 @@ const styles = StyleSheet.create({
   summary: {
     minHeight: 28,
     paddingHorizontal: 4,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    columnGap: 12,
-    rowGap: 3,
+    gap: 4,
   },
-  summaryText: {
+  summaryLine: {
     fontSize: 16,
     lineHeight: 22,
-    fontWeight: "600",
+    fontWeight: "500",
     fontVariant: ["tabular-nums"],
   },
   row: {
-    minHeight: 100,
-    paddingHorizontal: 4,
-    paddingVertical: 16,
-    borderRadius: 14,
-    borderCurve: "continuous",
+    minHeight: 76,
+    marginHorizontal: -spacing.md,
+    paddingHorizontal: spacing.md + spacing.xs,
+    paddingVertical: 12,
     flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
+    alignItems: "flex-start",
+    gap: 12,
   },
   copy: {
     flex: 1,
-    gap: 5,
+    gap: spacing.xs,
+    position: "relative",
+  },
+  copyCentered: {
+    justifyContent: "center",
+    gap: 0,
+  },
+  heading: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  headingCentered: {
+    minHeight: 52,
+    alignItems: "center",
   },
   name: {
+    flex: 1,
     fontSize: 19,
     lineHeight: 24,
     fontWeight: "700",
     letterSpacing: -0.3,
   },
   subtitles: {
-    gap: 2,
+    gap: 3,
   },
   subtitle: {
     fontSize: 13,
     lineHeight: 17,
+    fontVariant: ["tabular-nums"],
   },
   trailing: {
-    maxWidth: "32%",
+    maxWidth: "40%",
     alignItems: "flex-end",
     gap: 2,
   },
+  trailingOverlay: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+  },
   status: {
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 10,
+    lineHeight: 14,
     fontWeight: "600",
     textTransform: "uppercase",
     letterSpacing: 0.35,
   },
   amount: {
-    fontSize: 15,
-    lineHeight: 20,
+    fontSize: 14,
+    lineHeight: 18,
     fontWeight: "700",
     fontVariant: ["tabular-nums"],
   },

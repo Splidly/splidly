@@ -11,7 +11,7 @@ import {
   or,
   profiles,
 } from "@splidly/db";
-import { money } from "@splidly/shared";
+import { money, type CurrencyCode } from "@splidly/shared";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
@@ -229,7 +229,17 @@ export const friendsRouter = router({
           ),
         )
         .orderBy(expenses.occurredAt);
-      return { friendship, friend, expenses: activity.reverse() };
+      return {
+        friendship,
+        friend,
+        expenses: activity.reverse().map((expense) => ({
+          ...expense,
+          canonicalAmount: money(
+            expense.sourceCurrency as CurrencyCode,
+            expense.sourceAmountMinor,
+          ),
+        })),
+      };
     }),
 
   remove: protectedProcedure

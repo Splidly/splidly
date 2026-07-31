@@ -33,6 +33,7 @@ const config: ExpoConfig = {
     "expo-router",
     "expo-secure-store",
     "expo-apple-authentication",
+    "expo-notifications",
     "expo-image",
     "expo-localization",
     "./plugins/with-google-signin-modular-headers",

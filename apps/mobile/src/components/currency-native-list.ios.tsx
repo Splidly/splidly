@@ -7,6 +7,7 @@ import {
   View,
 } from "react-native";
 import { useTheme } from "../theme";
+import { currencySymbolWithCode } from "../lib/money-display";
 import type {
   CurrencyNativeListProps,
   CurrencySection,
@@ -86,7 +87,7 @@ export function CurrencyNativeList({
                   {item.name}
                 </Text>
                 <Text style={[styles.currencyCode, { color: theme.muted }]}>
-                  {item.code}
+                  {currencySymbolWithCode(item.code)}
                 </Text>
               </View>
               {item.code === value ? (

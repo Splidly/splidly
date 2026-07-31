@@ -53,7 +53,18 @@ jest.mock("../lib/trpc", () => ({
                 balance: { currency: "EUR", minor: "-1234" },
               },
             ],
-            expenses: [],
+            expenses: [
+              {
+                id: "expense-1",
+                description: "Dinner",
+                occurredAt: new Date("2026-07-20T12:00:00.000Z"),
+                sourceCurrency: "USD",
+                sourceAmountMinor: 1_000n,
+                canonicalAmount: { currency: "EUR", minor: "850" },
+                iconKey: "food",
+                iconManuallySet: true,
+              },
+            ],
           },
           error: null,
           isPending: false,
@@ -83,7 +94,9 @@ describe("GroupDetailScreen settlements", () => {
       </SafeAreaInsetsContext.Provider>,
     );
 
-    expect(view.getByText("You owe 12.34 EUR")).toBeTruthy();
+    expect(view.getByText("You owe 12.34 €")).toBeTruthy();
+    expect(view.getByText("8.50 €")).toBeTruthy();
+    expect(view.getByText("$10.00")).toBeTruthy();
     await fireEvent.press(view.getByText("Settle"));
 
     expect(mockPush).toHaveBeenCalledWith({

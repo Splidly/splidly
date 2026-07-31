@@ -2,6 +2,12 @@ import { act, fireEvent, render } from "@testing-library/react-native";
 import type { ReactNode } from "react";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import { ExpenseEditor } from "./expense-editor";
+import { ExpensePaymentEditor } from "./expense-payment-editor";
+import {
+  ExpensePaymentSessionProvider,
+  useExpensePaymentSession,
+} from "./expense-payment-session";
+import { ExpenseSplitSessionProvider } from "./expense-split-session";
 
 const mockQuote = jest.fn();
 const mockCreateExpense = jest.fn();
@@ -16,10 +22,30 @@ jest.mock("expo-router", () => {
   const Toolbar = ({ children }: { children: React.ReactNode }) => (
     <>{children}</>
   );
-  Toolbar.Button = () => null;
+  Toolbar.Button = ({
+    children,
+    ...props
+  }: {
+    children?: React.ReactNode;
+    [key: string]: unknown;
+  }) => {
+    const {
+      Pressable,
+      Text,
+    } = require("react-native") as typeof import("react-native");
+    return (
+      <Pressable {...props}>
+        <Text>{children}</Text>
+      </Pressable>
+    );
+  };
+  Toolbar.View = ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  );
   return {
     router: {
       back: jest.fn(),
+      push: jest.fn(),
     },
     Stack: {
       Screen,
@@ -162,17 +188,31 @@ jest.mock("../lib/trpc", () => ({
   },
 }));
 
-function renderEditor() {
-  return render(
-    <SafeAreaInsetsContext.Provider
-      value={{ top: 0, right: 0, bottom: 0, left: 0 }}
-    >
+function EditorHarness() {
+  const paymentSession = useExpensePaymentSession();
+  return (
+    <>
       <ExpenseEditor
         newContext={{
           type: "friend",
           friendshipId: "11111111-1111-4111-8111-111111111111",
         }}
       />
+      {paymentSession.request ? <ExpensePaymentEditor /> : null}
+    </>
+  );
+}
+
+function renderEditor() {
+  return render(
+    <SafeAreaInsetsContext.Provider
+      value={{ top: 0, right: 0, bottom: 0, left: 0 }}
+    >
+      <ExpensePaymentSessionProvider>
+        <ExpenseSplitSessionProvider>
+          <EditorHarness />
+        </ExpenseSplitSessionProvider>
+      </ExpensePaymentSessionProvider>
     </SafeAreaInsetsContext.Provider>,
   );
 }
@@ -231,7 +271,7 @@ describe("ExpenseEditor", () => {
       base: "EUR",
       targets: ["EUR", "USD"],
     });
-    expect(view.getByText("≈ 12.50 USD")).toBeTruthy();
+    expect(view.getByText("≈ $12.50")).toBeTruthy();
     expect(view.getByText(/1 EUR = 1.25 USD/)).toBeTruthy();
     expect(view.queryByText("Frozen exchange rates")).toBeNull();
   });
@@ -325,6 +365,60 @@ describe("ExpenseEditor", () => {
         description: "Warmmiete",
         iconKey: "travel",
         iconManuallySet: true,
+      }),
+    );
+  });
+
+  it("requires multiple payer contributions to cover the full expense", async () => {
+    const view = await renderEditor();
+    await act(async () => {});
+
+    await fireEvent.changeText(view.getByLabelText("Description"), "Dinner");
+    await fireEvent.changeText(view.getByLabelText("Amount"), "70.00");
+    await fireEvent.press(view.getByText("Paid by"));
+    await fireEvent(
+      view.getByLabelText("Friend paid"),
+      "valueChange",
+      true,
+    );
+
+    expect(
+      view.getByLabelText("70.00 € of 70.00 €, Complete"),
+    ).toBeTruthy();
+    await fireEvent.changeText(
+      view.getByLabelText("Lasse paid amount"),
+      "50.00",
+    );
+    expect(
+      view.getByLabelText("85.00 € of 70.00 €, Incomplete"),
+    ).toBeTruthy();
+
+    await fireEvent.changeText(
+      view.getByLabelText("Friend paid amount"),
+      "20.00",
+    );
+    expect(
+      view.getByLabelText("70.00 € of 70.00 €, Complete"),
+    ).toBeTruthy();
+    await fireEvent.press(
+      view.getByLabelText("Save payment allocation"),
+    );
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(450);
+    });
+    await fireEvent.press(view.getByText("Save expense"));
+
+    expect(mockCreateExpense).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payments: [
+          { userId: "user-1", amountMinor: "5000" },
+          { userId: "user-2", amountMinor: "2000" },
+        ],
+        split: {
+          mode: "equal",
+          participantIds: ["user-1", "user-2"],
+        },
       }),
     );
   });

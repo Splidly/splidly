@@ -47,5 +47,86 @@ describe("money", () => {
       }),
     ).toThrow("must equal");
   });
-});
 
+  it("allocates percentage and weighted-share splits deterministically", () => {
+    expect(
+      splitSourceAmount(10_00n, {
+        mode: "percentage",
+        shares: [
+          { userId: "a", percentage: "12.5" },
+          { userId: "b", percentage: "87.5" },
+        ],
+      }),
+    ).toEqual(
+      new Map([
+        ["a", 125n],
+        ["b", 875n],
+      ]),
+    );
+    expect(() =>
+      splitSourceAmount(10_00n, {
+        mode: "percentage",
+        shares: [
+          { userId: "a", percentage: "40" },
+          { userId: "b", percentage: "50" },
+        ],
+      }),
+    ).toThrow("100%");
+    expect(
+      splitSourceAmount(10n, {
+        mode: "shares",
+        shares: [
+          { userId: "a", shares: "0" },
+          { userId: "b", shares: "1" },
+          { userId: "c", shares: "2" },
+        ],
+      }),
+    ).toEqual(
+      new Map([
+        ["a", 0n],
+        ["b", 3n],
+        ["c", 7n],
+      ]),
+    );
+  });
+
+  it("aggregates itemized shares and validates the item total", () => {
+    expect(
+      splitSourceAmount(15_00n, {
+        mode: "itemized",
+        items: [
+          {
+            id: "pizza",
+            description: "Pizza",
+            amountMinor: "1200",
+            participantIds: ["a", "b"],
+          },
+          {
+            id: "drink",
+            description: "Drink",
+            amountMinor: "300",
+            participantIds: ["b"],
+          },
+        ],
+      }),
+    ).toEqual(
+      new Map([
+        ["a", 600n],
+        ["b", 900n],
+      ]),
+    );
+    expect(() =>
+      splitSourceAmount(15_00n, {
+        mode: "itemized",
+        items: [
+          {
+            id: "pizza",
+            description: "Pizza",
+            amountMinor: "1400",
+            participantIds: ["a"],
+          },
+        ],
+      }),
+    ).toThrow("must equal");
+  });
+});

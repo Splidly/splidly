@@ -1,4 +1,5 @@
 import { fireEvent, render } from "@testing-library/react-native";
+import { StyleSheet } from "react-native";
 import {
   GroupListRow,
   GroupListSummary,
@@ -30,12 +31,27 @@ describe("GroupListRow", () => {
     );
 
     expect(view.getByText("Lisbon")).toBeTruthy();
-    expect(view.getByText("You owe Alex 8.00 EUR")).toBeTruthy();
-    expect(view.getByText("Sam owes you 12.25 EUR")).toBeTruthy();
+    expect(view.getByLabelText("You owe Alex 8.00 €")).toBeTruthy();
+    expect(view.getByLabelText("Sam owes you 12.25 €")).toBeTruthy();
     expect(view.getByText("You are owed")).toBeTruthy();
-    expect(view.getByText("4.25 EUR")).toBeTruthy();
+    expect(view.getByText("4.25 €")).toBeTruthy();
 
-    await fireEvent.press(view.getByLabelText("Lisbon, You are owed 4.25 EUR"));
+    const alexLine = view.getByLabelText("You owe Alex 8.00 €");
+    await fireEvent(alexLine, "textLayout", {
+      nativeEvent: { lines: [{}, {}] },
+    });
+    expect(
+      view.getByLabelText("You owe Alex 8.00 €").props.children[0],
+    ).toBe("You owe A.");
+
+    const row = view.getByLabelText("Lisbon, You are owed 4.25 €");
+    expect(StyleSheet.flatten(row.props.style)).toEqual(
+      expect.objectContaining({
+        marginHorizontal: -16,
+        paddingHorizontal: 20,
+      }),
+    );
+    await fireEvent.press(row);
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
@@ -51,9 +67,9 @@ describe("GroupListRow", () => {
       />,
     );
 
-    expect(view.getByText("All settled up")).toBeTruthy();
+    expect(view.queryByText("All settled up")).toBeNull();
     expect(view.getByText("Settled up")).toBeTruthy();
-    expect(view.queryByText("0.00 EUR")).toBeNull();
+    expect(view.queryByText("0.00 €")).toBeNull();
   });
 });
 
@@ -62,17 +78,25 @@ describe("GroupListSummary", () => {
     const view = await render(
       <GroupListSummary
         lines={[
-          { key: "owes", text: "You owe 8.00 EUR", tone: "negative" },
+          {
+            key: "owes",
+            label: "You owe",
+            text: "You owe 8.00 €",
+            amount: "8.00 €",
+            tone: "negative",
+          },
           {
             key: "owed",
-            text: "You are owed 12.25 EUR",
+            label: "You are owed",
+            text: "You are owed 12.25 €",
+            amount: "12.25 €",
             tone: "positive",
           },
         ]}
       />,
     );
 
-    expect(view.getByText("You owe 8.00 EUR")).toBeTruthy();
-    expect(view.getByText("You are owed 12.25 EUR")).toBeTruthy();
+    expect(view.getByLabelText("You owe 8.00 €")).toBeTruthy();
+    expect(view.getByLabelText("You are owed 12.25 €")).toBeTruthy();
   });
 });

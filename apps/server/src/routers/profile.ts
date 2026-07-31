@@ -10,6 +10,7 @@ import {
   ledgerEntries,
   or,
   profiles,
+  pushInstallations,
   sessions,
   sql,
   users,
@@ -162,6 +163,9 @@ export const profileRouter = router({
         }
 
         await tx.delete(invites).where(eq(invites.inviterId, userId));
+        await tx
+          .delete(pushInstallations)
+          .where(eq(pushInstallations.userId, userId));
         await tx.delete(sessions).where(eq(sessions.userId, userId));
         await tx.delete(accounts).where(eq(accounts.userId, userId));
         await tx
