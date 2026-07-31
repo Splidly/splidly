@@ -1,9 +1,9 @@
-import * as Application from "expo-application";
 import * as Notifications from "expo-notifications";
 import { router } from "expo-router";
 import { useCallback, useEffect, useRef } from "react";
 import { AppState, Platform } from "react-native";
 import { authClient } from "../lib/auth-client";
+import { getApnsEnvironment } from "../lib/apns-environment";
 import {
   notificationHref,
   parseExpenseNotificationData,
@@ -47,12 +47,9 @@ export function NotificationCoordinator() {
   const registerToken = useCallback(
     async (token: Notifications.DevicePushToken) => {
       if (token.type !== "ios" || typeof token.data !== "string") return;
-      const environment =
-        await Application.getIosPushNotificationServiceEnvironmentAsync();
-      if (!environment) return;
       await registerPushInstallation({
         installationId: await getPushInstallationId(),
-        environment,
+        environment: await getApnsEnvironment(),
         token: token.data,
       });
     },
