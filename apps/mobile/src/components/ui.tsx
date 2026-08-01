@@ -323,6 +323,7 @@ export function RowDivider({ inset = 64 }: { inset?: number }) {
 export function ListRow({
   title,
   subtitle,
+  subtitleNumberOfLines = 2,
   value,
   valueFallback,
   valueTone = "default",
@@ -334,6 +335,7 @@ export function ListRow({
 }: {
   title: string;
   subtitle?: string;
+  subtitleNumberOfLines?: number;
   value?: string;
   valueFallback?: string;
   valueTone?: "default" | "muted" | "positive" | "negative";
@@ -373,7 +375,7 @@ export function ListRow({
         </Text>
         {subtitle ? (
           <Text
-            numberOfLines={2}
+            numberOfLines={subtitleNumberOfLines}
             style={[styles.rowSubtitle, { color: theme.muted }]}
           >
             {subtitle}

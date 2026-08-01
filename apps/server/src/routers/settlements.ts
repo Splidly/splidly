@@ -51,11 +51,6 @@ export const settlementsRouter = router({
           message: "A settlement requires two people",
         });
       }
-      assertSettlementParticipant(
-        ctx.session.user.id,
-        input.fromUserId,
-        input.toUserId,
-      );
       const [duplicate] = await ctx.db
         .select()
         .from(settlements)
@@ -109,6 +104,11 @@ export const settlementsRouter = router({
         contextId = group.id;
         simplifyDebts = group.simplifyDebts;
       } else {
+        assertSettlementParticipant(
+          ctx.session.user.id,
+          input.fromUserId,
+          input.toUserId,
+        );
         const friendship = await requireFriendshipParticipant(
           ctx.db,
           input.context.friendshipId,

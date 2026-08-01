@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 import { assertSettlementParticipant } from "../src/routers/settlements";
 
-describe("settlement participant authorization", () => {
+describe("direct settlement participant authorization", () => {
   it("allows either person involved in the debt", () => {
     expect(() =>
       assertSettlementParticipant("payer", "payer", "recipient"),
@@ -12,7 +12,7 @@ describe("settlement participant authorization", () => {
     ).not.toThrow();
   });
 
-  it("rejects another member of the same group", () => {
+  it("rejects someone outside the direct ledger", () => {
     try {
       assertSettlementParticipant("other-member", "payer", "recipient");
       throw new Error("Expected authorization to fail");

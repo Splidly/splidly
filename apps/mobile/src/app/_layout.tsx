@@ -83,7 +83,7 @@ function Navigation() {
         <Stack.Screen
           name="settlement/new"
           options={{
-            title: "Settle Up",
+            title: "Record Payment",
             ...formSheetOptions(theme.sheet),
           }}
         />

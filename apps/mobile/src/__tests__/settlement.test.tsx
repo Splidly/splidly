@@ -1,6 +1,15 @@
-import { render } from "@testing-library/react-native";
+import { fireEvent, render } from "@testing-library/react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import NewSettlementScreen from "../app/settlement/new";
+
+jest.mock("@expo/ui/community/menu", () => {
+  const { View } = require("react-native") as typeof import("react-native");
+  return {
+    MenuView: ({ children, ...props }: { children: React.ReactNode }) => (
+      <View {...props}>{children}</View>
+    ),
+  };
+});
 
 jest.mock("expo-crypto", () => ({
   randomUUID: () => "00000000-0000-4000-8000-000000000000",
@@ -74,6 +83,11 @@ jest.mock("../lib/trpc", () => ({
                 displayName: "Alex",
                 homeCurrency: "USD",
               },
+              {
+                userId: "user-3",
+                displayName: "Flo",
+                homeCurrency: "EUR",
+              },
             ],
           },
           error: null,
@@ -91,6 +105,7 @@ jest.mock("../lib/trpc", () => ({
           error: null,
           isPending: false,
           mutateAsync: jest.fn(),
+          reset: jest.fn(),
         })),
       },
     },
@@ -136,6 +151,10 @@ describe("NewSettlementScreen group context", () => {
     ).api;
 
     expect(view.getByText("Alex paid you")).toBeTruthy();
+    expect(view.getByDisplayValue("12.34")).toBeTruthy();
+    expect(
+      view.queryByText(/Splidly updates the ledger/),
+    ).toBeNull();
     expect(mockedApi.friends.detail.useQuery).toHaveBeenCalledWith(
       { friendshipId: "" },
       { enabled: false },
@@ -144,5 +163,10 @@ describe("NewSettlementScreen group context", () => {
       { groupId: "group-1" },
       { enabled: true },
     );
+
+    await fireEvent(view.getByTestId("settlement-paid-by"), "pressAction", {
+      nativeEvent: { event: "user-3" },
+    });
+    expect(view.getByText("Flo paid you")).toBeTruthy();
   });
 });

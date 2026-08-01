@@ -33,6 +33,7 @@ import {
   repaymentPlan,
   viewerRepaymentBalances,
 } from "../domain/debt-simplification";
+import { expenseActivitySummary } from "../domain/expense-activity";
 import { requireActiveGroupMember } from "../domain/helpers";
 import { protectedProcedure, router } from "../trpc";
 
@@ -244,23 +245,119 @@ export const groupsRouter = router({
           ),
         )
         .orderBy(expenses.occurredAt);
-      const activityRates =
-        activity.length === 0
+      const settlementRecords = await ctx.db
+        .select({
+          id: settlements.id,
+          occurredAt: settlements.occurredAt,
+          notes: settlements.notes,
+          fromUserId: settlements.fromUserId,
+          toUserId: settlements.toUserId,
+          sourceCurrency: settlements.sourceCurrency,
+          sourceAmountMinor: settlements.sourceAmountMinor,
+        })
+        .from(settlements)
+        .where(
+          and(
+            eq(settlements.groupId, input.groupId),
+            isNull(settlements.deletedAt),
+          ),
+        )
+        .orderBy(settlements.occurredAt);
+      const settlementUserIds = [
+        ...new Set(
+          settlementRecords.flatMap((settlement) => [
+            settlement.fromUserId,
+            settlement.toUserId,
+          ]),
+        ),
+      ];
+      const settlementProfiles =
+        settlementUserIds.length === 0
           ? []
           : await ctx.db
               .select({
-                expenseId: rateSnapshots.expenseId,
-                base: rateSnapshots.base,
-                quote: rateSnapshots.quote,
-                rate: rateSnapshots.rate,
+                userId: profiles.userId,
+                displayName: profiles.displayName,
+                avatarUrl: profiles.avatarUrl,
               })
-              .from(rateSnapshots)
-              .where(
-                inArray(
-                  rateSnapshots.expenseId,
-                  activity.map((expense) => expense.id),
+              .from(profiles)
+              .where(inArray(profiles.userId, settlementUserIds));
+      const settlementProfilesById = new Map(
+        settlementProfiles.map((profile) => [profile.userId, profile]),
+      );
+      const activityIds = activity.map((expense) => expense.id);
+      const [
+        activityRates,
+        activityPayments,
+        viewerSplits,
+        legacyPayers,
+      ] =
+        activity.length === 0
+          ? [[], [], [], []]
+          : await Promise.all([
+              ctx.db
+                .select({
+                  expenseId: rateSnapshots.expenseId,
+                  base: rateSnapshots.base,
+                  quote: rateSnapshots.quote,
+                  rate: rateSnapshots.rate,
+                })
+                .from(rateSnapshots)
+                .where(inArray(rateSnapshots.expenseId, activityIds)),
+              ctx.db
+                .select({
+                  expenseId: expensePayments.expenseId,
+                  userId: expensePayments.userId,
+                  sourceAmountMinor: expensePayments.sourceAmountMinor,
+                  displayName: profiles.displayName,
+                })
+                .from(expensePayments)
+                .innerJoin(
+                  profiles,
+                  eq(profiles.userId, expensePayments.userId),
+                )
+                .where(inArray(expensePayments.expenseId, activityIds)),
+              ctx.db
+                .select({
+                  expenseId: expenseSplits.expenseId,
+                  sourceAmountMinor: expenseSplits.sourceAmountMinor,
+                })
+                .from(expenseSplits)
+                .where(
+                  and(
+                    inArray(expenseSplits.expenseId, activityIds),
+                    eq(expenseSplits.userId, ctx.session.user.id),
+                  ),
                 ),
-              );
+              ctx.db
+                .select({
+                  userId: profiles.userId,
+                  displayName: profiles.displayName,
+                })
+                .from(profiles)
+                .where(
+                  inArray(
+                    profiles.userId,
+                    [...new Set(activity.map((expense) => expense.payerId))],
+                  ),
+                ),
+            ]);
+      const activityPaymentsByExpense = new Map<
+        string,
+        (typeof activityPayments)[number][]
+      >();
+      for (const payment of activityPayments) {
+        const payments =
+          activityPaymentsByExpense.get(payment.expenseId) ?? [];
+        payments.push(payment);
+        activityPaymentsByExpense.set(payment.expenseId, payments);
+      }
+      const viewerSplitsByExpense = new Map(
+        viewerSplits.map((split) => [split.expenseId, split]),
+      );
+      const legacyPayersById = new Map(
+        legacyPayers.map((profile) => [profile.userId, profile]),
+      );
       const groupEntries = await ctx.db
         .select()
         .from(ledgerEntries)
@@ -310,13 +407,57 @@ export const groupsRouter = router({
                 )
               : null;
 
-        return { ...expense, canonicalAmount };
+        const summary = expenseActivitySummary({
+          sourceCurrency,
+          sourceAmountMinor: expense.sourceAmountMinor,
+          legacyPayerId: expense.payerId,
+          legacyPayerDisplayName: legacyPayersById.get(expense.payerId)
+            ?.displayName,
+          payments: activityPaymentsByExpense.get(expense.id) ?? [],
+          viewerUserId: ctx.session.user.id,
+          viewerShareMinor: viewerSplitsByExpense.get(expense.id)
+            ?.sourceAmountMinor,
+        });
+
+        return { ...expense, canonicalAmount, ...summary };
       });
+      const settlementActivity = settlementRecords
+        .reverse()
+        .map((settlement) => {
+          const fromProfile = settlementProfilesById.get(
+            settlement.fromUserId,
+          );
+          const toProfile = settlementProfilesById.get(
+            settlement.toUserId,
+          );
+          return {
+            id: settlement.id,
+            occurredAt: settlement.occurredAt,
+            notes: settlement.notes,
+            amount: money(
+              settlement.sourceCurrency as CurrencyCode,
+              settlement.sourceAmountMinor,
+            ),
+            from: {
+              userId: settlement.fromUserId,
+              displayName: fromProfile?.displayName ?? "Unknown member",
+              avatarUrl: fromProfile?.avatarUrl ?? null,
+              isViewer: settlement.fromUserId === ctx.session.user.id,
+            },
+            to: {
+              userId: settlement.toUserId,
+              displayName: toProfile?.displayName ?? "Unknown member",
+              avatarUrl: toProfile?.avatarUrl ?? null,
+              isViewer: settlement.toUserId === ctx.session.user.id,
+            },
+          };
+        });
       return {
         group,
         members,
         memberBalances,
         expenses: expenseActivity,
+        settlements: settlementActivity,
       };
     }),
 

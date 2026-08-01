@@ -5,15 +5,19 @@ import {
   type RateSnapshot,
 } from "@splidly/shared";
 import * as Crypto from "expo-crypto";
+import {
+  MenuView,
+  type MenuAction,
+} from "@expo/ui/community/menu";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Text, View } from "react-native";
 import {
   Avatar,
   ErrorState,
   Field,
   FormSection,
-  Intro,
+  ListRow,
   LoadingState,
   PrimaryButton,
   Screen,
@@ -22,14 +26,69 @@ import { CurrencyField } from "../../components/currency-field";
 import { api } from "../../lib/trpc";
 import { useTheme } from "../../theme";
 
+type SettlementMember = {
+  userId: string;
+  displayName: string;
+  avatarUrl?: string | null;
+  homeCurrency: CurrencyCode;
+};
+
+function MemberField({
+  label,
+  value,
+  members,
+  excludedUserId,
+  onValueChange,
+  disabled = false,
+}: {
+  label: string;
+  value: SettlementMember | undefined;
+  members: SettlementMember[];
+  excludedUserId: string | undefined;
+  onValueChange: (userId: string) => void;
+  disabled?: boolean;
+}) {
+  const row = (
+    <View accessibilityRole={disabled ? undefined : "button"}>
+      <ListRow
+        title={label}
+        value={value?.displayName ?? "Choose person"}
+        valueTone={value ? "default" : "muted"}
+        showsDisclosureIndicator={false}
+      />
+    </View>
+  );
+  if (disabled) return row;
+
+  const actions: MenuAction[] = members
+    .filter((member) => member.userId !== excludedUserId)
+    .map((member) => ({
+      id: member.userId,
+      title: member.displayName,
+      state: member.userId === value?.userId ? "on" : "off",
+    }));
+  return (
+    <MenuView
+      title={label}
+      actions={actions}
+      testID={`settlement-${label.toLowerCase().replaceAll(" ", "-")}`}
+      onPressAction={({ nativeEvent }) => onValueChange(nativeEvent.event)}
+    >
+      {row}
+    </MenuView>
+  );
+}
+
 export default function NewSettlementScreen() {
   const params = useLocalSearchParams<{
     type: "group" | "friend";
     id: string;
     friendshipId?: string;
-    friendId: string;
+    friendId?: string;
+    fromUserId?: string;
+    toUserId?: string;
     canonicalCurrency: CurrencyCode;
-    canonicalMinor: string;
+    canonicalMinor?: string;
   }>();
   const theme = useTheme();
   const profile = api.profile.me.useQuery();
@@ -47,18 +106,29 @@ export default function NewSettlementScreen() {
     { enabled: params.type === "group" },
   );
   const utils = api.useUtils();
-  const negative = BigInt(params.canonicalMinor) < 0n;
-  const absolute = negative
-    ? -BigInt(params.canonicalMinor)
-    : BigInt(params.canonicalMinor);
+  let signedCanonicalMinor: bigint | undefined;
+  try {
+    signedCanonicalMinor = params.canonicalMinor
+      ? BigInt(params.canonicalMinor)
+      : undefined;
+  } catch {
+    signedCanonicalMinor = undefined;
+  }
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState(params.canonicalCurrency);
+  const [fromUserId, setFromUserId] = useState(params.fromUserId ?? "");
+  const [toUserId, setToUserId] = useState(params.toUserId ?? "");
   const [notes, setNotes] = useState("");
   const [rateValues, setRateValues] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string>();
   useEffect(() => {
+    if (signedCanonicalMinor === undefined) return;
+    const absolute =
+      signedCanonicalMinor < 0n
+        ? -signedCanonicalMinor
+        : signedCanonicalMinor;
     setAmount(formatMinor(absolute, params.canonicalCurrency));
-  }, [absolute, params.canonicalCurrency]);
+  }, [params.canonicalCurrency, params.canonicalMinor]);
 
   const quote = api.currency.quote.useMutation();
   const create = api.settlements.create.useMutation({
@@ -69,37 +139,104 @@ export default function NewSettlementScreen() {
         params.type === "group"
           ? utils.groups.detail.invalidate({ groupId: params.id })
           : utils.friends.detail.invalidate({
-              friendshipId: params.id,
+              friendshipId: params.friendshipId ?? params.id,
             }),
       ]);
       router.back();
     },
   });
-  const fromUserId = negative ? profile.data?.userId : params.friendId;
-  const toUserId = negative ? params.friendId : profile.data?.userId;
-  const counterparty =
-    params.type === "group"
-      ? group.data?.members.find(
-          (member) => member.userId === params.friendId,
-        )
-      : friend.data?.friend;
-  const friendName = counterparty?.displayName ?? "Your friend";
+  const contextMembers = useMemo(
+    () => {
+      const candidates =
+        params.type === "group"
+          ? (group.data?.members ?? [])
+          : [profile.data, friend.data?.friend];
+      return candidates.flatMap((member): SettlementMember[] =>
+        member
+          ? [
+              {
+                userId: member.userId,
+                displayName: member.displayName,
+                avatarUrl: member.avatarUrl,
+                homeCurrency: member.homeCurrency as CurrencyCode,
+              },
+            ]
+          : [],
+      );
+    },
+    [friend.data?.friend, group.data?.members, params.type, profile.data],
+  );
+  const fromMember = contextMembers.find(
+    (member) => member.userId === fromUserId,
+  );
+  const toMember = contextMembers.find(
+    (member) => member.userId === toUserId,
+  );
   const contextCurrencies = [
-    counterparty?.homeCurrency,
-    profile.data?.homeCurrency,
+    fromMember?.homeCurrency,
+    toMember?.homeCurrency,
   ].filter((value): value is CurrencyCode => Boolean(value));
+
+  useEffect(() => {
+    if (!profile.data || contextMembers.length < 2) return;
+    const legacyNegative = signedCanonicalMinor !== undefined
+      ? signedCanonicalMinor < 0n
+      : false;
+    const initialFrom =
+      params.fromUserId ??
+      (params.friendId
+        ? legacyNegative
+          ? profile.data.userId
+          : params.friendId
+        : profile.data.userId);
+    const initialTo =
+      params.toUserId ??
+      (params.friendId
+        ? legacyNegative
+          ? params.friendId
+          : profile.data.userId
+        : contextMembers.find((member) => member.userId !== initialFrom)
+            ?.userId);
+    setFromUserId((current) => current || initialFrom);
+    setToUserId((current) => current || initialTo || "");
+  }, [
+    contextMembers,
+    params.friendId,
+    params.fromUserId,
+    params.toUserId,
+    profile.data,
+    signedCanonicalMinor,
+  ]);
+
+  function resetQuote() {
+    quote.reset();
+    setRateValues({});
+  }
+
+  function selectFrom(nextUserId: string) {
+    setFromUserId(nextUserId);
+    resetQuote();
+  }
+
+  function selectTo(nextUserId: string) {
+    setToUserId(nextUserId);
+    resetQuote();
+  }
 
   async function preview() {
     setFormError(undefined);
-    if (!profile.data || !counterparty) return;
+    if (!fromMember || !toMember || fromMember.userId === toMember.userId) {
+      setFormError("Choose two different people");
+      return;
+    }
     try {
       parseDecimalToMinor(amount, currency);
       const result = await quote.mutateAsync({
         base: currency,
         targets: [
           params.canonicalCurrency,
-          profile.data.homeCurrency,
-          counterparty.homeCurrency,
+          fromMember.homeCurrency,
+          toMember.homeCurrency,
         ],
       });
       setRateValues(
@@ -159,14 +296,14 @@ export default function NewSettlementScreen() {
       </Screen>
     );
   }
-  if (contextError || !counterparty) {
+  if (contextError || contextMembers.length < 2) {
     return (
       <Screen background="sheet">
         <ErrorState
           message={
             contextError?.message ??
             (params.type === "group"
-              ? "Group member not found"
+              ? "This group needs at least two members"
               : "Friend not found")
           }
         />
@@ -177,12 +314,23 @@ export default function NewSettlementScreen() {
   return (
     <Screen background="sheet">
       <View style={{ alignItems: "center", gap: 10, paddingVertical: 8 }}>
-        <Avatar
-          name={friendName}
-          colorKey={counterparty.userId}
-          imageUrl={counterparty.avatarUrl}
-          size={68}
-        />
+        {fromMember && toMember ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <Avatar
+              name={fromMember.displayName}
+              colorKey={fromMember.userId}
+              imageUrl={fromMember.avatarUrl}
+              size={54}
+            />
+            <Text style={{ color: theme.muted, fontSize: 22 }}>→</Text>
+            <Avatar
+              name={toMember.displayName}
+              colorKey={toMember.userId}
+              imageUrl={toMember.avatarUrl}
+              size={54}
+            />
+          </View>
+        ) : null}
         <Text
           style={{
             color: theme.text,
@@ -191,14 +339,32 @@ export default function NewSettlementScreen() {
             textAlign: "center",
           }}
         >
-          {negative ? `You paid ${friendName}` : `${friendName} paid you`}
+          {fromMember && toMember
+            ? fromMember.userId === profile.data?.userId
+              ? `You paid ${toMember.displayName}`
+              : toMember.userId === profile.data?.userId
+                ? `${fromMember.displayName} paid you`
+                : `${fromMember.displayName} paid ${toMember.displayName}`
+            : "Record payment"}
         </Text>
       </View>
-      <Intro>
-        Record a payment that already happened. Splidly updates the ledger but
-        never moves money.
-      </Intro>
       <FormSection title="Payment">
+        <MemberField
+          label="Paid by"
+          value={fromMember}
+          members={contextMembers}
+          excludedUserId={toUserId}
+          onValueChange={selectFrom}
+          disabled={params.type === "friend"}
+        />
+        <MemberField
+          label="Paid to"
+          value={toMember}
+          members={contextMembers}
+          excludedUserId={fromUserId}
+          onValueChange={selectTo}
+          disabled={params.type === "friend"}
+        />
         <Field
           label="Amount"
           value={amount}
@@ -208,7 +374,10 @@ export default function NewSettlementScreen() {
         <CurrencyField
           label="Currency"
           value={currency}
-          onValueChange={setCurrency}
+          onValueChange={(value) => {
+            setCurrency(value);
+            resetQuote();
+          }}
           recentCurrencies={contextCurrencies}
         />
         <Field
@@ -223,7 +392,12 @@ export default function NewSettlementScreen() {
         label={quote.isPending ? "Getting rate…" : "Preview conversion"}
         tone="secondary"
         onPress={() => void preview()}
-        disabled={quote.isPending || !fromUserId || !toUserId}
+        disabled={
+          quote.isPending ||
+          !fromMember ||
+          !toMember ||
+          fromUserId === toUserId
+        }
       />
       {quote.data ? (
         <FormSection
