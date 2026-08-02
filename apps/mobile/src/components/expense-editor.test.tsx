@@ -1,5 +1,7 @@
 import { act, fireEvent, render } from "@testing-library/react-native";
+import { HeaderHeightContext } from "expo-router/build/react-navigation/elements/Header/HeaderHeightContext";
 import type { ReactNode } from "react";
+import { StyleSheet } from "react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import { ExpenseEditor } from "./expense-editor";
 import { ExpensePaymentEditor } from "./expense-payment-editor";
@@ -205,15 +207,17 @@ function EditorHarness() {
 
 function renderEditor() {
   return render(
-    <SafeAreaInsetsContext.Provider
-      value={{ top: 0, right: 0, bottom: 0, left: 0 }}
-    >
-      <ExpensePaymentSessionProvider>
-        <ExpenseSplitSessionProvider>
-          <EditorHarness />
-        </ExpenseSplitSessionProvider>
-      </ExpensePaymentSessionProvider>
-    </SafeAreaInsetsContext.Provider>,
+    <HeaderHeightContext.Provider value={96}>
+      <SafeAreaInsetsContext.Provider
+        value={{ top: 0, right: 0, bottom: 0, left: 0 }}
+      >
+        <ExpensePaymentSessionProvider>
+          <ExpenseSplitSessionProvider>
+            <EditorHarness />
+          </ExpenseSplitSessionProvider>
+        </ExpensePaymentSessionProvider>
+      </SafeAreaInsetsContext.Provider>
+    </HeaderHeightContext.Provider>,
   );
 }
 
@@ -248,6 +252,76 @@ describe("ExpenseEditor", () => {
 
   afterEach(() => {
     jest.useRealTimers();
+  });
+
+  it("uses a focused composer with progressive details and a floating save action", async () => {
+    const view = await renderEditor();
+    await act(async () => {});
+
+    expect(view.getByTestId("expense-entry-card")).toBeTruthy();
+    expect(view.getByLabelText("Description").props.inputAccessoryViewID).toBe(
+      "expense-primary-action",
+    );
+    expect(view.getByLabelText("Amount").props.inputAccessoryViewID).toBe(
+      "expense-primary-action",
+    );
+    expect(view.getByLabelText("Currency")).toBeTruthy();
+    expect(view.getByText("Payment plan")).toBeTruthy();
+    expect(view.getByLabelText("Paid by")).toBeTruthy();
+    expect(view.getByLabelText("Split")).toBeTruthy();
+    await fireEvent.changeText(view.getByLabelText("Amount"), "10.00");
+    expect(view.getByText("Paid by You")).toBeTruthy();
+    expect(view.queryByText("You paid")).toBeNull();
+    expect(view.queryByLabelText("Notes")).toBeNull();
+    expect(
+      view.queryByText("Splidly records the expense. It does not charge anyone."),
+    ).toBeNull();
+
+    await fireEvent.press(view.getByText("Add a note"));
+
+    expect(view.getByLabelText("Notes")).toBeTruthy();
+    expect(view.getByTestId("screen-bottom-overlay")).toBeTruthy();
+    expect(view.getByText("Save expense")).toBeTruthy();
+    expect(view.getByText("Add expense")).toBeTruthy();
+
+    const [scrollView] = view.container.queryAll(
+      (instance) =>
+        instance.props.contentInsetAdjustmentBehavior === "automatic",
+    );
+    if (!scrollView) throw new Error("Expense ScrollView was not rendered");
+    await fireEvent(scrollView, "layout", {
+      nativeEvent: { layout: { height: 800 } },
+    });
+    const [resizedScrollView] = view.container.queryAll(
+      (instance) =>
+        instance.props.contentInsetAdjustmentBehavior === "automatic",
+    );
+    expect(
+      StyleSheet.flatten(resizedScrollView?.props.contentContainerStyle)
+        .minHeight,
+    ).toBe(708);
+
+    if (!resizedScrollView) throw new Error("Expense ScrollView was not resized");
+    await fireEvent(resizedScrollView, "contentSizeChange", 400, 1_000);
+    const [overflowingScrollView] = view.container.queryAll(
+      (instance) =>
+        instance.props.contentInsetAdjustmentBehavior === "automatic",
+    );
+    expect(
+      StyleSheet.flatten(overflowingScrollView?.props.contentContainerStyle)
+        .paddingBottom,
+    ).toBe(108);
+  });
+
+  it("formats the amount to the currency precision when focus leaves", async () => {
+    const view = await renderEditor();
+    await act(async () => {});
+
+    const amount = view.getByLabelText("Amount");
+    await fireEvent.changeText(amount, "5");
+    await fireEvent(amount, "blur");
+
+    expect(view.getByLabelText("Amount").props.value).toBe("5.00");
   });
 
   it("loads conversion metadata after a short amount-entry debounce", async () => {
@@ -375,7 +449,7 @@ describe("ExpenseEditor", () => {
 
     await fireEvent.changeText(view.getByLabelText("Description"), "Dinner");
     await fireEvent.changeText(view.getByLabelText("Amount"), "70.00");
-    await fireEvent.press(view.getByText("Paid by"));
+    await fireEvent.press(view.getByLabelText("Paid by"));
     await fireEvent(
       view.getByLabelText("Friend paid"),
       "valueChange",
@@ -403,6 +477,9 @@ describe("ExpenseEditor", () => {
     await fireEvent.press(
       view.getByLabelText("Save payment allocation"),
     );
+
+    expect(view.getByText("Paid by")).toBeTruthy();
+    expect(view.getByText("You and Friend paid")).toBeTruthy();
 
     await act(async () => {
       await jest.advanceTimersByTimeAsync(450);

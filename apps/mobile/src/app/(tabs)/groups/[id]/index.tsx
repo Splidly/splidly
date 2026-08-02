@@ -1,31 +1,29 @@
 import { Stack, router, useLocalSearchParams, type Href } from "expo-router";
 import { View, useColorScheme } from "react-native";
-import {
-  normalizeGroupIconKey,
-} from "../../../../components/group-icon";
+import { ActivityTimeline } from "../../../../components/activity-timeline";
+import { normalizeGroupIconKey } from "../../../../components/group-icon";
 import {
   GroupBalanceSummary,
   GroupSummaryHeader,
 } from "../../../../components/group-summary-header";
 import { ExpenseIcon } from "../../../../components/expense-icon";
 import { ExpenseListInvolvement } from "../../../../components/expense-list-involvement";
+import { SettlementActivityRow } from "../../../../components/settlement-activity-row";
 import {
-  Avatar,
   EmptyState,
   ErrorState,
   HeaderButton,
   ListRow,
   LoadingState,
   PrimaryButton,
-  RowDivider,
   Screen,
   Section,
 } from "../../../../components/ui";
 import { api } from "../../../../lib/trpc";
-import { expenseActivitySubtitle } from "../../../../lib/expense-activity";
+import { groupActivityByDate } from "../../../../lib/activity-dates";
+import { expensePaymentSummary } from "../../../../lib/expense-activity";
 import { groupBalanceLines } from "../../../../lib/group-balance-summary";
 import { groupActionColorsFor } from "../../../../lib/group-colors";
-import { settlementActivitySubtitle } from "../../../../lib/settlement-activity";
 
 export default function GroupDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -49,11 +47,8 @@ export default function GroupDetailScreen() {
       occurredAt: settlement.occurredAt,
       record: settlement,
     })),
-  ].sort(
-    (left, right) =>
-      new Date(right.occurredAt).getTime() -
-      new Date(left.occurredAt).getTime(),
-  );
+  ];
+  const activityGroups = groupActivityByDate(activity);
   const balanceLines = groupBalanceLines(
     memberBalances,
     members.length,
@@ -94,80 +89,61 @@ export default function GroupDetailScreen() {
               tone="secondary"
               backgroundColor={actionColors.secondaryBackground}
               foregroundColor={actionColors.secondaryForeground}
-              onPress={() => router.push(`/groups/${group.id}/settle`)}
+              onPress={() =>
+                router.push({
+                  pathname: "/settlement/group",
+                  params: { id: group.id },
+                })
+              }
             />
           </View>
         </View>
         <GroupBalanceSummary lines={balanceLines} />
-        <Section title="Activity">
-          {activity.length === 0 ? (
+        {activity.length === 0 ? (
+          <Section>
             <EmptyState
               title="No activity yet"
               message="Add the first shared cost."
             />
-          ) : (
-            activity.map((item, index) => {
+          </Section>
+        ) : (
+          <ActivityTimeline
+            groups={activityGroups}
+            getItemKey={(item) => `${item.type}:${item.record.id}`}
+            renderItem={(item) => {
               if (item.type === "settlement") {
-                const settlement = item.record;
-                const involvement = settlement.from.isViewer
-                  ? "paid"
-                  : settlement.to.isViewer
-                    ? "received"
-                    : "none";
-                return (
-                  <View key={`settlement:${settlement.id}`}>
-                    {index > 0 ? <RowDivider inset={16} /> : null}
-                    <ListRow
-                      title="Payment"
-                      subtitle={settlementActivitySubtitle(settlement)}
-                      subtitleNumberOfLines={1}
-                      trailing={
-                        <ExpenseListInvolvement
-                          kind={involvement}
-                          amount={settlement.amount}
-                        />
-                      }
-                      leading={
-                        <Avatar
-                          name={settlement.from.displayName}
-                          colorKey={settlement.from.userId}
-                          imageUrl={settlement.from.avatarUrl}
-                        />
-                      }
-                    />
-                  </View>
-                );
+                return <SettlementActivityRow settlement={item.record} />;
               }
               const expense = item.record;
               return (
-                <View key={`expense:${expense.id}`}>
-                  {index > 0 ? <RowDivider inset={16} /> : null}
-                  <ListRow
-                    title={expense.description}
-                    subtitle={expenseActivitySubtitle(expense)}
-                    subtitleNumberOfLines={1}
-                    trailing={
-                      <ExpenseListInvolvement
-                        kind={expense.viewerInvolvement.kind}
-                        amount={expense.viewerInvolvement.amount}
-                      />
-                    }
-                    leading={
-                      <ExpenseIcon
-                        iconKey={expense.iconKey}
-                        name={expense.description}
-                        useNameFallback={!expense.iconManuallySet}
-                      />
-                    }
-                    onPress={() =>
-                      router.push(`/expense/${expense.id}` as Href)
-                    }
-                  />
-                </View>
+                <ListRow
+                  title={expense.description}
+                  subtitle={expensePaymentSummary(
+                    expense.payers,
+                    expense.paymentTotal,
+                  )}
+                  subtitleNumberOfLines={1}
+                  trailing={
+                    <ExpenseListInvolvement
+                      kind={expense.viewerInvolvement.kind}
+                      amount={expense.viewerInvolvement.amount}
+                    />
+                  }
+                  leading={
+                    <ExpenseIcon
+                      iconKey={expense.iconKey}
+                      name={expense.description}
+                      useNameFallback={!expense.iconManuallySet}
+                    />
+                  }
+                  onPress={() =>
+                    router.push(`/expense/${expense.id}` as Href)
+                  }
+                />
               );
-            })
-          )}
-        </Section>
+            }}
+          />
+        )}
       </Screen>
       <Stack.Screen
         options={{

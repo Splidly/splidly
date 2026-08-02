@@ -1,5 +1,4 @@
 import type { CurrencyCode, Money } from "@splidly/shared";
-import { formatExpenseActivityDate } from "./expense-activity";
 import { formatMoney } from "./money-display";
 
 type SettlementPerson = {
@@ -19,17 +18,4 @@ export function settlementPaymentSummary(input: {
     input.amount.currency as CurrencyCode,
   );
   return `${fromName} paid ${toName} ${amount}`;
-}
-
-export function settlementActivitySubtitle(input: {
-  occurredAt: Date | string;
-  from: SettlementPerson;
-  to: SettlementPerson;
-  amount: Money;
-  locale?: string | undefined;
-}) {
-  return `${formatExpenseActivityDate(
-    input.occurredAt,
-    input.locale,
-  )} · ${settlementPaymentSummary(input)}`;
 }

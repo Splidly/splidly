@@ -1,5 +1,5 @@
 import type { CurrencyCode } from "@splidly/shared";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, type Href } from "expo-router";
 import { Text, View } from "react-native";
 import {
   Avatar,
@@ -7,13 +7,12 @@ import {
   FormSection,
   ListRow,
   LoadingState,
-  PrimaryButton,
   Screen,
   SheetCloseButton,
-} from "../../../../components/ui";
-import { api } from "../../../../lib/trpc";
-import { formatConvertedMoney } from "../../../../lib/money-display";
-import { useTheme } from "../../../../theme";
+} from "../../components/ui";
+import { formatConvertedMoney } from "../../lib/money-display";
+import { api } from "../../lib/trpc";
+import { useTheme } from "../../theme";
 
 export default function SettleGroupScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -48,7 +47,7 @@ export default function SettleGroupScreen() {
     <Screen background="sheet">
       <SheetCloseButton
         label="Close settle up"
-        onPress={() => router.back()}
+        onPress={() => router.dismissTo(`/groups/${id}` as Href)}
       />
       <View style={{ paddingVertical: 8, gap: 4 }}>
         <Text
@@ -111,22 +110,48 @@ export default function SettleGroupScreen() {
         </FormSection>
       ) : null}
 
-      <PrimaryButton
-        label="Custom payment"
-        tone="secondary"
-        disabled={members.length < 2}
-        onPress={() =>
-          router.replace({
-            pathname: "/settlement/new",
-            params: {
-              type: "group",
-              id: group.id,
-              fromUserId: profile.data.userId,
-              canonicalCurrency: group.currency,
-            },
-          })
-        }
-      />
+      <FormSection>
+        <ListRow
+          title="Custom payment"
+          leading={
+            <View
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 14,
+                borderCurve: "continuous",
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: theme.elevated,
+              }}
+            >
+              <Text
+                accessibilityElementsHidden
+                style={{ color: theme.primary, fontSize: 24, lineHeight: 27 }}
+              >
+                ＋
+              </Text>
+            </View>
+          }
+          {...(members.length >= 2
+            ? {
+                onPress: () =>
+                  router.replace({
+                    pathname: "/settlement/new",
+                    params: {
+                      type: "group",
+                      id: group.id,
+                      fromUserId: profile.data.userId,
+                      canonicalCurrency: group.currency,
+                    },
+                  }),
+              }
+            : {
+                value: "Unavailable",
+                valueTone: "muted" as const,
+              })}
+        />
+      </FormSection>
     </Screen>
   );
 }

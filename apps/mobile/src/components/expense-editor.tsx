@@ -11,9 +11,21 @@ import {
 import * as Crypto from "expo-crypto";
 import { router, Stack } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Text, View } from "react-native";
+import {
+  findNodeHandle,
+  InputAccessoryView,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { beginCurrencySelection } from "../lib/currency-selection";
 import { api } from "../lib/trpc";
-import { formatConvertedMoney } from "../lib/money-display";
+import {
+  formatConvertedMoney,
+  formatExchangeRate,
+} from "../lib/money-display";
 import { expensePaymentStatus } from "../lib/expense-payments";
 import {
   createExpenseSplitDraft,
@@ -25,22 +37,21 @@ import {
   type SplitParticipant,
 } from "../lib/expense-split";
 import { useTheme } from "../theme";
-import { CurrencyField } from "./currency-field";
 import { DateField } from "./date-field";
+import {
+  AllocationChoiceCard,
+  ComposerSectionHeader,
+  ExpenseEntryCard,
+  ExpenseSaveControl,
+} from "./expense-composer-ui";
 import { ExpenseIconPicker } from "./expense-icon";
 import { useExpensePaymentSession } from "./expense-payment-session";
 import { useExpenseSplitSession } from "./expense-split-session";
 import {
   ErrorState,
-  Field,
-  FormSection,
   HeaderButton,
-  ListRow,
   LoadingState,
-  PrimaryButton,
-  RowDivider,
   Screen,
-  Section,
 } from "./ui";
 
 function requiredRateTargets(
@@ -188,6 +199,7 @@ export function ExpenseEditor({
   const [description, setDescription] = useState("");
   const [manualIconKey, setManualIconKey] = useState<ExpenseIconKey>();
   const [notes, setNotes] = useState("");
+  const [notesExpanded, setNotesExpanded] = useState(editing);
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState<CurrencyCode>("EUR");
   const [date, setDate] = useState(() => new Date());
@@ -203,6 +215,8 @@ export function ExpenseEditor({
   const [formError, setFormError] = useState<string>();
   const initialized = useRef<string | undefined>(undefined);
   const rateRequest = useRef(0);
+  const screenRef = useRef<ScrollView>(null);
+  const notesInputRef = useRef<TextInput>(null);
   const detectedIconKey = useMemo(
     () => detectExpenseIconKey(description),
     [description],
@@ -539,7 +553,7 @@ export function ExpenseEditor({
     (context?.type === "friend" && friend.isPending);
   if ((editing && detail.isPending) || contextPending) {
     return (
-      <Screen background="sheet">
+      <Screen underlapsHeader={false}>
         <LoadingState />
       </Screen>
     );
@@ -548,7 +562,7 @@ export function ExpenseEditor({
     detail.error ?? profile.error ?? group.error ?? friend.error;
   if (!context || loadingError) {
     return (
-      <Screen background="sheet">
+      <Screen underlapsHeader={false}>
         <ErrorState message={loadingError?.message ?? "Expense not found"} />
       </Screen>
     );
@@ -559,7 +573,10 @@ export function ExpenseEditor({
   const payerNames = payerIds
     .map(
       (payerId) =>
-        participants.find((person) => person.userId === payerId)?.displayName,
+        payerId === profile.data?.userId
+          ? "You"
+          : participants.find((person) => person.userId === payerId)
+              ?.displayName,
     )
     .filter((name): name is string => Boolean(name));
   const paymentSummary =
@@ -570,220 +587,342 @@ export function ExpenseEditor({
         : payerNames.length === 2
           ? `${payerNames[0]} and ${payerNames[1]} paid`
           : `${payerNames[0]} and ${payerNames.length - 1} others paid`;
+  const onlyCurrentUserPaid =
+    payerNames.length === 1 && payerNames[0] === "You";
+  const saveDisabled =
+    saving ||
+    !conversionReady ||
+    !paymentStatus.valid ||
+    !splitStatus.valid ||
+    description.trim().length === 0 ||
+    selectedIds.length === 0 ||
+    payerIds.length === 0;
+  const openCurrency = () => {
+    beginCurrencySelection(
+      currency,
+      setCurrency,
+      contextDefaultCurrency ? [contextDefaultCurrency] : [],
+    );
+    router.push("/currency-picker");
+  };
+  const openPaymentAllocation = () => {
+    if (sourceMinor === undefined) {
+      setFormError(
+        "Enter a valid expense amount before assigning payment",
+      );
+      return;
+    }
+    setFormError(undefined);
+    paymentSession.open({
+      currency,
+      totalMinor: sourceMinor,
+      participants,
+      draft: { payerIds, payerAmounts },
+      onSave: (draft) => {
+        setPayerIds(draft.payerIds);
+        setPayerAmounts(draft.payerAmounts);
+      },
+    });
+    router.push("/expense/payment");
+  };
+  const openSplitAllocation = () => {
+    if (sourceMinor === undefined) {
+      setFormError("Enter a valid expense amount before splitting it");
+      return;
+    }
+    setFormError(undefined);
+    splitSession.open({
+      currency,
+      totalMinor: sourceMinor,
+      participants,
+      draft: effectiveSplitDraft,
+      onSave: setSplitDraft,
+    });
+    router.push("/expense/split");
+  };
 
-  return (
-    <>
-      <Screen background="sheet">
-        <FormSection
-          title="Expense"
-          footer={
-            manualIconKey
-              ? "The category is fixed. Tap its icon to change it or restore Automatic."
-              : "The category follows the description. Tap its icon to choose manually."
-          }
-        >
-          <Field
-            label="Description"
-            value={description}
-            onChangeText={setDescription}
-            placeholder="Dinner"
-            leading={
-              <ExpenseIconPicker
-                value={iconKey}
-                automatic={manualIconKey === undefined}
-                onValueChange={setManualIconKey}
-                name={description}
-                size={36}
-              />
-            }
-          />
-          <Field
-            label="Amount"
-            value={amount}
-            onChangeText={setAmount}
-            keyboardType="decimal-pad"
-            placeholder="0.00"
-          />
-          <CurrencyField
-            label="Currency"
-            value={currency}
-            onValueChange={setCurrency}
-            recentCurrencies={
-              contextDefaultCurrency ? [contextDefaultCurrency] : []
-            }
-          />
+  const formatAmountOnBlur = () => {
+    try {
+      setAmount(formatMinor(parseDecimalToMinor(amount, currency), currency));
+    } catch {
+      // Keep incomplete input intact so validation can explain the problem.
+    }
+  };
+
+  const revealNotesInput = () => {
+    const notesHandle = findNodeHandle(notesInputRef.current);
+    if (notesHandle === null) return;
+    requestAnimationFrame(() => {
+      screenRef.current?.scrollResponderScrollNativeHandleToKeyboard(
+        notesHandle,
+        20,
+        true,
+      );
+    });
+  };
+
+  const keyboardAccessoryID = "expense-primary-action";
+  const saveLabel = saving
+    ? "Saving…"
+    : editing
+      ? "Save changes"
+      : "Save expense";
+
+  const conversionMetadata = (
+    <View accessibilityLiveRegion="polite" style={{ gap: 3 }}>
+      {rateStatus === "loading" ? (
+        <Text style={{ color: theme.muted, fontSize: 13 }}>
+          Updating exchange rates…
+        </Text>
+      ) : rateStatus === "error" ? (
+        <Text style={{ color: theme.negative, fontSize: 13 }}>
+          {rateError ?? "Could not load exchange rates"}
+        </Text>
+      ) : sourceMinor === undefined ? (
+        amount.trim().length > 0 ? (
+          <Text style={{ color: theme.warning, fontSize: 13 }}>
+            Enter a valid positive amount
+          </Text>
+        ) : null
+      ) : selectedIds.length === 0 ? (
+        <Text style={{ color: theme.muted, fontSize: 13 }}>
+          Choose the split to preview converted totals
+        </Text>
+      ) : conversionReady && convertedAmounts.length === 0 ? (
+        <Text style={{ color: theme.muted, fontSize: 13 }}>
+          No currency conversion needed
+        </Text>
+      ) : conversionReady ? (
+        convertedAmounts.map((rate) => (
           <View
-            accessibilityLiveRegion="polite"
-            style={{ paddingHorizontal: 16, paddingVertical: 12, gap: 4 }}
+            key={`${rate.base}:${rate.quote}`}
+            style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}
           >
             <Text
               style={{
-                color: theme.muted,
-                fontSize: 13,
-                fontWeight: "600",
+                color: theme.primary,
+                fontSize: 15,
+                fontWeight: "700",
+                fontVariant: ["tabular-nums"],
               }}
             >
-              Currency conversion
+              ≈ {formatConvertedMoney(rate.amountMinor, rate.quote)}
             </Text>
-            {rateStatus === "loading" ? (
-              <Text style={{ color: theme.muted, fontSize: 14 }}>
-                Updating exchange rates…
-              </Text>
-            ) : rateStatus === "error" ? (
-              <Text style={{ color: theme.negative, fontSize: 14 }}>
-                {rateError ?? "Could not load exchange rates"}
-              </Text>
-            ) : sourceMinor === undefined ? (
-              <Text style={{ color: theme.muted, fontSize: 14 }}>
-                Enter a valid amount to see converted totals.
-              </Text>
-            ) : selectedIds.length === 0 ? (
-              <Text style={{ color: theme.muted, fontSize: 14 }}>
-                Select who shares this expense.
-              </Text>
-            ) : conversionReady && convertedAmounts.length === 0 ? (
-              <Text style={{ color: theme.muted, fontSize: 14 }}>
-                No currency conversion is needed.
-              </Text>
-            ) : conversionReady ? (
-              convertedAmounts.map((rate) => (
-                <View key={`${rate.base}:${rate.quote}`} style={{ gap: 2 }}>
-                  <Text
-                    style={{
-                      color: theme.text,
-                      fontSize: 16,
-                      fontWeight: "600",
-                      fontVariant: ["tabular-nums"],
-                    }}
-                  >
-                    ≈ {formatConvertedMoney(rate.amountMinor, rate.quote)}
-                  </Text>
-                  <Text
-                    style={{
-                      color: theme.muted,
-                      fontSize: 12,
-                      fontVariant: ["tabular-nums"],
-                    }}
-                  >
-                    1 {rate.base} = {rate.rate} {rate.quote} ·{" "}
-                    {rate.providerDate}
-                  </Text>
-                </View>
-              ))
-            ) : null}
+            <Text
+              numberOfLines={1}
+              style={{
+                color: theme.muted,
+                flex: 1,
+                fontSize: 11,
+                fontVariant: ["tabular-nums"],
+              }}
+            >
+              1 {rate.base} = {formatExchangeRate(rate.rate)} {rate.quote} ·{" "}
+              {rate.providerDate}
+            </Text>
           </View>
-        </FormSection>
-        <Section title="Allocation">
-          <ListRow
-            title="Paid by"
-            subtitle={
-              sourceMinor === undefined
-                ? "Enter an amount first"
-                : paymentSummary
-            }
-            value={
-              sourceMinor === undefined
-                ? "Not set"
-                : paymentReady
-                  ? "Complete"
-                  : "Incomplete"
-            }
-            valueTone={
-              sourceMinor === undefined
-                ? "muted"
-                : paymentReady
-                  ? "positive"
-                  : "negative"
-            }
-            onPress={() => {
-              if (sourceMinor === undefined) {
-                setFormError(
-                  "Enter a valid expense amount before assigning payment",
-                );
-                return;
-              }
-              setFormError(undefined);
-              paymentSession.open({
-                currency,
-                totalMinor: sourceMinor,
-                participants,
-                draft: { payerIds, payerAmounts },
-                onSave: (draft) => {
-                  setPayerIds(draft.payerIds);
-                  setPayerAmounts(draft.payerAmounts);
-                },
-              });
-              router.push("/expense/payment");
-            }}
+        ))
+      ) : null}
+    </View>
+  );
+
+  return (
+    <>
+      <Screen
+        scrollViewRef={screenRef}
+        underlapsHeader={false}
+        bottomOverlay={
+          <ExpenseSaveControl
+            label={saveLabel}
+            onPress={submit}
+            disabled={saveDisabled}
           />
-          <RowDivider inset={16} />
-          <ListRow
-            title="Split"
-            subtitle={
-              sourceMinor === undefined
-                ? "Enter an amount first"
-                : expenseSplitSummary(effectiveSplitDraft)
-            }
-            value={
-              sourceMinor === undefined
-                ? "Not set"
-                : splitReady
-                  ? "Complete"
-                  : "Incomplete"
-            }
-            valueTone={
-              sourceMinor === undefined
-                ? "muted"
-                : splitReady
-                  ? "positive"
-                  : "negative"
-            }
-            onPress={() => {
-              if (sourceMinor === undefined) {
-                setFormError("Enter a valid expense amount before splitting it");
-                return;
-              }
-              setFormError(undefined);
-              splitSession.open({
-                currency,
-                totalMinor: sourceMinor,
-                participants,
-                draft: effectiveSplitDraft,
-                onSave: setSplitDraft,
-              });
-              router.push("/expense/split");
-            }}
-          />
-        </Section>
-        <FormSection title="Details">
-          <DateField value={date} onValueChange={setDate} />
-          <Field
-            label="Notes"
-            value={notes}
-            onChangeText={setNotes}
-            placeholder="Optional"
-            multiline
-          />
-        </FormSection>
-        <PrimaryButton
-          label={saving ? "Saving…" : editing ? "Save changes" : "Save expense"}
-          onPress={submit}
-          disabled={
-            saving ||
-            !conversionReady ||
-            !paymentStatus.valid ||
-            !splitStatus.valid ||
-            description.trim().length === 0 ||
-            selectedIds.length === 0 ||
-            payerIds.length === 0
+        }
+        bottomOverlayHeight={92}
+        contentContainerStyle={{ paddingTop: 16, gap: 22 }}
+      >
+        <ExpenseEntryCard
+          icon={
+            <ExpenseIconPicker
+              value={iconKey}
+              automatic={manualIconKey === undefined}
+              onValueChange={setManualIconKey}
+              name={description}
+              size={58}
+            />
           }
+          description={description}
+          onDescriptionChange={setDescription}
+          amount={amount}
+          onAmountChange={setAmount}
+          onAmountBlur={formatAmountOnBlur}
+          currency={currency}
+          onCurrencyPress={openCurrency}
+          categoryHint={
+            manualIconKey
+              ? "Custom category · Tap the icon to change"
+              : "Category follows the description · Tap the icon to change"
+          }
+          metadata={conversionMetadata}
+          {...(process.env.EXPO_OS === "ios"
+            ? { inputAccessoryViewID: keyboardAccessoryID }
+            : {})}
         />
+
+        <View style={{ gap: 10 }}>
+          <ComposerSectionHeader
+            title="Payment plan"
+            subtitle="Review who paid and how the expense is shared."
+          />
+          <View style={{ flexDirection: "row", gap: 12 }}>
+            <AllocationChoiceCard
+              title={
+                onlyCurrentUserPaid ? "Paid by You" : "Paid by"
+              }
+              accessibilityLabel="Paid by"
+              {...(sourceMinor === undefined
+                ? { subtitle: "Add an amount first" }
+                : onlyCurrentUserPaid
+                  ? {}
+                  : { subtitle: paymentSummary })}
+              glyph="↑"
+              enabled={sourceMinor !== undefined}
+              ready={paymentReady}
+              onPress={openPaymentAllocation}
+            />
+            <AllocationChoiceCard
+              title="Split"
+              subtitle={
+                sourceMinor === undefined
+                  ? "Add an amount first"
+                  : expenseSplitSummary(effectiveSplitDraft)
+              }
+              glyph="÷"
+              enabled={sourceMinor !== undefined}
+              ready={splitReady}
+              onPress={openSplitAllocation}
+            />
+          </View>
+        </View>
+
+        <View style={{ gap: 10 }}>
+          <ComposerSectionHeader
+            title="Details"
+            subtitle="Set the date and add anything worth remembering."
+          />
+          <View
+            style={{
+              overflow: "hidden",
+              borderRadius: 20,
+              borderCurve: "continuous",
+              backgroundColor: theme.surface,
+            }}
+          >
+            <DateField value={date} onValueChange={setDate} />
+            <View
+              style={{
+                height: 1,
+                marginLeft: 16,
+                backgroundColor: theme.border,
+              }}
+            />
+            {notesExpanded ? (
+              <View style={{ paddingHorizontal: 16, paddingVertical: 13, gap: 6 }}>
+                <Text
+                  style={{
+                    color: theme.muted,
+                    fontSize: 12,
+                    fontWeight: "600",
+                    textTransform: "uppercase",
+                    letterSpacing: 0.4,
+                  }}
+                >
+                  Note
+                </Text>
+                <TextInput
+                  ref={notesInputRef}
+                  accessibilityLabel="Notes"
+                  value={notes}
+                  onChangeText={setNotes}
+                  placeholder="Add a note…"
+                  placeholderTextColor={theme.subtle}
+                  selectionColor={theme.primary}
+                  multiline
+                  onFocus={revealNotesInput}
+                  textAlignVertical="top"
+                  style={{
+                    color: theme.text,
+                    minHeight: 72,
+                    padding: 0,
+                    fontSize: 16,
+                    lineHeight: 21,
+                  }}
+                />
+              </View>
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setNotesExpanded(true)}
+                style={({ pressed }) => ({
+                  minHeight: 54,
+                  paddingHorizontal: 16,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 10,
+                  opacity: pressed ? 0.62 : 1,
+                })}
+              >
+                <Text
+                  accessibilityElementsHidden
+                  style={{ color: theme.primary, fontSize: 20 }}
+                >
+                  ＋
+                </Text>
+                <Text
+                  style={{
+                    color: theme.primary,
+                    fontSize: 16,
+                    fontWeight: "600",
+                  }}
+                >
+                  Add a note
+                </Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
+
         {formError ? <ErrorState message={formError} /> : null}
         {saveError ? <ErrorState message={saveError.message} /> : null}
-        <Text style={{ color: theme.muted, textAlign: "center", fontSize: 12 }}>
-          Splidly records the expense. It does not charge anyone.
-        </Text>
       </Screen>
+      {process.env.EXPO_OS === "ios" ? (
+        <InputAccessoryView
+          nativeID={keyboardAccessoryID}
+          backgroundColor={theme.background}
+        >
+          <View
+            style={{
+              paddingHorizontal: 16,
+              paddingTop: 8,
+              paddingBottom: 8,
+              alignItems: "center",
+              backgroundColor: theme.background,
+            }}
+          >
+            <ExpenseSaveControl
+              label={
+                saving
+                  ? "Saving…"
+                  : editing
+                    ? "Save changes"
+                    : "Add expense"
+              }
+              onPress={submit}
+              disabled={saveDisabled}
+            />
+          </View>
+        </InputAccessoryView>
+      ) : null}
       <Stack.Screen
         options={{
           title: editing ? "Edit Expense" : "New Expense",

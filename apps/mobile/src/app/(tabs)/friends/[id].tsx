@@ -1,6 +1,7 @@
 import type { CurrencyCode } from "@splidly/shared";
 import { Stack, router, useLocalSearchParams, type Href } from "expo-router";
 import { Text, View } from "react-native";
+import { ActivityTimeline } from "../../../components/activity-timeline";
 import {
   Avatar,
   BalanceText,
@@ -15,6 +16,7 @@ import {
   Section,
 } from "../../../components/ui";
 import { ExpenseIcon } from "../../../components/expense-icon";
+import { groupActivityByDate } from "../../../lib/activity-dates";
 import { api } from "../../../lib/trpc";
 import { formatMoney } from "../../../lib/money-display";
 import { useTheme } from "../../../theme";
@@ -30,6 +32,7 @@ export default function FriendDetailScreen() {
   }
   const summary = list.data?.find((item) => item.friendship.id === id);
   const name = detail.data.friend?.displayName ?? "Deleted user";
+  const expenseGroups = groupActivityByDate(detail.data.expenses);
   return (
     <>
       <Screen>
@@ -103,41 +106,38 @@ export default function FriendDetailScreen() {
             ))}
           </Section>
         ) : null}
-        <Section title="Activity">
-          {detail.data.expenses.length === 0 ? (
+        {detail.data.expenses.length === 0 ? (
+          <Section>
             <EmptyState
               title="No expenses yet"
               message={`Add the first direct expense with ${name}.`}
             />
-          ) : (
-            detail.data.expenses.map((expense, index) => (
-              <View key={expense.id}>
-                {index > 0 ? <RowDivider inset={16} /> : null}
-                <ListRow
-                  title={expense.description}
-                  subtitle={new Date(expense.occurredAt).toLocaleDateString(
-                    undefined,
-                    { dateStyle: "medium" },
-                  )}
-                  value={formatMoney(
-                    expense.sourceAmountMinor,
-                    expense.sourceCurrency as CurrencyCode,
-                  )}
-                  leading={
-                    <ExpenseIcon
-                      iconKey={expense.iconKey}
-                      name={expense.description}
-                      useNameFallback={!expense.iconManuallySet}
-                    />
-                  }
-                  onPress={() =>
-                    router.push(`/expense/${expense.id}` as Href)
-                  }
-                />
-              </View>
-            ))
-          )}
-        </Section>
+          </Section>
+        ) : (
+          <ActivityTimeline
+            groups={expenseGroups}
+            getItemKey={(expense) => expense.id}
+            renderItem={(expense) => (
+              <ListRow
+                title={expense.description}
+                value={formatMoney(
+                  expense.sourceAmountMinor,
+                  expense.sourceCurrency as CurrencyCode,
+                )}
+                leading={
+                  <ExpenseIcon
+                    iconKey={expense.iconKey}
+                    name={expense.description}
+                    useNameFallback={!expense.iconManuallySet}
+                  />
+                }
+                onPress={() =>
+                  router.push(`/expense/${expense.id}` as Href)
+                }
+              />
+            )}
+          />
+        )}
       </Screen>
       <Stack.Screen options={{ title: name }} />
     </>

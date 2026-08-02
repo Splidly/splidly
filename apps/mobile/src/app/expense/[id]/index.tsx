@@ -15,6 +15,7 @@ import { ExpenseIcon } from "../../../components/expense-icon";
 import { expenseSplitModeLabels } from "../../../lib/expense-split";
 import {
   currencySymbol,
+  formatExchangeRate,
   formatMoney,
 } from "../../../lib/money-display";
 import { api } from "../../../lib/trpc";
@@ -229,7 +230,7 @@ export default function ExpenseDetailScreen() {
                   <ListRow
                     title={`${rate.base} → ${rate.quote}`}
                     subtitle={`${rate.provider} · ${rate.providerDate}`}
-                    value={rate.rate}
+                    value={formatExchangeRate(rate.rate)}
                   />
                 </View>
               ))}

@@ -39,19 +39,6 @@ export default function GroupsStackLayout() {
         }}
       />
       <Stack.Screen name="[id]/index" options={{ title: "Group" }} />
-      <Stack.Screen
-        name="[id]/settle"
-        options={{
-          headerShown: false,
-          ...formSheetOptions(theme.sheet),
-          sheetAllowedDetents: "fitToContents",
-          sheetInitialDetentIndex: 0,
-          sheetGrabberVisible: false,
-          sheetCornerRadius: 30,
-          gestureEnabled: false,
-          headerBackButtonMenuEnabled: false,
-        }}
-      />
       <Stack.Screen name="[id]/settings" options={{ title: "Group Settings" }} />
       <Stack.Screen
         name="[id]/edit"

@@ -1,4 +1,5 @@
 import { fireEvent, render } from "@testing-library/react-native";
+import { StyleSheet } from "react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import GroupDetailScreen from "../app/(tabs)/groups/[id]";
 
@@ -99,7 +100,7 @@ jest.mock("../lib/trpc", () => ({
               {
                 id: "expense-2",
                 description: "Taxi",
-                occurredAt: new Date("2026-07-19T12:00:00.000Z"),
+                occurredAt: new Date("2026-07-20T18:00:00.000Z"),
                 sourceCurrency: "EUR",
                 sourceAmountMinor: 2_400n,
                 canonicalAmount: { currency: "EUR", minor: "2400" },
@@ -161,13 +162,31 @@ describe("GroupDetailScreen actions", () => {
     expect(view.getByText("You lent")).toBeTruthy();
     expect(view.getByText("10.00 €")).toBeTruthy();
     expect(view.getByText("Payment")).toBeTruthy();
-    expect(view.getByText(/21 Jul · Alex paid you 6\.00 €$/)).toBeTruthy();
-    expect(view.getByText("You received")).toBeTruthy();
-    expect(view.getByText("6.00 €")).toBeTruthy();
+    expect(view.getByTestId("settlement-activity-row")).toBeTruthy();
+    expect(
+      view.getByLabelText("Payment. Alex paid you 6.00 €"),
+    ).toBeTruthy();
+    expect(view.getByText("Alex paid you 6.00 €")).toBeTruthy();
+    expect(view.queryByText("You received")).toBeNull();
+    expect(view.queryByText("6.00 €")).toBeNull();
+    expect(
+      view.getAllByTestId(/^activity-date-\d{4}-\d{2}-\d{2}$/),
+    ).toHaveLength(2);
+    expect(view.getByTestId("activity-date-2026-07-20")).toBeTruthy();
+    expect(view.queryByText("Activity")).toBeNull();
+    expect(
+      StyleSheet.flatten(
+        view.getByTestId("activity-date-label-2026-07-20").props.style,
+      ).fontSize,
+    ).toBe(14);
+    expect(view.queryByText(/20 Jul ·/)).toBeNull();
     expect(view.queryByText("Open balances")).toBeNull();
     expect(view.queryByText("Statistics")).toBeNull();
     await fireEvent.press(view.getByText("Settle up"));
 
-    expect(mockPush).toHaveBeenCalledWith("/groups/group-1/settle");
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: "/settlement/group",
+      params: { id: "group-1" },
+    });
   });
 });

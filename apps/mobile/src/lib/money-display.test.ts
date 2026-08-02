@@ -1,6 +1,7 @@
 import {
   currencySymbol,
   formatConvertedMoney,
+  formatExchangeRate,
   formatMoney,
 } from "./money-display";
 
@@ -20,5 +21,11 @@ describe("money display", () => {
     expect(formatConvertedMoney(3_315n, "KWD")).toBe("3.32 KWD");
     expect(formatConvertedMoney(1_000n, "JPY")).toBe("¥1000.00");
     expect(formatConvertedMoney(-3_314n, "KWD")).toBe("-3.31 KWD");
+  });
+
+  it("limits exchange-rate metadata to five decimal places", () => {
+    expect(formatExchangeRate("1.23456789")).toBe("1.23456");
+    expect(formatExchangeRate("1.25000000")).toBe("1.25");
+    expect(formatExchangeRate("1")).toBe("1");
   });
 });

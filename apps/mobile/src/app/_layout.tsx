@@ -55,7 +55,7 @@ function Navigation() {
           name="expense/new"
           options={{
             title: "New Expense",
-            ...formSheetOptions(theme.sheet),
+            ...formSheetOptions(theme.background),
           }}
         />
         <Stack.Screen name="expense/[id]/index" options={{ title: "Expense" }} />
@@ -63,7 +63,7 @@ function Navigation() {
           name="expense/[id]/edit"
           options={{
             title: "Edit Expense",
-            ...formSheetOptions(theme.sheet),
+            ...formSheetOptions(theme.background),
           }}
         />
         <Stack.Screen
@@ -81,10 +81,26 @@ function Navigation() {
           }}
         />
         <Stack.Screen
+          name="settlement/group"
+          options={{
+            headerShown: false,
+            ...formSheetOptions(theme.sheet),
+            sheetAllowedDetents: "fitToContents",
+            sheetInitialDetentIndex: 0,
+            sheetGrabberVisible: false,
+            sheetCornerRadius: 30,
+            gestureEnabled: false,
+            headerBackButtonMenuEnabled: false,
+          }}
+        />
+        <Stack.Screen
           name="settlement/new"
           options={{
             title: "Record Payment",
             ...formSheetOptions(theme.sheet),
+            sheetAllowedDetents: [0.82, 1],
+            sheetInitialDetentIndex: 0,
+            sheetGrabberVisible: true,
           }}
         />
         <Stack.Screen

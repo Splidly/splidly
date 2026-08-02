@@ -220,3 +220,11 @@ export function formatConvertedMoney(
     currency,
   );
 }
+
+export function formatExchangeRate(rate: string): string {
+  const [whole, fraction] = rate.split(".");
+  if (whole === undefined || fraction === undefined) return rate;
+
+  const truncated = fraction.slice(0, 5).replace(/0+$/, "");
+  return truncated.length > 0 ? `${whole}.${truncated}` : whole;
+}

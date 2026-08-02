@@ -1,10 +1,10 @@
 import { fireEvent, render } from "@testing-library/react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
-import SettleGroupScreen from "../app/(tabs)/groups/[id]/settle";
+import SettleGroupScreen from "../app/settlement/group";
 
 jest.mock("expo-router", () => ({
   router: {
-    back: jest.fn(),
+    dismissTo: jest.fn(),
     replace: jest.fn(),
   },
   useLocalSearchParams: () => ({ id: "group-1" }),
@@ -73,6 +73,11 @@ const mockReplace = (
     router: { replace: jest.Mock };
   }
 ).router.replace;
+const mockDismissTo = (
+  jest.requireMock("expo-router") as {
+    router: { dismissTo: jest.Mock };
+  }
+).router.dismissTo;
 
 function renderScreen() {
   return render(
@@ -85,7 +90,18 @@ function renderScreen() {
 }
 
 describe("SettleGroupScreen", () => {
-  beforeEach(() => mockReplace.mockClear());
+  beforeEach(() => {
+    mockReplace.mockClear();
+    mockDismissTo.mockClear();
+  });
+
+  it("dismisses directly to the group overview", async () => {
+    const view = await renderScreen();
+
+    await fireEvent.press(view.getByLabelText("Close settle up"));
+
+    expect(mockDismissTo).toHaveBeenCalledWith("/groups/group-1");
+  });
 
   it("opens a prefilled payment form for the viewer's balance", async () => {
     const view = await renderScreen();

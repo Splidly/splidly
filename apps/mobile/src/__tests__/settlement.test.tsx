@@ -1,4 +1,4 @@
-import { fireEvent, render } from "@testing-library/react-native";
+import { act, fireEvent, render } from "@testing-library/react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import NewSettlementScreen from "../app/settlement/new";
 
@@ -15,18 +15,39 @@ jest.mock("expo-crypto", () => ({
   randomUUID: () => "00000000-0000-4000-8000-000000000000",
 }));
 
-jest.mock("expo-router", () => ({
-  router: {
-    back: jest.fn(),
-  },
-  useLocalSearchParams: () => ({
-    type: "group",
-    id: "group-1",
-    friendId: "user-2",
-    canonicalCurrency: "EUR",
-    canonicalMinor: "1234",
-  }),
-}));
+jest.mock("expo-router", () => {
+  const React = require("react") as typeof import("react");
+  const { Pressable } =
+    require("react-native") as typeof import("react-native");
+  const Screen = () => null;
+  const Toolbar = ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  );
+  Toolbar.Button = ({
+    accessibilityLabel,
+    onPress,
+  }: {
+    accessibilityLabel: string;
+    onPress: () => void;
+  }) => (
+    <Pressable accessibilityLabel={accessibilityLabel} onPress={onPress} />
+  );
+  return {
+    router: {
+      back: jest.fn(),
+      dismissTo: jest.fn(),
+      push: jest.fn(),
+    },
+    Stack: { Screen, Toolbar },
+    useLocalSearchParams: () => ({
+      type: "group",
+      id: "group-1",
+      friendId: "user-2",
+      canonicalCurrency: "EUR",
+      canonicalMinor: "1234",
+    }),
+  };
+});
 
 jest.mock("../components/currency-field", () => ({
   CurrencyField: ({
@@ -39,6 +60,29 @@ jest.mock("../components/currency-field", () => ({
     const { Text } = require("react-native") as typeof import("react-native");
     return <Text accessibilityLabel={label}>{value}</Text>;
   },
+}));
+
+const mockQuote = jest.fn(async () => ({
+  id: "quote-1",
+  expiresAt: "2099-08-02T12:00:00.000Z",
+  rates: [
+    {
+      base: "EUR",
+      quote: "EUR",
+      rate: "1",
+      provider: "identity",
+      providerDate: "2026-08-02",
+      source: "automatic",
+    },
+    {
+      base: "EUR",
+      quote: "USD",
+      rate: "1.2",
+      provider: "Test rates",
+      providerDate: "2026-08-02",
+      source: "automatic",
+    },
+  ],
 }));
 
 jest.mock("../lib/trpc", () => ({
@@ -104,8 +148,7 @@ jest.mock("../lib/trpc", () => ({
           data: undefined,
           error: null,
           isPending: false,
-          mutateAsync: jest.fn(),
-          reset: jest.fn(),
+          mutateAsync: mockQuote,
         })),
       },
     },
@@ -133,6 +176,28 @@ jest.mock("../lib/trpc", () => ({
 }));
 
 describe("NewSettlementScreen group context", () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    mockQuote.mockClear();
+    (
+      jest.requireMock("expo-router") as {
+        router: { back: jest.Mock; dismissTo: jest.Mock };
+      }
+    ).router.back.mockClear();
+    (
+      jest.requireMock("expo-router") as {
+        router: { dismissTo: jest.Mock };
+      }
+    ).router.dismissTo.mockClear();
+    (
+      jest.requireMock("../lib/trpc") as {
+        api: { settlements: { create: { useMutation: jest.Mock } } };
+      }
+    ).api.settlements.create.useMutation.mockClear();
+  });
+
+  afterEach(() => jest.useRealTimers());
+
   it("loads the counterparty from group membership without a friendship route", async () => {
     const view = await render(
       <SafeAreaInsetsContext.Provider
@@ -150,8 +215,11 @@ describe("NewSettlementScreen group context", () => {
       }
     ).api;
 
-    expect(view.getByText("Alex paid you")).toBeTruthy();
+    await act(async () => {});
+    expect(view.getByLabelText("Paid by: Alex")).toBeTruthy();
+    expect(view.getByLabelText("Paid to: You")).toBeTruthy();
     expect(view.getByDisplayValue("12.34")).toBeTruthy();
+    expect(view.queryByText("Preview conversion")).toBeNull();
     expect(
       view.queryByText(/Splidly updates the ledger/),
     ).toBeNull();
@@ -164,9 +232,65 @@ describe("NewSettlementScreen group context", () => {
       { enabled: true },
     );
 
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(400);
+    });
+    expect(mockQuote).toHaveBeenCalledWith({
+      base: "EUR",
+      targets: ["EUR", "USD"],
+    });
+
     await fireEvent(view.getByTestId("settlement-paid-by"), "pressAction", {
       nativeEvent: { event: "user-3" },
     });
-    expect(view.getByText("Flo paid you")).toBeTruthy();
+    expect(view.getByLabelText("Paid by: Flo")).toBeTruthy();
+  });
+
+  it("can always be cancelled from the native sheet toolbar", async () => {
+    const view = await render(
+      <SafeAreaInsetsContext.Provider
+        value={{ top: 0, right: 0, bottom: 0, left: 0 }}
+      >
+        <NewSettlementScreen />
+      </SafeAreaInsetsContext.Provider>,
+    );
+
+    await fireEvent.press(view.getByLabelText("Cancel payment"));
+
+    expect(
+      (
+        jest.requireMock("expo-router") as {
+          router: { dismissTo: jest.Mock };
+        }
+      ).router.dismissTo,
+    ).toHaveBeenCalledWith("/groups/group-1");
+  });
+
+  it("dismisses to the group after a payment is recorded", async () => {
+    await render(
+      <SafeAreaInsetsContext.Provider
+        value={{ top: 0, right: 0, bottom: 0, left: 0 }}
+      >
+        <NewSettlementScreen />
+      </SafeAreaInsetsContext.Provider>,
+    );
+    const createHook = (
+      jest.requireMock("../lib/trpc") as {
+        api: { settlements: { create: { useMutation: jest.Mock } } };
+      }
+    ).api.settlements.create.useMutation;
+    const options = createHook.mock.calls[0]?.[0] as {
+      onSuccess: () => Promise<void>;
+    };
+
+    await act(async () => options.onSuccess());
+
+    expect(
+      (
+        jest.requireMock("expo-router") as {
+          router: { dismissTo: jest.Mock };
+        }
+      ).router.dismissTo,
+    ).toHaveBeenCalledWith("/groups/group-1");
   });
 });

@@ -8,6 +8,7 @@ import {
   useEffect,
   useState,
   type PropsWithChildren,
+  type RefObject,
   type ReactNode,
 } from "react";
 import {
@@ -116,6 +117,7 @@ export function Screen({
   accountForTopInset = false,
   underlapsHeader,
   contentContainerStyle,
+  scrollViewRef,
   bottomOverlay,
   bottomOverlayHeight = 62,
 }: PropsWithChildren<{
@@ -125,6 +127,7 @@ export function Screen({
   accountForTopInset?: boolean;
   underlapsHeader?: boolean;
   contentContainerStyle?: ScrollViewProps["contentContainerStyle"];
+  scrollViewRef?: RefObject<ScrollView | null>;
   bottomOverlay?: ReactNode;
   bottomOverlayHeight?: number;
 }>) {
@@ -165,6 +168,7 @@ export function Screen({
   return (
     <>
       <ScrollView
+        ref={scrollViewRef}
         style={[styles.screen, { backgroundColor }]}
         contentContainerStyle={[
           styles.screenContent,
