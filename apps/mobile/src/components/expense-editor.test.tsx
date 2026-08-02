@@ -260,10 +260,10 @@ describe("ExpenseEditor", () => {
 
     expect(view.getByTestId("expense-entry-card")).toBeTruthy();
     expect(view.getByLabelText("Description").props.inputAccessoryViewID).toBe(
-      "expense-primary-action",
+      "expense-description-primary-action",
     );
     expect(view.getByLabelText("Amount").props.inputAccessoryViewID).toBe(
-      "expense-primary-action",
+      "expense-amount-primary-action",
     );
     expect(view.getByLabelText("Currency")).toBeTruthy();
     expect(view.getByText("Payment plan")).toBeTruthy();
@@ -279,10 +279,12 @@ describe("ExpenseEditor", () => {
 
     await fireEvent.press(view.getByText("Add a note"));
 
-    expect(view.getByLabelText("Notes")).toBeTruthy();
+    expect(view.getByLabelText("Notes").props.onContentSizeChange).toEqual(
+      expect.any(Function),
+    );
     expect(view.getByTestId("screen-bottom-overlay")).toBeTruthy();
     expect(view.getByText("Save expense")).toBeTruthy();
-    expect(view.getByText("Add expense")).toBeTruthy();
+    expect(view.getAllByText("Add expense")).toHaveLength(2);
 
     const [scrollView] = view.container.queryAll(
       (instance) =>
@@ -299,7 +301,7 @@ describe("ExpenseEditor", () => {
     expect(
       StyleSheet.flatten(resizedScrollView?.props.contentContainerStyle)
         .minHeight,
-    ).toBe(708);
+    ).toBe(800);
 
     if (!resizedScrollView) throw new Error("Expense ScrollView was not resized");
     await fireEvent(resizedScrollView, "contentSizeChange", 400, 1_000);

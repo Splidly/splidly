@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { useTheme } from "../theme";
+import { DropdownChevron } from "./dropdown-chevron";
 import { Avatar, PrimaryButton } from "./ui";
 
 export type SettlementMember = {
@@ -52,7 +53,7 @@ function PartyChoice({
       accessibilityRole={disabled ? undefined : "button"}
       accessibilityLabel={`${label}: ${name}`}
       style={{
-        flex: 1,
+        width: "100%",
         minWidth: 0,
         alignItems: "center",
         gap: 7,
@@ -116,6 +117,7 @@ function PartyChoice({
       title={label}
       actions={actions}
       testID={testID}
+      style={{ width: "100%" }}
       onPressAction={({ nativeEvent }) => onValueChange(nativeEvent.event)}
     >
       {content}
@@ -152,21 +154,24 @@ export function SettlementDirectionCard({
         backgroundColor: theme.surface,
         boxShadow: "0 8px 28px rgba(0, 0, 0, 0.08)",
         flexDirection: "row",
-        alignItems: "center",
+        alignItems: "flex-start",
         gap: 10,
       }}
     >
-      <PartyChoice
-        label="Paid by"
-        value={from}
-        viewerId={viewerId}
-        members={members}
-        excludedUserId={to?.userId}
-        onValueChange={onFromChange}
-        disabled={locked}
-        testID="settlement-paid-by"
-      />
+      <View testID="settlement-paid-by-slot" style={{ flex: 1, minWidth: 0 }}>
+        <PartyChoice
+          label="Paid by"
+          value={from}
+          viewerId={viewerId}
+          members={members}
+          excludedUserId={to?.userId}
+          onValueChange={onFromChange}
+          disabled={locked}
+          testID="settlement-paid-by"
+        />
+      </View>
       <View
+        testID="settlement-direction-arrow"
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
         style={{
@@ -175,6 +180,8 @@ export function SettlementDirectionCard({
           borderRadius: 18,
           alignItems: "center",
           justifyContent: "center",
+          alignSelf: "flex-start",
+          marginTop: 13,
           backgroundColor: theme.elevated,
         }}
       >
@@ -189,16 +196,18 @@ export function SettlementDirectionCard({
           →
         </Text>
       </View>
-      <PartyChoice
-        label="Paid to"
-        value={to}
-        viewerId={viewerId}
-        members={members}
-        excludedUserId={from?.userId}
-        onValueChange={onToChange}
-        disabled={locked}
-        testID="settlement-paid-to"
-      />
+      <View testID="settlement-paid-to-slot" style={{ flex: 1, minWidth: 0 }}>
+        <PartyChoice
+          label="Paid to"
+          value={to}
+          viewerId={viewerId}
+          members={members}
+          excludedUserId={from?.userId}
+          onValueChange={onToChange}
+          disabled={locked}
+          testID="settlement-paid-to"
+        />
+      </View>
     </View>
   );
 }
@@ -207,12 +216,14 @@ export function SettlementAmountCard({
   amount,
   currency,
   onAmountChange,
+  onAmountBlur,
   onCurrencyPress,
   metadata,
 }: {
   amount: string;
   currency: CurrencyCode;
   onAmountChange: (value: string) => void;
+  onAmountBlur?: () => void;
   onCurrencyPress: () => void;
   metadata?: ReactNode;
 }) {
@@ -246,6 +257,7 @@ export function SettlementAmountCard({
           accessibilityLabel="Amount"
           value={amount}
           onChangeText={onAmountChange}
+          onBlur={onAmountBlur}
           keyboardType="decimal-pad"
           placeholder="0.00"
           placeholderTextColor={theme.subtle}
@@ -277,11 +289,16 @@ export function SettlementAmountCard({
             opacity: pressed ? 0.65 : 1,
           })}
         >
-          <Text
-            style={{ color: theme.primary, fontSize: 16, fontWeight: "700" }}
+          <View
+            style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
           >
-            {currency}⌄
-          </Text>
+            <Text
+              style={{ color: theme.primary, fontSize: 16, fontWeight: "700" }}
+            >
+              {currency}
+            </Text>
+            <DropdownChevron color={theme.primary} />
+          </View>
         </Pressable>
       </View>
       {metadata}

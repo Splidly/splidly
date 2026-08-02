@@ -42,10 +42,7 @@ import {
   requireActiveGroupMember,
   requireFriendshipParticipant,
 } from "../domain/helpers";
-import {
-  enqueueExpenseNotifications,
-  loadExpenseParticipantIds,
-} from "../domain/expense-notifications";
+import { enqueueExpenseNotifications } from "../domain/expense-notifications";
 import {
   protectedProcedure,
   router,
@@ -60,7 +57,6 @@ interface PreparedExpense {
   canonicalCurrency: CurrencyCode;
   payments: Map<string, bigint>;
   sourceShares: Map<string, bigint>;
-  participantIds: string[];
   transfers: {
     debtorId: string;
     creditorId: string;
@@ -237,7 +233,6 @@ async function prepareExpense(
     canonicalCurrency,
     payments,
     sourceShares,
-    participantIds: involvedIds,
     transfers,
     homeCurrencies,
     rates,
@@ -515,7 +510,8 @@ export const expensesRouter = router({
             expenseId: expense.id,
             expenseVersion: expense.version,
             groupId: expense.groupId,
-            participantIds: prepared.participantIds,
+            sourceAmountMinor: expense.sourceAmountMinor,
+            sourceCurrency: expense.sourceCurrency as CurrencyCode,
           });
         }
         return expense;
@@ -578,10 +574,6 @@ export const expensesRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Payer required" });
       }
       return ctx.db.transaction(async (tx) => {
-        const previousParticipantIds = await loadExpenseParticipantIds(
-          tx,
-          current.id,
-        );
         await reverseActiveEntries(tx, "expense", current.id);
         await tx
           .delete(expensePayments)
@@ -638,8 +630,8 @@ export const expensesRouter = router({
             expenseId: updated.id,
             expenseVersion: updated.version,
             groupId: updated.groupId,
-            previousParticipantIds,
-            participantIds: prepared.participantIds,
+            sourceAmountMinor: updated.sourceAmountMinor,
+            sourceCurrency: updated.sourceCurrency as CurrencyCode,
           });
         }
         return updated;
@@ -674,7 +666,6 @@ export const expensesRouter = router({
         );
       }
       return ctx.db.transaction(async (tx) => {
-        const participantIds = await loadExpenseParticipantIds(tx, current.id);
         await reverseActiveEntries(tx, "expense", current.id);
         const [removed] = await tx
           .update(expenses)
@@ -707,7 +698,8 @@ export const expensesRouter = router({
             expenseId: removed.id,
             expenseVersion: removed.version,
             groupId: removed.groupId,
-            participantIds,
+            sourceAmountMinor: removed.sourceAmountMinor,
+            sourceCurrency: removed.sourceCurrency as CurrencyCode,
           });
         }
         return removed;

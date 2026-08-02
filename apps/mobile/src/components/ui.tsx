@@ -5,7 +5,9 @@ import {
   Children,
   Fragment,
   use,
+  useCallback,
   useEffect,
+  useRef,
   useState,
   type PropsWithChildren,
   type RefObject,
@@ -13,6 +15,8 @@ import {
 } from "react";
 import {
   ActivityIndicator,
+  findNodeHandle,
+  Keyboard,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -37,46 +41,48 @@ function useScrollViewportFill({
   accountForTopInset = false,
   underlapsHeader = false,
   reservedBottomHeight = 0,
+  transientBottomClearance = 0,
 }: {
   accountForTopInset?: boolean;
   underlapsHeader?: boolean;
   reservedBottomHeight?: number;
+  transientBottomClearance?: number;
 } = {}) {
   const insets = useSafeAreaInsets();
   const headerHeight = use(HeaderHeightContext) ?? 0;
   const [viewportHeight, setViewportHeight] = useState(0);
   const [contentMeasurement, setContentMeasurement] = useState({
     height: 0,
-    includesBottomSpacing: false,
+    includedBottomPadding: 0,
   });
   const [hasBottomSpacing, setHasBottomSpacing] = useState(false);
   const fillHeight = Math.max(
     0,
     viewportHeight -
       insets.bottom -
-      reservedBottomHeight -
       (underlapsHeader && process.env.EXPO_OS === "ios"
         ? headerHeight
         : accountForTopInset
           ? insets.top
           : 0),
   );
+  const contentFillHeight = Math.max(0, fillHeight - reservedBottomHeight);
+  const bottomPadding =
+    reservedBottomHeight +
+    transientBottomClearance +
+    (hasBottomSpacing ? spacing.md : 0);
 
   useEffect(() => {
     if (viewportHeight === 0 || contentMeasurement.height === 0) return;
     const unpaddedHeight =
-      contentMeasurement.height -
-      (contentMeasurement.includesBottomSpacing
-        ? spacing.md + reservedBottomHeight
-        : 0);
-    const nextHasBottomSpacing = unpaddedHeight > fillHeight + 1;
+      contentMeasurement.height - contentMeasurement.includedBottomPadding;
+    const nextHasBottomSpacing = unpaddedHeight > contentFillHeight + 1;
     setHasBottomSpacing((current) =>
       current === nextHasBottomSpacing ? current : nextHasBottomSpacing,
     );
   }, [
     contentMeasurement,
-    fillHeight,
-    reservedBottomHeight,
+    contentFillHeight,
     viewportHeight,
   ]);
 
@@ -85,9 +91,7 @@ function useScrollViewportFill({
       viewportHeight > 0
         ? {
             minHeight: fillHeight,
-            paddingBottom: hasBottomSpacing
-              ? spacing.md + reservedBottomHeight
-              : undefined,
+            paddingBottom: bottomPadding > 0 ? bottomPadding : undefined,
           }
         : undefined,
     onLayout: ({
@@ -103,9 +107,77 @@ function useScrollViewportFill({
     onContentSizeChange: (_width: number, height: number) => {
       setContentMeasurement({
         height,
-        includesBottomSpacing: hasBottomSpacing,
+        includedBottomPadding: bottomPadding,
       });
     },
+  };
+}
+
+export function useKeyboardFocusScroll(
+  scrollViewRef: RefObject<ScrollView | null>,
+  additionalOffset = spacing.md,
+) {
+  const focusedInputRef = useRef<TextInput | null>(null);
+  const [keyboardClearance, setKeyboardClearance] = useState(0);
+
+  const revealFocusedInput = useCallback(() => {
+    const inputHandle = findNodeHandle(focusedInputRef.current);
+    if (inputHandle === null) return;
+    const scrollView = scrollViewRef.current;
+    if (!scrollView) return;
+    const reveal = (viewportScreenY: number) => {
+      scrollView.scrollResponderScrollNativeHandleToKeyboard(
+        inputHandle,
+        additionalOffset + viewportScreenY,
+        true,
+      );
+    };
+    const nativeScrollView = scrollView.getNativeScrollRef();
+    if (!nativeScrollView) {
+      reveal(0);
+      return;
+    }
+    nativeScrollView.measureInWindow((_x, y) => reveal(y));
+  }, [additionalOffset, scrollViewRef]);
+
+  useEffect(() => {
+    const shown = Keyboard.addListener("keyboardDidShow", (event) => {
+      if (!focusedInputRef.current) return;
+      setKeyboardClearance(event.endCoordinates.height);
+      requestAnimationFrame(revealFocusedInput);
+    });
+    const hidden = Keyboard.addListener("keyboardDidHide", () => {
+      setKeyboardClearance(0);
+    });
+    return () => {
+      shown.remove();
+      hidden.remove();
+    };
+  }, [revealFocusedInput]);
+
+  useEffect(() => {
+    if (keyboardClearance <= 0) return;
+    requestAnimationFrame(revealFocusedInput);
+  }, [keyboardClearance, revealFocusedInput]);
+
+  const focusInput = useCallback(
+    (input: TextInput | null) => {
+      focusedInputRef.current = input;
+      setKeyboardClearance(Keyboard.metrics()?.height ?? 0);
+      requestAnimationFrame(revealFocusedInput);
+    },
+    [revealFocusedInput],
+  );
+
+  const blurInput = useCallback((input: TextInput | null) => {
+    if (focusedInputRef.current === input) focusedInputRef.current = null;
+  }, []);
+
+  return {
+    keyboardClearance,
+    focusInput,
+    blurInput,
+    revealFocusedInput,
   };
 }
 
@@ -118,6 +190,7 @@ export function Screen({
   underlapsHeader,
   contentContainerStyle,
   scrollViewRef,
+  transientBottomClearance = 0,
   bottomOverlay,
   bottomOverlayHeight = 62,
 }: PropsWithChildren<{
@@ -128,6 +201,7 @@ export function Screen({
   underlapsHeader?: boolean;
   contentContainerStyle?: ScrollViewProps["contentContainerStyle"];
   scrollViewRef?: RefObject<ScrollView | null>;
+  transientBottomClearance?: number;
   bottomOverlay?: ReactNode;
   bottomOverlayHeight?: number;
 }>) {
@@ -140,6 +214,7 @@ export function Screen({
     underlapsHeader:
       underlapsHeader ?? (background === "default" && !accountForTopInset),
     reservedBottomHeight: bottomOverlay ? bottomOverlayHeight : 0,
+    transientBottomClearance,
   });
   if (!scroll) {
     return (

@@ -1,4 +1,5 @@
-import { render } from "@testing-library/react-native";
+import { fireEvent, render } from "@testing-library/react-native";
+import { router } from "expo-router";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import FriendDetailScreen from "../app/(tabs)/friends/[id]";
 
@@ -20,6 +21,19 @@ jest.mock("expo-router", () => ({
 
 jest.mock("../lib/trpc", () => ({
   api: {
+    profile: {
+      me: {
+        useQuery: () => ({
+          data: {
+            userId: "user-1",
+            displayName: "You",
+            homeCurrency: "EUR",
+          },
+          error: null,
+          isPending: false,
+        }),
+      },
+    },
     friends: {
       detail: {
         useQuery: () => ({
@@ -53,9 +67,10 @@ jest.mock("../lib/trpc", () => ({
 describe("FriendDetailScreen", () => {
   beforeEach(() => {
     mockFriendExpenses = [];
+    jest.clearAllMocks();
   });
 
-  it("omits settlement UI when there are no open balances", async () => {
+  it("allows a payment even when there are no open balances", async () => {
     const view = await render(
       <SafeAreaInsetsContext.Provider
         value={{ top: 0, right: 0, bottom: 0, left: 0 }}
@@ -66,6 +81,19 @@ describe("FriendDetailScreen", () => {
 
     expect(view.queryByText("You’re all settled")).toBeNull();
     expect(view.queryByText(/There are no open balances/)).toBeNull();
+    await fireEvent.press(view.getByText("Record payment"));
+    expect(router.push).toHaveBeenCalledWith({
+      pathname: "/settlement/new",
+      params: {
+        type: "friend",
+        id: "friendship-1",
+        friendshipId: "friendship-1",
+        friendId: "user-2",
+        fromUserId: "user-1",
+        toUserId: "user-2",
+        canonicalCurrency: "EUR",
+      },
+    });
     expect(view.getByText("No expenses yet")).toBeTruthy();
   });
 

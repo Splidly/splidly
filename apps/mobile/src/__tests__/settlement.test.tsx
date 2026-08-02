@@ -1,4 +1,5 @@
 import { act, fireEvent, render } from "@testing-library/react-native";
+import { StyleSheet } from "react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import NewSettlementScreen from "../app/settlement/new";
 
@@ -219,6 +220,26 @@ describe("NewSettlementScreen group context", () => {
     expect(view.getByLabelText("Paid by: Alex")).toBeTruthy();
     expect(view.getByLabelText("Paid to: You")).toBeTruthy();
     expect(view.getByDisplayValue("12.34")).toBeTruthy();
+    expect(
+      StyleSheet.flatten(view.getByTestId("settlement-paid-by-slot").props.style)
+        .flex,
+    ).toBe(1);
+    expect(
+      StyleSheet.flatten(view.getByTestId("settlement-paid-to-slot").props.style)
+        .flex,
+    ).toBe(1);
+    expect(
+      StyleSheet.flatten(
+        view.getByTestId("settlement-direction-arrow", {
+          includeHiddenElements: true,
+        }).props.style,
+      ),
+    ).toEqual(
+      expect.objectContaining({ alignSelf: "flex-start", marginTop: 13 }),
+    );
+    expect(
+      view.getByTestId("currency-chevron", { includeHiddenElements: true }),
+    ).toBeTruthy();
     expect(view.queryByText("Preview conversion")).toBeNull();
     expect(
       view.queryByText(/Splidly updates the ledger/),
@@ -244,6 +265,40 @@ describe("NewSettlementScreen group context", () => {
       nativeEvent: { event: "user-3" },
     });
     expect(view.getByLabelText("Paid by: Flo")).toBeTruthy();
+  });
+
+  it("formats the payment amount to the currency precision on blur", async () => {
+    const view = await render(
+      <SafeAreaInsetsContext.Provider
+        value={{ top: 0, right: 0, bottom: 0, left: 0 }}
+      >
+        <NewSettlementScreen />
+      </SafeAreaInsetsContext.Provider>,
+    );
+    await act(async () => {});
+
+    const amount = view.getByLabelText("Amount");
+    await fireEvent.changeText(amount, "8");
+    await fireEvent(amount, "blur");
+
+    expect(view.getByLabelText("Amount").props.value).toBe("8.00");
+  });
+
+  it("keeps a growing note tied to the focused-input scroll behavior", async () => {
+    const view = await render(
+      <SafeAreaInsetsContext.Provider
+        value={{ top: 0, right: 0, bottom: 0, left: 0 }}
+      >
+        <NewSettlementScreen />
+      </SafeAreaInsetsContext.Provider>,
+    );
+    await act(async () => {});
+
+    await fireEvent.press(view.getByText("Add a note"));
+
+    expect(view.getByLabelText("Notes").props.onContentSizeChange).toEqual(
+      expect.any(Function),
+    );
   });
 
   it("can always be cancelled from the native sheet toolbar", async () => {

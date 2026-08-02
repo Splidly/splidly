@@ -241,8 +241,8 @@ describe("Screen", () => {
       view.getByTestId("screen-bottom-overlay").props.style,
     );
 
-    expect(shortStyle.minHeight).toBe(692);
-    expect(shortStyle.paddingBottom).toBeUndefined();
+    expect(shortStyle.minHeight).toBe(780);
+    expect(shortStyle.paddingBottom).toBe(88);
     expect(overlayStyle.height).toBe(108);
     expect(overlayStyle.paddingBottom).toBe(20);
 
@@ -256,6 +256,43 @@ describe("Screen", () => {
       overflowingScrollView?.props.contentContainerStyle,
     );
     expect(overflowingStyle.paddingBottom).toBe(104);
+  });
+
+  it("adds temporary focus clearance without changing the resting viewport fill", async () => {
+    const view = await render(
+      <HeaderHeightContext.Provider value={0}>
+        <SafeAreaInsetsContext.Provider
+          value={{ top: 0, right: 0, bottom: 20, left: 0 }}
+        >
+          <Screen
+            bottomOverlay={<Text>Save</Text>}
+            bottomOverlayHeight={88}
+            transientBottomClearance={300}
+          >
+            <Text>Focused form</Text>
+          </Screen>
+        </SafeAreaInsetsContext.Provider>
+      </HeaderHeightContext.Provider>,
+    );
+    const [scrollView] = view.container.queryAll(
+      (instance) =>
+        instance.props.contentInsetAdjustmentBehavior === "automatic",
+    );
+    if (!scrollView) throw new Error("ScrollView was not rendered");
+
+    await fireEvent(scrollView, "layout", {
+      nativeEvent: { layout: { height: 800 } },
+    });
+    const [resizedScrollView] = view.container.queryAll(
+      (instance) =>
+        instance.props.contentInsetAdjustmentBehavior === "automatic",
+    );
+    const contentStyle = StyleSheet.flatten(
+      resizedScrollView?.props.contentContainerStyle,
+    );
+
+    expect(contentStyle.minHeight).toBe(780);
+    expect(contentStyle.paddingBottom).toBe(388);
   });
 });
 

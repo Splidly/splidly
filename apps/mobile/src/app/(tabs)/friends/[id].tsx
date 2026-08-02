@@ -26,9 +26,22 @@ export default function FriendDetailScreen() {
   const theme = useTheme();
   const detail = api.friends.detail.useQuery({ friendshipId: id });
   const list = api.friends.list.useQuery();
-  if (detail.isPending || list.isPending) return <Screen><LoadingState /></Screen>;
-  if (detail.error || !detail.data) {
-    return <Screen><ErrorState message={detail.error?.message} /></Screen>;
+  const profile = api.profile.me.useQuery();
+  if (detail.isPending || list.isPending || profile.isPending) {
+    return <Screen><LoadingState /></Screen>;
+  }
+  if (detail.error || profile.error || !detail.data || !profile.data) {
+    return (
+      <Screen>
+        <ErrorState
+          message={
+            detail.error?.message ??
+            profile.error?.message ??
+            "Could not load this friend"
+          }
+        />
+      </Screen>
+    );
   }
   const summary = list.data?.find((item) => item.friendship.id === id);
   const name = detail.data.friend?.displayName ?? "Deleted user";
@@ -50,15 +63,39 @@ export default function FriendDetailScreen() {
             Private ledger
           </Text>
         </View>
-        <PrimaryButton
-          label="Add an expense"
-          onPress={() =>
-            router.push({
-              pathname: "/expense/new",
-              params: { type: "friend", id },
-            })
-          }
-        />
+        <View style={{ flexDirection: "row", gap: 12 }}>
+          <View style={{ flex: 1 }}>
+            <PrimaryButton
+              label="Add expense"
+              onPress={() =>
+                router.push({
+                  pathname: "/expense/new",
+                  params: { type: "friend", id },
+                })
+              }
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <PrimaryButton
+              label="Record payment"
+              tone="secondary"
+              onPress={() =>
+                router.push({
+                  pathname: "/settlement/new",
+                  params: {
+                    type: "friend",
+                    id,
+                    friendshipId: id,
+                    friendId: detail.data.friend?.userId,
+                    fromUserId: profile.data.userId,
+                    toUserId: detail.data.friend?.userId,
+                    canonicalCurrency: profile.data.homeCurrency,
+                  },
+                })
+              }
+            />
+          </View>
+        </View>
         <Intro>
           Direct and group balances stay separated so every amount remains
           traceable to its original ledger.

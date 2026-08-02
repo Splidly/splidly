@@ -8,6 +8,7 @@ import {
   type ColorValue,
 } from "react-native";
 import { useTheme } from "../theme";
+import { DropdownChevron } from "./dropdown-chevron";
 import { PrimaryButton } from "./ui";
 
 export function ExpenseEntryCard({
@@ -21,7 +22,8 @@ export function ExpenseEntryCard({
   onCurrencyPress,
   categoryHint,
   metadata,
-  inputAccessoryViewID,
+  descriptionInputAccessoryViewID,
+  amountInputAccessoryViewID,
 }: {
   icon: ReactNode;
   description: string;
@@ -33,7 +35,8 @@ export function ExpenseEntryCard({
   onCurrencyPress: () => void;
   categoryHint: string;
   metadata?: ReactNode;
-  inputAccessoryViewID?: string;
+  descriptionInputAccessoryViewID?: string;
+  amountInputAccessoryViewID?: string;
 }) {
   const theme = useTheme();
 
@@ -69,7 +72,7 @@ export function ExpenseEntryCard({
             selectionColor={theme.primary}
             clearButtonMode="while-editing"
             returnKeyType="next"
-            inputAccessoryViewID={inputAccessoryViewID}
+            inputAccessoryViewID={descriptionInputAccessoryViewID}
             style={{
               color: theme.text,
               minHeight: 36,
@@ -111,7 +114,7 @@ export function ExpenseEntryCard({
             onChangeText={onAmountChange}
             onBlur={onAmountBlur}
             keyboardType="decimal-pad"
-            inputAccessoryViewID={inputAccessoryViewID}
+            inputAccessoryViewID={amountInputAccessoryViewID}
             placeholder="0.00"
             placeholderTextColor={theme.subtle}
             selectionColor={theme.primary}
@@ -154,18 +157,7 @@ export function ExpenseEntryCard({
               >
                 {currency}
               </Text>
-              <Text
-                accessibilityElementsHidden
-                style={{
-                  color: theme.primary,
-                  fontSize: 17,
-                  lineHeight: 17,
-                  fontWeight: "700",
-                  transform: [{ translateY: -2 }],
-                }}
-              >
-                ⌄
-              </Text>
+              <DropdownChevron color={theme.primary} />
             </View>
           </Pressable>
         </View>

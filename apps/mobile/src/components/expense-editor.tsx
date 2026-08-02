@@ -12,7 +12,6 @@ import * as Crypto from "expo-crypto";
 import { router, Stack } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  findNodeHandle,
   InputAccessoryView,
   Pressable,
   ScrollView,
@@ -52,7 +51,10 @@ import {
   HeaderButton,
   LoadingState,
   Screen,
+  useKeyboardFocusScroll,
 } from "./ui";
+
+const expenseOverlayHeight = 92;
 
 function requiredRateTargets(
   canonicalCurrency: CurrencyCode | undefined,
@@ -217,6 +219,15 @@ export function ExpenseEditor({
   const rateRequest = useRef(0);
   const screenRef = useRef<ScrollView>(null);
   const notesInputRef = useRef<TextInput>(null);
+  const {
+    keyboardClearance,
+    focusInput: focusBottomInput,
+    blurInput: blurBottomInput,
+    revealFocusedInput: revealBottomInput,
+  } = useKeyboardFocusScroll(
+    screenRef,
+    expenseOverlayHeight + 16,
+  );
   const detectedIconKey = useMemo(
     () => detectExpenseIconKey(description),
     [description],
@@ -649,19 +660,8 @@ export function ExpenseEditor({
     }
   };
 
-  const revealNotesInput = () => {
-    const notesHandle = findNodeHandle(notesInputRef.current);
-    if (notesHandle === null) return;
-    requestAnimationFrame(() => {
-      screenRef.current?.scrollResponderScrollNativeHandleToKeyboard(
-        notesHandle,
-        20,
-        true,
-      );
-    });
-  };
-
-  const keyboardAccessoryID = "expense-primary-action";
+  const descriptionAccessoryID = "expense-description-primary-action";
+  const amountAccessoryID = "expense-amount-primary-action";
   const saveLabel = saving
     ? "Saving…"
     : editing
@@ -730,6 +730,7 @@ export function ExpenseEditor({
     <>
       <Screen
         scrollViewRef={screenRef}
+        transientBottomClearance={keyboardClearance}
         underlapsHeader={false}
         bottomOverlay={
           <ExpenseSaveControl
@@ -738,7 +739,7 @@ export function ExpenseEditor({
             disabled={saveDisabled}
           />
         }
-        bottomOverlayHeight={92}
+        bottomOverlayHeight={expenseOverlayHeight}
         contentContainerStyle={{ paddingTop: 16, gap: 22 }}
       >
         <ExpenseEntryCard
@@ -765,7 +766,10 @@ export function ExpenseEditor({
           }
           metadata={conversionMetadata}
           {...(process.env.EXPO_OS === "ios"
-            ? { inputAccessoryViewID: keyboardAccessoryID }
+            ? {
+                descriptionInputAccessoryViewID: descriptionAccessoryID,
+                amountInputAccessoryViewID: amountAccessoryID,
+              }
             : {})}
         />
 
@@ -848,7 +852,11 @@ export function ExpenseEditor({
                   placeholderTextColor={theme.subtle}
                   selectionColor={theme.primary}
                   multiline
-                  onFocus={revealNotesInput}
+                  onFocus={() => focusBottomInput(notesInputRef.current)}
+                  onBlur={() => blurBottomInput(notesInputRef.current)}
+                  onContentSizeChange={() =>
+                    requestAnimationFrame(revealBottomInput)
+                  }
                   textAlignVertical="top"
                   style={{
                     color: theme.text,
@@ -895,34 +903,37 @@ export function ExpenseEditor({
         {formError ? <ErrorState message={formError} /> : null}
         {saveError ? <ErrorState message={saveError.message} /> : null}
       </Screen>
-      {process.env.EXPO_OS === "ios" ? (
-        <InputAccessoryView
-          nativeID={keyboardAccessoryID}
-          backgroundColor={theme.background}
-        >
-          <View
-            style={{
-              paddingHorizontal: 16,
-              paddingTop: 8,
-              paddingBottom: 8,
-              alignItems: "center",
-              backgroundColor: theme.background,
-            }}
-          >
-            <ExpenseSaveControl
-              label={
-                saving
-                  ? "Saving…"
-                  : editing
-                    ? "Save changes"
-                    : "Add expense"
-              }
-              onPress={submit}
-              disabled={saveDisabled}
-            />
-          </View>
-        </InputAccessoryView>
-      ) : null}
+      {process.env.EXPO_OS === "ios"
+        ? [descriptionAccessoryID, amountAccessoryID].map((accessoryID) => (
+            <InputAccessoryView
+              key={accessoryID}
+              nativeID={accessoryID}
+              backgroundColor={theme.background}
+            >
+              <View
+                style={{
+                  paddingHorizontal: 16,
+                  paddingTop: 8,
+                  paddingBottom: 8,
+                  alignItems: "center",
+                  backgroundColor: theme.background,
+                }}
+              >
+                <ExpenseSaveControl
+                  label={
+                    saving
+                      ? "Saving…"
+                      : editing
+                        ? "Save changes"
+                        : "Add expense"
+                  }
+                  onPress={submit}
+                  disabled={saveDisabled}
+                />
+              </View>
+            </InputAccessoryView>
+          ))
+        : null}
       <Stack.Screen
         options={{
           title: editing ? "Edit Expense" : "New Expense",

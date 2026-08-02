@@ -16,7 +16,6 @@ import {
 } from "@splidly/shared";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { repaymentPlan } from "../domain/debt-simplification";
 import {
   convertWithRates,
   loadHomeCurrencies,
@@ -64,7 +63,6 @@ export const settlementsRouter = router({
       if (duplicate) return duplicate;
 
       let contextId: string;
-      let simplifyDebts = false;
       if (input.context.type === "group") {
         await requireActiveGroupMember(
           ctx.db,
@@ -102,7 +100,6 @@ export const settlementsRouter = router({
           });
         }
         contextId = group.id;
-        simplifyDebts = group.simplifyDebts;
       } else {
         assertSettlementParticipant(
           ctx.session.user.id,
@@ -145,32 +142,8 @@ export const settlementsRouter = router({
         input.canonicalCurrency,
         rates,
       );
-      const pairEntries = await ctx.db
-        .select()
-        .from(ledgerEntries)
-        .where(
-          and(
-            eq(ledgerEntries.contextType, input.context.type),
-            eq(ledgerEntries.contextId, contextId),
-            eq(ledgerEntries.canonicalCurrency, input.canonicalCurrency),
-          ),
-        );
-      const outstanding = repaymentPlan(
-        pairEntries,
-        simplifyDebts,
-      )
-        .filter(
-          (transfer) =>
-            transfer.fromUserId === input.fromUserId &&
-            transfer.toUserId === input.toUserId,
-        )
-        .reduce((sum, transfer) => sum + transfer.amountMinor, 0n);
-      if (outstanding <= 0n || canonicalAmount > outstanding) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "Settlement exceeds the outstanding balance",
-        });
-      }
+      // A payment is a ledger fact, not a capped repayment action. It may
+      // reduce, clear, or reverse the current net balance between two people.
 
       return ctx.db.transaction(async (tx) => {
         const [settlement] = await tx

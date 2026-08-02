@@ -130,7 +130,10 @@ environment.
 
 Native APNs tokens are registered only after an authenticated, onboarded user
 grants notification permission. Expense create, update, and delete transactions
-enqueue one durable delivery per active iOS installation; the server retries
+enqueue one durable, recipient-specific delivery for every active iOS
+installation belonging to another active group member, including members who
+are not financially involved in the expense. Notifications include the full
+expense amount and describe the recipient's net involvement. The server retries
 transient APNs failures and disables tokens rejected as unregistered. Apply the
 database migrations and make a fresh native build after adding notification
 support—the JavaScript bundle alone cannot add the iOS push entitlement.

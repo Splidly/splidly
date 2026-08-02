@@ -13,7 +13,7 @@ import {
   type Href,
 } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { beginCurrencySelection } from "../../lib/currency-selection";
 import { formatConvertedMoney } from "../../lib/money-display";
 import { api } from "../../lib/trpc";
@@ -29,8 +29,11 @@ import {
   HeaderButton,
   LoadingState,
   Screen,
+  useKeyboardFocusScroll,
 } from "../../components/ui";
 import { useTheme } from "../../theme";
+
+const settlementOverlayHeight = 92;
 
 function rateBasis(base: CurrencyCode, targets: CurrencyCode[]) {
   return `${base}:${[...new Set(targets)].sort().join(",")}`;
@@ -63,6 +66,17 @@ export default function NewSettlementScreen() {
   const quote = api.currency.quote.useMutation();
   const requestQuote = quote.mutateAsync;
   const quoteRequest = useRef(0);
+  const screenRef = useRef<ScrollView>(null);
+  const notesInputRef = useRef<TextInput>(null);
+  const {
+    keyboardClearance,
+    focusInput: focusBottomInput,
+    blurInput: blurBottomInput,
+    revealFocusedInput: revealBottomInput,
+  } = useKeyboardFocusScroll(
+    screenRef,
+    settlementOverlayHeight + 16,
+  );
 
   let signedCanonicalMinor: bigint | undefined;
   try {
@@ -320,6 +334,14 @@ export default function NewSettlementScreen() {
     router.push("/currency-picker");
   }
 
+  function formatAmountOnBlur() {
+    try {
+      setAmount(formatMinor(parseDecimalToMinor(amount, currency), currency));
+    } catch {
+      // Keep incomplete input intact so validation can explain the problem.
+    }
+  }
+
   function submit() {
     setFormError(undefined);
     if (!fromMember || !toMember || fromMember.userId === toMember.userId) {
@@ -453,6 +475,7 @@ export default function NewSettlementScreen() {
           amount={amount}
           currency={currency}
           onAmountChange={setAmount}
+          onAmountBlur={formatAmountOnBlur}
           onCurrencyPress={openCurrency}
           {...(conversionMetadata ? { metadata: conversionMetadata } : {})}
         />
@@ -501,6 +524,7 @@ export default function NewSettlementScreen() {
                   Note
                 </Text>
                 <TextInput
+                  ref={notesInputRef}
                   accessibilityLabel="Notes"
                   value={notes}
                   onChangeText={setNotes}
@@ -508,6 +532,11 @@ export default function NewSettlementScreen() {
                   placeholderTextColor={theme.subtle}
                   selectionColor={theme.primary}
                   multiline
+                  onFocus={() => focusBottomInput(notesInputRef.current)}
+                  onBlur={() => blurBottomInput(notesInputRef.current)}
+                  onContentSizeChange={() =>
+                    requestAnimationFrame(revealBottomInput)
+                  }
                   textAlignVertical="top"
                   style={{
                     color: theme.text,
@@ -560,6 +589,8 @@ export default function NewSettlementScreen() {
   return (
     <>
       <Screen
+        scrollViewRef={screenRef}
+        transientBottomClearance={keyboardClearance}
         background="sheet"
         contentContainerStyle={{ paddingTop: 16, gap: 20 }}
         {...(!contextPending && !contextError && contextMembers.length >= 2
@@ -571,7 +602,7 @@ export default function NewSettlementScreen() {
                   disabled={create.isPending || !conversionReady}
                 />
               ),
-              bottomOverlayHeight: 76,
+              bottomOverlayHeight: settlementOverlayHeight,
             }
           : {})}
       >
