@@ -5,8 +5,8 @@ import {
 } from "@expo/ui/community/menu";
 import * as Crypto from "expo-crypto";
 import { router, Stack } from "expo-router";
-import { useEffect, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import {
   expenseSplitModeLabels,
   expenseSplitStatus,
@@ -31,6 +31,7 @@ import {
   HeaderButton,
   PrimaryButton,
   Screen,
+  useKeyboardFocusScroll,
 } from "./ui";
 
 const splitModeDescriptions: Record<ExpenseSplitMode, string> = {
@@ -52,6 +53,14 @@ export function ExpenseSplitEditor() {
   const [draft, setDraft] = useState<ExpenseSplitDraft | undefined>(
     request?.draft,
   );
+  const screenRef = useRef<ScrollView>(null);
+  const itemInputRefs = useRef(new Map<string, TextInput>());
+  const {
+    keyboardClearance,
+    focusInput,
+    blurInput,
+    revealFocusedInput,
+  } = useKeyboardFocusScroll(screenRef, 104);
   useEffect(() => {
     if (request) setDraft(request.draft);
   }, [request]);
@@ -75,6 +84,11 @@ export function ExpenseSplitEditor() {
     draft,
     request.totalMinor,
     request.currency,
+  );
+  const participants = request.participants.toSorted((left, right) =>
+    left.displayName.localeCompare(right.displayName, undefined, {
+      sensitivity: "base",
+    }),
   );
   const methodActions: MenuAction[] = (
     Object.keys(expenseSplitModeLabels) as ExpenseSplitMode[]
@@ -144,7 +158,7 @@ export function ExpenseSplitEditor() {
             } selected`;
 
   const participantSummary = (participantIds: string[]) => {
-    const names = request.participants
+    const names = participants
       .filter((person) => participantIds.includes(person.userId))
       .map((person) => person.displayName);
     if (names.length === 0) return "Choose";
@@ -215,6 +229,19 @@ export function ExpenseSplitEditor() {
       }
       return current;
     });
+  const selectEveryone = () =>
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            selectedIds: participants.map((person) => person.userId),
+          }
+        : current,
+    );
+  const deselectEveryone = () =>
+    setDraft((current) =>
+      current ? { ...current, selectedIds: [] } : current,
+    );
   const assignedRatio =
     draft.mode === "exact" || draft.mode === "itemized"
       ? request.totalMinor > 0n
@@ -234,6 +261,8 @@ export function ExpenseSplitEditor() {
   return (
     <>
       <Screen
+        scrollViewRef={screenRef}
+        transientBottomClearance={keyboardClearance}
         bottomOverlay={
           <AllocationFloatingSummary
             title={indicator}
@@ -312,20 +341,26 @@ export function ExpenseSplitEditor() {
                       ? "Percentages"
                       : "Shares"
               }
-              {...(draft.mode !== "equal" && draft.selectedIds.length > 0
-                ? {
-                    action:
-                      draft.mode === "exact"
-                        ? "Equal amounts"
-                        : draft.mode === "percentage"
-                          ? "Equal percentages"
-                          : "Reset shares",
-                    onAction: resetCurrentModeEvenly,
-                  }
-                : {})}
+              actions={[
+                { label: "Select All", onPress: selectEveryone },
+                { label: "Deselect All", onPress: deselectEveryone },
+                ...(draft.mode !== "equal" && draft.selectedIds.length > 0
+                  ? [
+                      {
+                        label:
+                          draft.mode === "exact"
+                            ? "Equal amounts"
+                            : draft.mode === "percentage"
+                              ? "Equal percentages"
+                              : "Reset shares",
+                        onPress: resetCurrentModeEvenly,
+                      },
+                    ]
+                  : []),
+              ]}
             />
             <AllocationList>
-              {request.participants.map((person) => {
+              {participants.map((person) => {
                 const selected = draft.selectedIds.includes(person.userId);
                 const valueKey =
                   draft.mode === "exact"
@@ -404,14 +439,25 @@ export function ExpenseSplitEditor() {
           <View style={{ gap: 12 }}>
             <AllocationHeader title="Items" />
             {draft.items.map((item, itemIndex) => {
-              const peopleActions: MenuAction[] =
-                request.participants.map((person) => ({
+              const peopleActions: MenuAction[] = [
+                {
+                  id: "__select_all__",
+                  title: "Select All",
+                  state: "off" as const,
+                },
+                {
+                  id: "__deselect_all__",
+                  title: "Deselect All",
+                  state: "off" as const,
+                },
+                ...participants.map((person) => ({
                   id: person.userId,
                   title: person.displayName,
                   state: item.participantIds.includes(person.userId)
-                    ? "on"
-                    : "off",
-                }));
+                    ? ("on" as const)
+                    : ("off" as const),
+                })),
+              ];
               return (
                 <View
                   key={item.id}
@@ -432,6 +478,11 @@ export function ExpenseSplitEditor() {
                     }}
                   >
                     <TextInput
+                      ref={(input) => {
+                        const key = `${item.id}:name`;
+                        if (input) itemInputRefs.current.set(key, input);
+                        else itemInputRefs.current.delete(key);
+                      }}
                       accessibilityLabel={`Item ${itemIndex + 1} name`}
                       value={item.description}
                       onChangeText={(description) =>
@@ -448,7 +499,20 @@ export function ExpenseSplitEditor() {
                             : current,
                         )
                       }
-                      placeholder="Item name"
+                      onFocus={() =>
+                        focusInput(
+                          itemInputRefs.current.get(`${item.id}:name`) ?? null,
+                        )
+                      }
+                      onBlur={() =>
+                        blurInput(
+                          itemInputRefs.current.get(`${item.id}:name`) ?? null,
+                        )
+                      }
+                      onContentSizeChange={() =>
+                        requestAnimationFrame(revealFocusedInput)
+                      }
+                      placeholder="Item name (optional)"
                       placeholderTextColor={theme.subtle}
                       selectionColor={theme.primary}
                       style={{
@@ -480,6 +544,8 @@ export function ExpenseSplitEditor() {
                       suffix={currencySymbol(request.currency)}
                       placeholder="0.00"
                       width={96}
+                      onFocus={focusInput}
+                      onBlur={blurInput}
                     />
                     <Pressable
                       accessibilityRole="button"
@@ -536,6 +602,19 @@ export function ExpenseSplitEditor() {
                               ...current,
                               items: current.items.map((candidate) => {
                                 if (candidate.id !== item.id) return candidate;
+                                if (nativeEvent.event === "__select_all__") {
+                                  return {
+                                    ...candidate,
+                                    participantIds: participants.map(
+                                      (person) => person.userId,
+                                    ),
+                                  };
+                                }
+                                if (
+                                  nativeEvent.event === "__deselect_all__"
+                                ) {
+                                  return { ...candidate, participantIds: [] };
+                                }
                                 const included =
                                   candidate.participantIds.includes(
                                     nativeEvent.event,

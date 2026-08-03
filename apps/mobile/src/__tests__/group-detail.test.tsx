@@ -92,7 +92,7 @@ jest.mock("../lib/trpc", () => ({
                 paymentTotal: { currency: "USD", minor: "1000" },
                 viewerInvolvement: {
                   kind: "borrowed",
-                  amount: { currency: "USD", minor: "400" },
+                  amount: { currency: "EUR", minor: "340" },
                 },
                 iconKey: "food",
                 iconManuallySet: true,
@@ -156,8 +156,8 @@ describe("GroupDetailScreen actions", () => {
 
     expect(view.getByLabelText("You owe Alex 12.34 €")).toBeTruthy();
     expect(view.getByText(/Alex paid \$10\.00$/)).toBeTruthy();
-    expect(view.getByText("You borrowed")).toBeTruthy();
-    expect(view.getByText("$4.00")).toBeTruthy();
+    expect(view.getByText("You owe")).toBeTruthy();
+    expect(view.getByText("3.40 €")).toBeTruthy();
     expect(view.getByText(/You \+ Alex paid 24\.00 €$/)).toBeTruthy();
     expect(view.getByText("You lent")).toBeTruthy();
     expect(view.getByText("10.00 €")).toBeTruthy();
@@ -182,6 +182,17 @@ describe("GroupDetailScreen actions", () => {
     expect(view.queryByText(/20 Jul ·/)).toBeNull();
     expect(view.queryByText("Open balances")).toBeNull();
     expect(view.queryByText("Statistics")).toBeNull();
+    await fireEvent.press(view.getByTestId("settlement-activity-row"));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: "/settlement/new",
+      params: {
+        type: "group",
+        id: "group-1",
+        canonicalCurrency: "EUR",
+        settlementId: "settlement-1",
+      },
+    });
+    mockPush.mockClear();
     await fireEvent.press(view.getByText("Settle up"));
 
     expect(mockPush).toHaveBeenCalledWith({

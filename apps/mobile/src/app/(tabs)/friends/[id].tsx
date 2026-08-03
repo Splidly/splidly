@@ -16,6 +16,7 @@ import {
   Section,
 } from "../../../components/ui";
 import { ExpenseIcon } from "../../../components/expense-icon";
+import { SettlementActivityRow } from "../../../components/settlement-activity-row";
 import { groupActivityByDate } from "../../../lib/activity-dates";
 import { api } from "../../../lib/trpc";
 import { formatMoney } from "../../../lib/money-display";
@@ -45,7 +46,21 @@ export default function FriendDetailScreen() {
   }
   const summary = list.data?.find((item) => item.friendship.id === id);
   const name = detail.data.friend?.displayName ?? "Deleted user";
-  const expenseGroups = groupActivityByDate(detail.data.expenses);
+  const activity = [
+    ...detail.data.expenses.map((expense) => ({
+      type: "expense" as const,
+      occurredAt: expense.occurredAt,
+      sortAt: expense.createdAt,
+      record: expense,
+    })),
+    ...detail.data.settlements.map((settlement) => ({
+      type: "settlement" as const,
+      occurredAt: settlement.occurredAt,
+      sortAt: settlement.createdAt,
+      record: settlement,
+    })),
+  ];
+  const activityGroups = groupActivityByDate(activity);
   return (
     <>
       <Screen>
@@ -143,36 +158,59 @@ export default function FriendDetailScreen() {
             ))}
           </Section>
         ) : null}
-        {detail.data.expenses.length === 0 ? (
+        {activity.length === 0 ? (
           <Section>
             <EmptyState
-              title="No expenses yet"
+              title="No activity yet"
               message={`Add the first direct expense with ${name}.`}
             />
           </Section>
         ) : (
           <ActivityTimeline
-            groups={expenseGroups}
-            getItemKey={(expense) => expense.id}
-            renderItem={(expense) => (
-              <ListRow
-                title={expense.description}
-                value={formatMoney(
-                  expense.sourceAmountMinor,
-                  expense.sourceCurrency as CurrencyCode,
-                )}
-                leading={
-                  <ExpenseIcon
-                    iconKey={expense.iconKey}
-                    name={expense.description}
-                    useNameFallback={!expense.iconManuallySet}
+            groups={activityGroups}
+            getItemKey={(item) => `${item.type}:${item.record.id}`}
+            renderItem={(item) => {
+              if (item.type === "settlement") {
+                return (
+                  <SettlementActivityRow
+                    settlement={item.record}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/settlement/new",
+                        params: {
+                          type: "friend",
+                          id,
+                          friendshipId: id,
+                          friendId: detail.data.friend?.userId,
+                          canonicalCurrency: item.record.canonicalCurrency,
+                          settlementId: item.record.id,
+                        },
+                      })
+                    }
                   />
-                }
-                onPress={() =>
-                  router.push(`/expense/${expense.id}` as Href)
-                }
-              />
-            )}
+                );
+              }
+              const expense = item.record;
+              return (
+                <ListRow
+                  title={expense.description}
+                  value={formatMoney(
+                    expense.sourceAmountMinor,
+                    expense.sourceCurrency as CurrencyCode,
+                  )}
+                  leading={
+                    <ExpenseIcon
+                      iconKey={expense.iconKey}
+                      name={expense.description}
+                      useNameFallback={!expense.iconManuallySet}
+                    />
+                  }
+                  onPress={() =>
+                    router.push(`/expense/${expense.id}` as Href)
+                  }
+                />
+              );
+            }}
           />
         )}
       </Screen>

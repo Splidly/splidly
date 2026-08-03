@@ -249,6 +249,8 @@ export const groupsRouter = router({
         .select({
           id: settlements.id,
           occurredAt: settlements.occurredAt,
+          createdAt: settlements.createdAt,
+          version: settlements.version,
           notes: settlements.notes,
           fromUserId: settlements.fromUserId,
           toUserId: settlements.toUserId,
@@ -419,7 +421,30 @@ export const groupsRouter = router({
             ?.sourceAmountMinor,
         });
 
-        return { ...expense, canonicalAmount, ...summary };
+        const viewerInvolvement = {
+          ...summary.viewerInvolvement,
+          amount:
+            sourceCurrency === canonicalCurrency
+              ? summary.viewerInvolvement.amount
+              : rate
+                ? money(
+                    canonicalCurrency,
+                    convertMinor(
+                      BigInt(summary.viewerInvolvement.amount.minor),
+                      sourceCurrency,
+                      canonicalCurrency,
+                      rate.rate,
+                    ),
+                  )
+                : summary.viewerInvolvement.amount,
+        };
+
+        return {
+          ...expense,
+          canonicalAmount,
+          ...summary,
+          viewerInvolvement,
+        };
       });
       const settlementActivity = settlementRecords
         .reverse()
@@ -433,6 +458,8 @@ export const groupsRouter = router({
           return {
             id: settlement.id,
             occurredAt: settlement.occurredAt,
+            createdAt: settlement.createdAt,
+            version: settlement.version,
             notes: settlement.notes,
             amount: money(
               settlement.sourceCurrency as CurrencyCode,

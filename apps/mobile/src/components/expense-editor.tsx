@@ -185,7 +185,11 @@ export function ExpenseEditor({
       known.set(person.userId, person);
     }
     for (const person of active) known.set(person.userId, person);
-    return [...known.values()];
+    return [...known.values()].sort((left, right) =>
+      left.displayName.localeCompare(right.displayName, undefined, {
+        sensitivity: "base",
+      }),
+    );
   }, [
     context?.type,
     detail.data?.payer,
@@ -743,6 +747,7 @@ export function ExpenseEditor({
         contentContainerStyle={{ paddingTop: 16, gap: 22 }}
       >
         <ExpenseEntryCard
+          autoFocusDescription={!editing}
           icon={
             <ExpenseIconPicker
               value={iconKey}

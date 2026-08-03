@@ -1,4 +1,4 @@
-import { Children, type ReactNode } from "react";
+import { Children, useRef, type ReactNode } from "react";
 import {
   Pressable,
   Text,
@@ -12,10 +12,12 @@ export function AllocationHeader({
   title,
   action,
   onAction,
+  actions,
 }: {
   title: string;
   action?: string;
   onAction?: () => void;
+  actions?: readonly { label: string; onPress: () => void }[];
 }) {
   const theme = useTheme();
   return (
@@ -40,23 +42,40 @@ export function AllocationHeader({
       >
         {title}
       </Text>
-      {action && onAction ? (
-        <Pressable
-          accessibilityRole="button"
-          onPress={onAction}
-          hitSlop={8}
-          style={({ pressed }) => ({ opacity: pressed ? 0.55 : 1 })}
+      {actions?.length || (action && onAction) ? (
+        <View
+          style={{
+            flex: 1,
+            flexDirection: "row",
+            flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "flex-end",
+            gap: 14,
+          }}
         >
-          <Text
-            style={{
-              color: theme.primary,
-              fontSize: 14,
-              fontWeight: "600",
-            }}
-          >
-            {action}
-          </Text>
-        </Pressable>
+          {(
+            actions ??
+            (action && onAction ? [{ label: action, onPress: onAction }] : [])
+          ).map((item) => (
+              <Pressable
+                key={item.label}
+                accessibilityRole="button"
+                onPress={item.onPress}
+                hitSlop={8}
+                style={({ pressed }) => ({ opacity: pressed ? 0.55 : 1 })}
+              >
+                <Text
+                  style={{
+                    color: theme.primary,
+                    fontSize: 14,
+                    fontWeight: "600",
+                  }}
+                >
+                  {item.label}
+                </Text>
+              </Pressable>
+            ))}
+        </View>
       ) : null}
     </View>
   );
@@ -138,6 +157,8 @@ export function InlineAmountInput({
   placeholder = "0",
   keyboardType = "decimal-pad",
   width = 104,
+  onFocus,
+  onBlur,
 }: {
   accessibilityLabel: string;
   value: string;
@@ -146,8 +167,11 @@ export function InlineAmountInput({
   placeholder?: string;
   keyboardType?: "decimal-pad" | "number-pad";
   width?: number;
+  onFocus?: (input: TextInput | null) => void;
+  onBlur?: (input: TextInput | null) => void;
 }) {
   const theme = useTheme();
+  const inputRef = useRef<TextInput>(null);
   const digitCount = value.replace(/\D/g, "").length;
   const fontSize = digitCount > 9 ? 13 : digitCount > 6 ? 14 : 15;
   return (
@@ -165,9 +189,12 @@ export function InlineAmountInput({
       }}
     >
       <TextInput
+        ref={inputRef}
         accessibilityLabel={accessibilityLabel}
         value={value}
         onChangeText={onChangeText}
+        onFocus={() => onFocus?.(inputRef.current)}
+        onBlur={() => onBlur?.(inputRef.current)}
         keyboardType={keyboardType}
         returnKeyType="done"
         selectTextOnFocus
@@ -255,15 +282,18 @@ export function AllocationRow({
 }) {
   const theme = useTheme();
   return (
-    <View
-      style={{
+    <Pressable
+      accessible={false}
+      onPress={() => onSelectedChange(!selected)}
+      style={({ pressed }) => ({
         minHeight: 56,
         paddingHorizontal: 12,
         paddingVertical: 8,
         flexDirection: "row",
         alignItems: "center",
         gap: 10,
-      }}
+        opacity: pressed ? 0.72 : 1,
+      })}
     >
       <SelectionControl
         selected={selected}
@@ -308,6 +338,6 @@ export function AllocationRow({
           {displayValue}
         </Text>
       ) : null}
-    </View>
+    </Pressable>
   );
 }

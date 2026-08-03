@@ -5,11 +5,13 @@ import {
   friendships,
   groupMembers,
   groups,
+  inArray,
   isNull,
   ledgerEntries,
   ledgerValuations,
   or,
   profiles,
+  settlements,
 } from "@splidly/db";
 import { money, type CurrencyCode } from "@splidly/shared";
 import { TRPCError } from "@trpc/server";
@@ -229,6 +231,34 @@ export const friendsRouter = router({
           ),
         )
         .orderBy(expenses.occurredAt);
+      const settlementRecords = await ctx.db
+        .select()
+        .from(settlements)
+        .where(
+          and(
+            eq(settlements.friendshipId, friendship.id),
+            isNull(settlements.deletedAt),
+          ),
+        );
+      const settlementProfiles =
+        settlementRecords.length === 0
+          ? []
+          : await ctx.db
+              .select({
+                userId: profiles.userId,
+                displayName: profiles.displayName,
+                avatarUrl: profiles.avatarUrl,
+              })
+              .from(profiles)
+              .where(
+                inArray(profiles.userId, [
+                  friendship.userLowId,
+                  friendship.userHighId,
+                ]),
+              );
+      const settlementProfilesById = new Map(
+        settlementProfiles.map((profile) => [profile.userId, profile]),
+      );
       return {
         friendship,
         friend,
@@ -238,6 +268,38 @@ export const friendsRouter = router({
             expense.sourceCurrency as CurrencyCode,
             expense.sourceAmountMinor,
           ),
+        })),
+        settlements: settlementRecords.map((settlement) => ({
+          id: settlement.id,
+          occurredAt: settlement.occurredAt,
+          createdAt: settlement.createdAt,
+          version: settlement.version,
+          notes: settlement.notes,
+          canonicalCurrency: settlement.canonicalCurrency,
+          amount: money(
+            settlement.sourceCurrency as CurrencyCode,
+            settlement.sourceAmountMinor,
+          ),
+          from: {
+            userId: settlement.fromUserId,
+            displayName:
+              settlementProfilesById.get(settlement.fromUserId)?.displayName ??
+              "Unknown member",
+            avatarUrl:
+              settlementProfilesById.get(settlement.fromUserId)?.avatarUrl ??
+              null,
+            isViewer: settlement.fromUserId === ctx.session.user.id,
+          },
+          to: {
+            userId: settlement.toUserId,
+            displayName:
+              settlementProfilesById.get(settlement.toUserId)?.displayName ??
+              "Unknown member",
+            avatarUrl:
+              settlementProfilesById.get(settlement.toUserId)?.avatarUrl ??
+              null,
+            isViewer: settlement.toUserId === ctx.session.user.id,
+          },
         })),
       };
     }),

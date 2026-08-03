@@ -131,4 +131,18 @@ describe("ExpensePaymentEditor", () => {
       view.queryByText("The payment allocation is no longer available."),
     ).toBeNull();
   });
+
+  it("stays open and incomplete when the last payer is deselected", async () => {
+    const view = await render(<Harness onSave={jest.fn()} />, {
+      wrapper: Wrapper,
+    });
+
+    await fireEvent.press(view.getByText("Open editor"));
+    await fireEvent.press(view.getByText("Deselect All"));
+
+    expect(
+      view.getByLabelText("0.00 € of 70.00 €, Incomplete"),
+    ).toBeTruthy();
+    expect(view.getByText("Alex")).toBeTruthy();
+  });
 });

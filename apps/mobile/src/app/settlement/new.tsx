@@ -3,6 +3,7 @@ import {
   formatMinor,
   parseDecimalToMinor,
   type CurrencyCode,
+  type ExpenseContext,
   type QuoteResult,
 } from "@splidly/shared";
 import * as Crypto from "expo-crypto";
@@ -49,7 +50,9 @@ export default function NewSettlementScreen() {
     toUserId?: string;
     canonicalCurrency: CurrencyCode;
     canonicalMinor?: string;
+    settlementId?: string;
   }>();
+  const editing = Boolean(params.settlementId);
   const theme = useTheme();
   const profile = api.profile.me.useQuery();
   const friend = api.friends.detail.useQuery(
@@ -62,10 +65,15 @@ export default function NewSettlementScreen() {
     { groupId: params.id },
     { enabled: params.type === "group" },
   );
+  const settlementDetail = api.settlements.detail.useQuery(
+    { settlementId: params.settlementId ?? "" },
+    { enabled: editing },
+  );
   const utils = api.useUtils();
   const quote = api.currency.quote.useMutation();
   const requestQuote = quote.mutateAsync;
   const quoteRequest = useRef(0);
+  const initializedSettlement = useRef<string | undefined>(undefined);
   const screenRef = useRef<ScrollView>(null);
   const notesInputRef = useRef<TextInput>(null);
   const {
@@ -93,7 +101,7 @@ export default function NewSettlementScreen() {
   const [toUserId, setToUserId] = useState(params.toUserId ?? "");
   const [date, setDate] = useState(() => new Date());
   const [notes, setNotes] = useState("");
-  const [notesExpanded, setNotesExpanded] = useState(false);
+  const [notesExpanded, setNotesExpanded] = useState(editing);
   const [activeQuote, setActiveQuote] = useState<QuoteResult>();
   const [activeRateBasis, setActiveRateBasis] = useState("");
   const [rateStatus, setRateStatus] = useState<
@@ -122,19 +130,29 @@ export default function NewSettlementScreen() {
     setAmount(formatMinor(absolute, params.canonicalCurrency));
   }, [params.canonicalCurrency, params.canonicalMinor]);
 
+  async function finishSaving() {
+    await Promise.all([
+      utils.friends.list.invalidate(),
+      utils.groups.list.invalidate(),
+      params.type === "group"
+        ? utils.groups.detail.invalidate({ groupId: params.id })
+        : utils.friends.detail.invalidate({
+            friendshipId: params.friendshipId ?? params.id,
+          }),
+      params.settlementId
+        ? utils.settlements.detail.invalidate({
+            settlementId: params.settlementId,
+          })
+        : Promise.resolve(),
+    ]);
+    closePayment();
+  }
+
   const create = api.settlements.create.useMutation({
-    async onSuccess() {
-      await Promise.all([
-        utils.friends.list.invalidate(),
-        utils.groups.list.invalidate(),
-        params.type === "group"
-          ? utils.groups.detail.invalidate({ groupId: params.id })
-          : utils.friends.detail.invalidate({
-              friendshipId: params.friendshipId ?? params.id,
-            }),
-      ]);
-      closePayment();
-    },
+    onSuccess: finishSaving,
+  });
+  const update = api.settlements.update.useMutation({
+    onSuccess: finishSaving,
   });
 
   const contextMembers = useMemo(() => {
@@ -142,19 +160,41 @@ export default function NewSettlementScreen() {
       params.type === "group"
         ? (group.data?.members ?? [])
         : [profile.data, friend.data?.friend];
-    return candidates.flatMap((member): SettlementMember[] =>
-      member
-        ? [
-            {
-              userId: member.userId,
-              displayName: member.displayName,
-              avatarUrl: member.avatarUrl,
-              homeCurrency: member.homeCurrency as CurrencyCode,
-            },
-          ]
-        : [],
-    );
+    return candidates
+      .flatMap((member): SettlementMember[] =>
+        member
+          ? [
+              {
+                userId: member.userId,
+                displayName: member.displayName,
+                avatarUrl: member.avatarUrl,
+                homeCurrency: member.homeCurrency as CurrencyCode,
+              },
+            ]
+          : [],
+      )
+      .sort((left, right) =>
+        left.displayName.localeCompare(right.displayName, undefined, {
+          sensitivity: "base",
+        }),
+      );
   }, [friend.data?.friend, group.data?.members, params.type, profile.data]);
+
+  useEffect(() => {
+    const detail = settlementDetail.data;
+    if (!params.settlementId || !detail) return;
+    if (initializedSettlement.current === params.settlementId) return;
+    const settlement = detail.settlement;
+    const initialCurrency = settlement.sourceCurrency as CurrencyCode;
+    setAmount(formatMinor(settlement.sourceAmountMinor, initialCurrency));
+    setCurrency(initialCurrency);
+    setFromUserId(settlement.fromUserId);
+    setToUserId(settlement.toUserId);
+    setDate(new Date(settlement.occurredAt));
+    setNotes(settlement.notes);
+    setNotesExpanded(Boolean(settlement.notes));
+    initializedSettlement.current = params.settlementId;
+  }, [params.settlementId, settlementDetail.data]);
 
   const fromMember = contextMembers.find(
     (member) => member.userId === fromUserId,
@@ -181,8 +221,18 @@ export default function NewSettlementScreen() {
   );
   const currentRateBasis = rateBasis(currency, rateTargets);
   const needsQuote = rateTargets.some((target) => target !== currency);
+  const storedRatesReady =
+    editing &&
+    rateTargets.every(
+      (target) =>
+        target === currency ||
+        settlementDetail.data?.rates.some(
+          (rate) => rate.base === currency && rate.quote === target,
+        ),
+    );
   const quoteReady =
     !needsQuote ||
+    storedRatesReady ||
     (activeQuote !== undefined && activeRateBasis === currentRateBasis);
   const conversionReady =
     sourceMinor !== undefined &&
@@ -238,6 +288,12 @@ export default function NewSettlementScreen() {
       setRateError(undefined);
       return;
     }
+    if (storedRatesReady) {
+      quoteRequest.current += 1;
+      setRateStatus("ready");
+      setRateError(undefined);
+      return;
+    }
     if (activeQuote && activeRateBasis === currentRateBasis) {
       setRateStatus("ready");
       setRateError(undefined);
@@ -286,6 +342,7 @@ export default function NewSettlementScreen() {
     rateTargets,
     requestQuote,
     sourceMinor,
+    storedRatesReady,
     toMember,
   ]);
 
@@ -356,14 +413,15 @@ export default function NewSettlementScreen() {
       setFormError(rateError ?? "Wait for the currency conversion to update");
       return;
     }
-    create.mutate({
-      context:
-        params.type === "group"
-          ? { type: "group", groupId: params.id }
-          : {
-              type: "friend",
-              friendshipId: params.friendshipId ?? params.id,
-            },
+    const context: ExpenseContext =
+      params.type === "group"
+        ? { type: "group", groupId: params.id }
+        : {
+            type: "friend",
+            friendshipId: params.friendshipId ?? params.id,
+          };
+    const mutation = {
+      context,
       clientMutationId: Crypto.randomUUID(),
       fromUserId: fromMember.userId,
       toUserId: toMember.userId,
@@ -381,19 +439,32 @@ export default function NewSettlementScreen() {
       notes: notes.trim(),
       ...(activeQuote ? { quoteId: activeQuote.id } : {}),
       rateOverrides: [],
-    });
+    };
+    if (params.settlementId && settlementDetail.data) {
+      update.mutate({
+        ...mutation,
+        settlementId: params.settlementId,
+        expectedVersion: settlementDetail.data.settlement.version,
+      });
+    } else {
+      create.mutate(mutation);
+    }
   }
 
   const convertedCanonical = useMemo(() => {
     if (
       sourceMinor === undefined ||
       currency === params.canonicalCurrency ||
-      !activeQuote ||
-      activeRateBasis !== currentRateBasis
+      (!storedRatesReady &&
+        (!activeQuote || activeRateBasis !== currentRateBasis))
     ) {
       return undefined;
     }
-    const rate = activeQuote.rates.find(
+    const rate = (
+      storedRatesReady
+        ? settlementDetail.data?.rates
+        : activeQuote?.rates
+    )?.find(
       (candidate) => candidate.quote === params.canonicalCurrency,
     );
     if (!rate) return undefined;
@@ -412,15 +483,19 @@ export default function NewSettlementScreen() {
     currency,
     currentRateBasis,
     params.canonicalCurrency,
+    settlementDetail.data?.rates,
     sourceMinor,
+    storedRatesReady,
   ]);
 
   const contextPending =
     profile.isPending ||
-    (params.type === "group" ? group.isPending : friend.isPending);
+    (params.type === "group" ? group.isPending : friend.isPending) ||
+    (editing && settlementDetail.isPending);
   const contextError =
     profile.error ??
-    (params.type === "group" ? group.error : friend.error);
+    (params.type === "group" ? group.error : friend.error) ??
+    settlementDetail.error;
 
   let content;
   if (contextPending) {
@@ -476,6 +551,8 @@ export default function NewSettlementScreen() {
           currency={currency}
           onAmountChange={setAmount}
           onAmountBlur={formatAmountOnBlur}
+          onAmountFocus={focusBottomInput}
+          onAmountBlurInput={blurBottomInput}
           onCurrencyPress={openCurrency}
           {...(conversionMetadata ? { metadata: conversionMetadata } : {})}
         />
@@ -581,7 +658,14 @@ export default function NewSettlementScreen() {
         </View>
 
         {formError ? <ErrorState message={formError} /> : null}
-        {create.error ? <ErrorState message={create.error.message} /> : null}
+        {create.error || update.error ? (
+          <ErrorState
+            message={
+              (create.error ?? update.error)?.message ??
+              "Could not save payment"
+            }
+          />
+        ) : null}
       </>
     );
   }
@@ -597,9 +681,17 @@ export default function NewSettlementScreen() {
           ? {
               bottomOverlay: (
                 <SettlementSaveControl
-                  label={create.isPending ? "Saving…" : "Record payment"}
+                  label={
+                    create.isPending || update.isPending
+                      ? "Saving…"
+                      : editing
+                        ? "Save changes"
+                        : "Record payment"
+                  }
                   onPress={submit}
-                  disabled={create.isPending || !conversionReady}
+                  disabled={
+                    create.isPending || update.isPending || !conversionReady
+                  }
                 />
               ),
               bottomOverlayHeight: settlementOverlayHeight,
@@ -610,14 +702,14 @@ export default function NewSettlementScreen() {
       </Screen>
       <Stack.Screen
         options={{
-          title: "Record Payment",
+          title: editing ? "Edit Payment" : "Record Payment",
           headerTitleAlign: "center",
           ...(process.env.EXPO_OS !== "ios" && {
             headerLeft: () => (
               <HeaderButton
                 label="Cancel payment"
                 glyph="×"
-                disabled={create.isPending}
+                disabled={create.isPending || update.isPending}
                 onPress={closePayment}
               />
             ),
@@ -628,7 +720,7 @@ export default function NewSettlementScreen() {
         <Stack.Toolbar.Button
           icon="xmark"
           accessibilityLabel="Cancel payment"
-          disabled={create.isPending}
+          disabled={create.isPending || update.isPending}
           onPress={closePayment}
         />
       </Stack.Toolbar>

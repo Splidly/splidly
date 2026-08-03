@@ -51,6 +51,16 @@ jest.mock("../lib/trpc", () => ({
                 displayName: "Lasse",
                 homeCurrency: "EUR",
               },
+              {
+                userId: "user-3",
+                displayName: "Zoe",
+                homeCurrency: "GBP",
+              },
+              {
+                userId: "user-2",
+                displayName: "Alex",
+                homeCurrency: "USD",
+              },
             ],
           },
           error: null,
@@ -159,5 +169,21 @@ describe("GroupSettingsScreen", () => {
       currency: "EUR",
       simplifyDebts: false,
     });
+  });
+
+  it("sorts members and keeps removal on the dedicated control", async () => {
+    const view = await render(
+      <SafeAreaInsetsContext.Provider
+        value={{ top: 0, right: 0, bottom: 0, left: 0 }}
+      >
+        <GroupSettingsScreen />
+      </SafeAreaInsetsContext.Provider>,
+    );
+
+    expect(
+      view.getAllByText(/^(Alex|Lasse|Zoe)$/).map((node) => node.props.children),
+    ).toEqual(["Alex", "Lasse", "Zoe"]);
+    expect(view.getByLabelText("Remove Alex")).toBeTruthy();
+    expect(view.getByText("Alex").parent?.parent?.props.onPress).toBeUndefined();
   });
 });

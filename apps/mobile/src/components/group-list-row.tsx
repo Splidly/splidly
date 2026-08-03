@@ -55,6 +55,8 @@ export function GroupListRow({
   const theme = useTheme();
   const [trailingWidth, setTrailingWidth] = useState(96);
   const lines = groupListBalanceLines(memberBalances);
+  const visibleLines = lines.length > 3 ? lines.slice(0, 2) : lines;
+  const hiddenLineCount = lines.length - visibleLines.length;
   const minor = BigInt(balance.minor);
   const absoluteMinor = minor < 0n ? -minor : minor;
   const hasOpenPayments = memberBalances.length > 0;
@@ -162,7 +164,7 @@ export function GroupListRow({
         </View>
         {isSettled ? null : trailing}
         <View style={styles.subtitles}>
-          {lines.map((line, index) => (
+          {visibleLines.map((line, index) => (
             <BalanceSummaryLine
               key={line.key}
               line={line}
@@ -172,6 +174,11 @@ export function GroupListRow({
               ]}
             />
           ))}
+          {hiddenLineCount > 0 ? (
+            <Text style={[styles.subtitle, { color: theme.muted }]}>
+              {hiddenLineCount} more not shown
+            </Text>
+          ) : null}
         </View>
       </View>
     </Pressable>

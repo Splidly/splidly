@@ -60,6 +60,11 @@ export function ExpensePaymentEditor() {
     request.totalMinor,
     request.currency,
   );
+  const participants = request.participants.toSorted((left, right) =>
+    left.displayName.localeCompare(right.displayName, undefined, {
+      sensitivity: "base",
+    }),
+  );
   const progress =
     request.totalMinor > 0n
       ? Number((status.assignedMinor * 1_000n) / request.totalMinor) /
@@ -108,10 +113,27 @@ export function ExpensePaymentEditor() {
         <View style={{ gap: 8 }}>
           <AllocationHeader
             title="Payers"
-            {...(draft.payerIds.length > 1
-              ? {
-                  action: "Equal amounts",
-                  onAction: () =>
+            actions={[
+              {
+                label: "Select All",
+                onPress: () =>
+                  setDraft({
+                    payerIds: participants.map((person) => person.userId),
+                    payerAmounts: equalPaymentAmounts(
+                      participants.map((person) => person.userId),
+                      request.totalMinor,
+                      request.currency,
+                    ),
+                  }),
+              },
+              {
+                label: "Deselect All",
+                onPress: () => setDraft({ payerIds: [], payerAmounts: {} }),
+              },
+              ...(draft.payerIds.length > 1
+                ? [{
+                  label: "Equal amounts",
+                  onPress: () =>
                     setDraft((current) =>
                       current
                         ? {
@@ -124,11 +146,12 @@ export function ExpensePaymentEditor() {
                           }
                         : current,
                     ),
-                }
-              : {})}
+                }]
+                : []),
+            ]}
           />
           <AllocationList>
-            {request.participants.map((person) => {
+            {participants.map((person) => {
               const selected = draft.payerIds.includes(person.userId);
               const showAmount = selected && draft.payerIds.length > 1;
               return (

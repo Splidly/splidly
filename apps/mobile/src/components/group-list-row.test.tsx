@@ -71,6 +71,27 @@ describe("GroupListRow", () => {
     expect(view.getByText("Settled up")).toBeTruthy();
     expect(view.queryByText("0.00 €")).toBeNull();
   });
+
+  it("collapses more than three repayment rows to two plus a count", async () => {
+    const view = await render(
+      <GroupListRow
+        id="group-1"
+        name="House"
+        iconKey="home"
+        balance={{ currency: "EUR", minor: "1000" }}
+        memberBalances={[
+          { userId: "a", displayName: "Alex", balance: { currency: "EUR", minor: "-100" } },
+          { userId: "b", displayName: "Bea", balance: { currency: "EUR", minor: "-200" } },
+          { userId: "c", displayName: "Chris", balance: { currency: "EUR", minor: "300" } },
+          { userId: "d", displayName: "Dana", balance: { currency: "EUR", minor: "1000" } },
+        ]}
+        onPress={jest.fn()}
+      />,
+    );
+
+    expect(view.getByText("2 more not shown")).toBeTruthy();
+    expect(view.queryByText(/Chris owes you/)).toBeNull();
+  });
 });
 
 describe("GroupListSummary", () => {

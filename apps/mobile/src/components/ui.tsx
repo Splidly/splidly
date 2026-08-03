@@ -18,6 +18,7 @@ import {
   findNodeHandle,
   Keyboard,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -193,6 +194,8 @@ export function Screen({
   transientBottomClearance = 0,
   bottomOverlay,
   bottomOverlayHeight = 62,
+  refreshing,
+  onRefresh,
 }: PropsWithChildren<{
   scroll?: boolean;
   bounces?: boolean;
@@ -204,6 +207,8 @@ export function Screen({
   transientBottomClearance?: number;
   bottomOverlay?: ReactNode;
   bottomOverlayHeight?: number;
+  refreshing?: boolean;
+  onRefresh?: () => void;
 }>) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -257,6 +262,11 @@ export function Screen({
         bounces={bounces}
         overScrollMode={bounces ? "auto" : "never"}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          onRefresh ? (
+            <RefreshControl refreshing={refreshing ?? false} onRefresh={onRefresh} />
+          ) : undefined
+        }
         onLayout={onLayout}
         onContentSizeChange={onContentSizeChange}
       >
@@ -298,8 +308,14 @@ function ScreenBottomOverlay({
 
 export function CollectionScreen({
   isEmpty = false,
+  refreshing,
+  onRefresh,
   children,
-}: PropsWithChildren<{ isEmpty?: boolean }>) {
+}: PropsWithChildren<{
+  isEmpty?: boolean;
+  refreshing?: boolean;
+  onRefresh?: () => void;
+}>) {
   const theme = useTheme();
   const { fillStyle, onLayout, onContentSizeChange } = useScrollViewportFill({
     underlapsHeader: true,
@@ -313,11 +329,16 @@ export function CollectionScreen({
         isEmpty ? styles.emptyCollectionContent : null,
       ]}
       contentInsetAdjustmentBehavior="automatic"
-      alwaysBounceVertical={!isEmpty}
-      bounces={!isEmpty}
-      scrollEnabled={!isEmpty}
-      overScrollMode={isEmpty ? "never" : "auto"}
+      alwaysBounceVertical={!isEmpty || Boolean(onRefresh)}
+      bounces={!isEmpty || Boolean(onRefresh)}
+      scrollEnabled={!isEmpty || Boolean(onRefresh)}
+      overScrollMode={isEmpty && !onRefresh ? "never" : "auto"}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        onRefresh ? (
+          <RefreshControl refreshing={refreshing ?? false} onRefresh={onRefresh} />
+        ) : undefined
+      }
       onLayout={onLayout}
       onContentSizeChange={onContentSizeChange}
     >

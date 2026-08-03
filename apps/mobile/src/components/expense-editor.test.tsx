@@ -222,6 +222,12 @@ function renderEditor() {
 }
 
 describe("ExpenseEditor", () => {
+  it("auto-focuses the description for a new expense", async () => {
+    const view = await renderEditor();
+
+    expect(view.getByLabelText("Description").props.autoFocus).toBe(true);
+  });
+
   beforeEach(() => {
     jest.useFakeTimers();
     mockQuote.mockReset();
@@ -496,7 +502,7 @@ describe("ExpenseEditor", () => {
         ],
         split: {
           mode: "equal",
-          participantIds: ["user-1", "user-2"],
+          participantIds: ["user-2", "user-1"],
         },
       }),
     );

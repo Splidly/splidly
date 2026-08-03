@@ -5,7 +5,7 @@ import {
   type Href,
 } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, Switch, View } from "react-native";
+import { Alert, Pressable, Switch, Text, View } from "react-native";
 import { normalizeGroupIconKey } from "../../../../components/group-icon";
 import { GroupSummaryHeader } from "../../../../components/group-summary-header";
 import {
@@ -21,9 +21,11 @@ import { shareInvite } from "../../../../lib/share-invite";
 import { normalizeGroupColor } from "../../../../lib/group-colors";
 import { currencySymbolWithCode } from "../../../../lib/money-display";
 import { api } from "../../../../lib/trpc";
+import { useTheme } from "../../../../theme";
 
 export default function GroupSettingsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const theme = useTheme();
   const detail = api.groups.detail.useQuery({ groupId: id });
   const me = api.profile.me.useQuery();
   const utils = api.useUtils();
@@ -145,55 +147,79 @@ export default function GroupSettingsScreen() {
             createInvite.mutate({ kind: "group", groupId: id })
           }
         />
-        {detail.data?.members.map((member) => {
-          const isMe = member.userId === me.data?.userId;
-          return (
-            <View key={member.userId}>
-              <RowDivider />
-              <ListRow
-                title={member.displayName}
-                showsDisclosureIndicator={false}
-                subtitle={
-                  isMe
-                    ? "You"
-                    : `Home currency · ${currencySymbolWithCode(
-                        member.homeCurrency as CurrencyCode,
-                      )}`
-                }
-                leading={
-                  <Avatar
-                    name={member.displayName}
-                    colorKey={member.userId}
-                    imageUrl={member.avatarUrl}
-                  />
-                }
-                valueTone="negative"
-                {...(!isMe ? { value: "Remove" } : {})}
-                {...(!isMe && !removeMember.isPending
-                  ? {
-                      onPress: () =>
-                        Alert.alert(
-                          `Remove ${member.displayName}?`,
-                          "They can rejoin later with a new invitation.",
-                          [
-                            { text: "Cancel", style: "cancel" },
-                            {
-                              text: "Remove",
-                              style: "destructive",
-                              onPress: () =>
-                                removeMember.mutate({
-                                  groupId: id,
-                                  userId: member.userId,
-                                }),
-                            },
-                          ],
-                        ),
-                    }
-                  : {})}
-              />
-            </View>
-          );
-        })}
+        {detail.data?.members
+          .toSorted((left, right) =>
+            left.displayName.localeCompare(right.displayName, undefined, {
+              sensitivity: "base",
+            }),
+          )
+          .map((member) => {
+            const isMe = member.userId === me.data?.userId;
+            return (
+              <View key={member.userId}>
+                <RowDivider />
+                <ListRow
+                  title={member.displayName}
+                  showsDisclosureIndicator={false}
+                  subtitle={
+                    isMe
+                      ? "You"
+                      : `Home currency · ${currencySymbolWithCode(
+                          member.homeCurrency as CurrencyCode,
+                        )}`
+                  }
+                  leading={
+                    <Avatar
+                      name={member.displayName}
+                      colorKey={member.userId}
+                      imageUrl={member.avatarUrl}
+                    />
+                  }
+                  trailing={
+                    !isMe ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Remove ${member.displayName}`}
+                        disabled={removeMember.isPending}
+                        hitSlop={8}
+                        onPress={() =>
+                          Alert.alert(
+                            `Remove ${member.displayName}?`,
+                            "They can rejoin later with a new invitation.",
+                            [
+                              { text: "Cancel", style: "cancel" },
+                              {
+                                text: "Remove",
+                                style: "destructive",
+                                onPress: () =>
+                                  removeMember.mutate({
+                                    groupId: id,
+                                    userId: member.userId,
+                                  }),
+                              },
+                            ],
+                          )
+                        }
+                        style={({ pressed }) => ({
+                          opacity:
+                            pressed || removeMember.isPending ? 0.5 : 1,
+                        })}
+                      >
+                        <Text
+                          style={{
+                            color: theme.negative,
+                            fontWeight: "600",
+                          }}
+                        >
+                          Remove
+                        </Text>
+                      </Pressable>
+                    ) : undefined
+                  }
+                />
+              </View>
+            );
+          })}
       </Section>
       <Section title="Group actions">
         <ListRow

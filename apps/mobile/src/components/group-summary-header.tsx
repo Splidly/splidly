@@ -1,7 +1,9 @@
-import type { GroupIconKey } from "@splidly/shared";
+import type { CurrencyCode, GroupIconKey } from "@splidly/shared";
 import { Button, Host } from "@expo/ui";
-import { StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { GroupBalanceLine } from "../lib/group-balance-summary";
+import { formatConvertedMoney } from "../lib/money-display";
 import { useTheme } from "../theme";
 import { BalanceSummaryLine } from "./balance-summary-line";
 import { GroupIcon } from "./group-icon";
@@ -10,9 +12,52 @@ type GroupSummaryLine = GroupBalanceLine;
 
 export function GroupBalanceSummary({
   lines,
+  currency,
+  totalMinor,
 }: {
   lines: readonly GroupSummaryLine[];
+  currency?: CurrencyCode;
+  totalMinor?: bigint;
 }) {
+  const theme = useTheme();
+  const [expanded, setExpanded] = useState(false);
+  if (lines.length > 3 && currency && totalMinor !== undefined) {
+    const total = formatConvertedMoney(totalMinor, currency);
+    return (
+      <View style={styles.accordion}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Outstanding ${total}`}
+          accessibilityState={{ expanded }}
+          onPress={() => setExpanded((current) => !current)}
+          style={({ pressed }) => [
+            styles.accordionButton,
+            { opacity: pressed ? 0.62 : 1 },
+          ]}
+        >
+          <Text
+            style={[styles.accordionTitle, { color: theme.text }]}
+          >
+            Outstanding · {total}
+          </Text>
+          <Text style={{ color: theme.muted, fontSize: 20 }}>
+            {expanded ? "⌃" : "⌄"}
+          </Text>
+        </Pressable>
+        {expanded ? (
+          <View style={styles.accordionLines}>
+            {lines.map((line) => (
+              <BalanceSummaryLine
+                key={line.key}
+                line={line}
+                style={styles.summaryLine}
+              />
+            ))}
+          </View>
+        ) : null}
+      </View>
+    );
+  }
   return (
     <View style={styles.summary}>
       {lines.map((line) => (
@@ -116,5 +161,30 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 20,
     fontVariant: ["tabular-nums"],
+  },
+  accordion: {
+    borderRadius: 14,
+    borderCurve: "continuous",
+    overflow: "hidden",
+  },
+  accordionButton: {
+    minHeight: 48,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  accordionTitle: {
+    flex: 1,
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
+  },
+  accordionLines: {
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+    gap: 4,
   },
 });

@@ -13,6 +13,37 @@ const participants: SplitParticipant[] = [
 ];
 
 describe("expense split drafts", () => {
+  it("allows untitled itemized entries and counts amounts before other validation", () => {
+    const draft = {
+      ...createExpenseSplitDraft(participants, 7_000n, currency),
+      mode: "itemized" as const,
+      items: [
+        {
+          id: "item-1",
+          description: "",
+          amount: "70",
+          participantIds: [],
+        },
+      ],
+    };
+
+    expect(expenseSplitStatus(draft, 7_000n, currency)).toMatchObject({
+      valid: false,
+      assignedMinor: 7_000n,
+      message: "Assign every item to at least one person",
+    });
+    expect(
+      expenseSplitStatus(
+        {
+          ...draft,
+          items: [{ ...draft.items[0]!, participantIds: ["a"] }],
+        },
+        7_000n,
+        currency,
+      ),
+    ).toMatchObject({ valid: true });
+  });
+
   it("starts with a complete even allocation", () => {
     const draft = createExpenseSplitDraft(participants, 7_000n, currency);
     expect(expenseSplitStatus(draft, 7_000n, currency)).toMatchObject({

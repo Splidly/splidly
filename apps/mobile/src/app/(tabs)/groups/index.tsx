@@ -21,7 +21,11 @@ export default function GroupsScreen() {
   const groups = api.groups.list.useQuery();
   return (
     <>
-      <CollectionScreen isEmpty={groups.data?.length === 0}>
+      <CollectionScreen
+        isEmpty={groups.data?.length === 0}
+        refreshing={groups.isRefetching}
+        onRefresh={() => void groups.refetch()}
+      >
         {groups.isPending ? <LoadingState /> : null}
         {groups.error ? <ErrorState message={groups.error.message} /> : null}
         {groups.data?.length === 0 ? (

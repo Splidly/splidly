@@ -27,7 +27,11 @@ export default function FriendsScreen() {
 
   return (
     <>
-      <CollectionScreen isEmpty={friends.data?.length === 0}>
+      <CollectionScreen
+        isEmpty={friends.data?.length === 0}
+        refreshing={friends.isRefetching}
+        onRefresh={() => void friends.refetch()}
+      >
         {friends.isPending ? <LoadingState /> : null}
         {friends.error ? <ErrorState message={friends.error.message} /> : null}
         {friends.data?.length === 0 ? (

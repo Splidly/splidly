@@ -241,19 +241,16 @@ export function expenseSplitStatus(
         participantIds: item.participantIds,
       }));
       if (items.length === 0) throw new Error("Add at least one item");
-      if (items.some((item) => item.description.length === 0)) {
-        throw new Error("Every item needs a name");
-      }
+      assignedMinor = items.reduce(
+        (sum, item) => sum + BigInt(item.amountMinor),
+        0n,
+      );
       if (items.some((item) => item.participantIds.length === 0)) {
         throw new Error("Assign every item to at least one person");
       }
       if (items.some((item) => BigInt(item.amountMinor) <= 0n)) {
         throw new Error("Every item needs a positive amount");
       }
-      assignedMinor = items.reduce(
-        (sum, item) => sum + BigInt(item.amountMinor),
-        0n,
-      );
       input = { mode: "itemized", items };
     }
 

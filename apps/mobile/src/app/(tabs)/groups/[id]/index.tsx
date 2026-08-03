@@ -24,6 +24,7 @@ import { groupActivityByDate } from "../../../../lib/activity-dates";
 import { expensePaymentSummary } from "../../../../lib/expense-activity";
 import { groupBalanceLines } from "../../../../lib/group-balance-summary";
 import { groupActionColorsFor } from "../../../../lib/group-colors";
+import type { CurrencyCode } from "@splidly/shared";
 
 export default function GroupDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -40,11 +41,13 @@ export default function GroupDetailScreen() {
     ...expenses.map((expense) => ({
       type: "expense" as const,
       occurredAt: expense.occurredAt,
+      sortAt: expense.createdAt,
       record: expense,
     })),
     ...settlements.map((settlement) => ({
       type: "settlement" as const,
       occurredAt: settlement.occurredAt,
+      sortAt: settlement.createdAt,
       record: settlement,
     })),
   ];
@@ -59,9 +62,16 @@ export default function GroupDetailScreen() {
     group.id,
     colorScheme,
   );
+  const outstandingMinor = memberBalances.reduce((total, member) => {
+    const minor = BigInt(member.balance.minor);
+    return total + (minor < 0n ? -minor : minor);
+  }, 0n);
   return (
     <>
-      <Screen>
+      <Screen
+        refreshing={detail.isRefetching}
+        onRefresh={() => void detail.refetch()}
+      >
         <GroupSummaryHeader
           iconKey={normalizeGroupIconKey(group.iconKey)}
           name={group.name}
@@ -98,7 +108,11 @@ export default function GroupDetailScreen() {
             />
           </View>
         </View>
-        <GroupBalanceSummary lines={balanceLines} />
+        <GroupBalanceSummary
+          lines={balanceLines}
+          currency={group.currency as CurrencyCode}
+          totalMinor={outstandingMinor}
+        />
         {activity.length === 0 ? (
           <Section>
             <EmptyState
@@ -112,7 +126,22 @@ export default function GroupDetailScreen() {
             getItemKey={(item) => `${item.type}:${item.record.id}`}
             renderItem={(item) => {
               if (item.type === "settlement") {
-                return <SettlementActivityRow settlement={item.record} />;
+                return (
+                  <SettlementActivityRow
+                    settlement={item.record}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/settlement/new",
+                        params: {
+                          type: "group",
+                          id: group.id,
+                          canonicalCurrency: group.currency,
+                          settlementId: item.record.id,
+                        },
+                      })
+                    }
+                  />
+                );
               }
               const expense = item.record;
               return (

@@ -3,6 +3,9 @@ import { StyleSheet } from "react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import NewSettlementScreen from "../app/settlement/new";
 
+let mockSettlementParams: Record<string, string | undefined> = {};
+let mockSettlementDetailData: unknown;
+
 jest.mock("@expo/ui/community/menu", () => {
   const { View } = require("react-native") as typeof import("react-native");
   return {
@@ -40,13 +43,7 @@ jest.mock("expo-router", () => {
       push: jest.fn(),
     },
     Stack: { Screen, Toolbar },
-    useLocalSearchParams: () => ({
-      type: "group",
-      id: "group-1",
-      friendId: "user-2",
-      canonicalCurrency: "EUR",
-      canonicalMinor: "1234",
-    }),
+    useLocalSearchParams: () => mockSettlementParams,
   };
 });
 
@@ -104,7 +101,7 @@ jest.mock("../lib/trpc", () => ({
     friends: {
       detail: {
         useQuery: jest.fn(() => ({
-          data: undefined,
+          data: mockSettlementDetailData,
           error: null,
           isPending: false,
         })),
@@ -154,7 +151,22 @@ jest.mock("../lib/trpc", () => ({
       },
     },
     settlements: {
+      detail: {
+        useQuery: jest.fn(() => ({
+          data: mockSettlementDetailData,
+          error: null,
+          isPending: false,
+        })),
+      },
       create: {
+        useMutation: jest.fn(() => ({
+          data: undefined,
+          error: null,
+          isPending: false,
+          mutate: jest.fn(),
+        })),
+      },
+      update: {
         useMutation: jest.fn(() => ({
           data: undefined,
           error: null,
@@ -172,12 +184,23 @@ jest.mock("../lib/trpc", () => ({
         list: { invalidate: jest.fn() },
         detail: { invalidate: jest.fn() },
       },
+      settlements: {
+        detail: { invalidate: jest.fn() },
+      },
     }),
   },
 }));
 
 describe("NewSettlementScreen group context", () => {
   beforeEach(() => {
+    mockSettlementParams = {
+      type: "group",
+      id: "group-1",
+      friendId: "user-2",
+      canonicalCurrency: "EUR",
+      canonicalMinor: "1234",
+    };
+    mockSettlementDetailData = undefined;
     jest.useFakeTimers();
     mockQuote.mockClear();
     (
@@ -284,6 +307,30 @@ describe("NewSettlementScreen group context", () => {
     expect(view.getByLabelText("Amount").props.value).toBe("8.00");
   });
 
+  it("allows matching party choices but disables recording", async () => {
+    const view = await render(
+      <SafeAreaInsetsContext.Provider
+        value={{ top: 0, right: 0, bottom: 0, left: 0 }}
+      >
+        <NewSettlementScreen />
+      </SafeAreaInsetsContext.Provider>,
+    );
+    await act(async () => {});
+
+    expect(
+      view.getByTestId("settlement-paid-by").props.actions.some(
+        (action: { id: string }) => action.id === "user-1",
+      ),
+    ).toBe(true);
+    await fireEvent(view.getByTestId("settlement-paid-by"), "pressAction", {
+      nativeEvent: { event: "user-1" },
+    });
+
+    expect(
+      view.getByText("Record payment").parent?.props.accessibilityState,
+    ).toEqual({ disabled: true });
+  });
+
   it("keeps a growing note tied to the focused-input scroll behavior", async () => {
     const view = await render(
       <SafeAreaInsetsContext.Provider
@@ -347,5 +394,62 @@ describe("NewSettlementScreen group context", () => {
         }
       ).router.dismissTo,
     ).toHaveBeenCalledWith("/groups/group-1");
+  });
+
+  it("loads and updates an existing payment", async () => {
+    mockSettlementParams = {
+      type: "group",
+      id: "group-1",
+      canonicalCurrency: "EUR",
+      settlementId: "settlement-1",
+    };
+    mockSettlementDetailData = {
+      settlement: {
+        id: "settlement-1",
+        version: 2,
+        fromUserId: "user-3",
+        toUserId: "user-1",
+        sourceCurrency: "EUR",
+        sourceAmountMinor: 900n,
+        occurredAt: new Date("2026-07-20T12:00:00.000Z"),
+        notes: "Cash",
+      },
+      rates: [],
+    };
+
+    const view = await render(
+      <SafeAreaInsetsContext.Provider
+        value={{ top: 0, right: 0, bottom: 0, left: 0 }}
+      >
+        <NewSettlementScreen />
+      </SafeAreaInsetsContext.Provider>,
+    );
+    await act(async () => {});
+
+    expect(view.getByDisplayValue("9.00")).toBeTruthy();
+    expect(view.getByLabelText("Paid by: Flo")).toBeTruthy();
+    expect(view.getByDisplayValue("Cash")).toBeTruthy();
+    const saveButton = view.getByText("Save changes").parent;
+    expect(saveButton?.props.accessibilityState).toEqual({ disabled: false });
+    if (!saveButton) throw new Error("Save button not found");
+    await fireEvent.press(saveButton);
+
+    const updateHook = (
+      jest.requireMock("../lib/trpc") as {
+        api: { settlements: { update: { useMutation: jest.Mock } } };
+      }
+    ).api.settlements.update.useMutation;
+    const updateMutate = updateHook.mock.results
+      .map((result) => result.value.mutate as jest.Mock)
+      .find((mutate) => mutate.mock.calls.length > 0);
+    expect(updateMutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        settlementId: "settlement-1",
+        expectedVersion: 2,
+        fromUserId: "user-3",
+        toUserId: "user-1",
+        notes: "Cash",
+      }),
+    );
   });
 });

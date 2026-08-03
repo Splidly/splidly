@@ -1,5 +1,7 @@
 export type DatedActivity = {
   occurredAt: Date | string;
+  sortAt?: Date | string;
+  createdAt?: Date | string;
 };
 
 export type ActivityDateGroup<T> = {
@@ -53,8 +55,10 @@ export function groupActivityByDate<T extends DatedActivity>(
 
   for (const item of [...items].sort(
     (left, right) =>
-      new Date(right.occurredAt).getTime() -
-      new Date(left.occurredAt).getTime(),
+      new Date(right.occurredAt).setHours(0, 0, 0, 0) -
+        new Date(left.occurredAt).setHours(0, 0, 0, 0) ||
+      new Date(right.sortAt ?? right.createdAt ?? right.occurredAt).getTime() -
+        new Date(left.sortAt ?? left.createdAt ?? left.occurredAt).getTime(),
   )) {
     const key = localDateKey(item.occurredAt);
     const current = groups.at(-1);

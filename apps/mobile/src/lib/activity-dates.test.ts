@@ -44,4 +44,29 @@ describe("activity date grouping", () => {
       },
     ]);
   });
+
+  it("uses creation time to order activity recorded for the same day", () => {
+    const occurredAt = new Date(2026, 6, 21, 12);
+    const groups = groupActivityByDate(
+      [
+        {
+          id: "older-expense",
+          occurredAt,
+          createdAt: new Date(2026, 6, 22, 9),
+        },
+        {
+          id: "new-payment",
+          occurredAt,
+          createdAt: new Date(2026, 6, 22, 11),
+        },
+      ],
+      "en-US",
+      now,
+    );
+
+    expect(groups[0]?.items.map((item) => item.id)).toEqual([
+      "new-payment",
+      "older-expense",
+    ]);
+  });
 });

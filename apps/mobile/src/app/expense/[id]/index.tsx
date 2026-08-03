@@ -200,7 +200,7 @@ export default function ExpenseDetailScreen() {
               <View key={item.id}>
                 {index > 0 ? <RowDivider inset={16} /> : null}
                 <ListRow
-                  title={item.description}
+                  title={item.description || `Item ${index + 1}`}
                   subtitle={item.participantIds
                     .map(
                       (userId) =>

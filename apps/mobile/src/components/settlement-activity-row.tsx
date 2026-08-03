@@ -1,5 +1,5 @@
 import type { Money } from "@splidly/shared";
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { settlementPaymentSummary } from "../lib/settlement-activity";
 import { useTheme } from "../theme";
 import { Avatar } from "./ui";
@@ -13,28 +13,32 @@ type SettlementPerson = {
 
 export function SettlementActivityRow({
   settlement,
+  onPress,
 }: {
   settlement: {
     from: SettlementPerson;
     to: SettlementPerson;
     amount: Money;
   };
+  onPress?: () => void;
 }) {
   const theme = useTheme();
 
   return (
-    <View
+    <Pressable
       testID="settlement-activity-row"
+      accessibilityRole={onPress ? "button" : undefined}
       accessibilityLabel={`Payment. ${settlementPaymentSummary(settlement)}`}
-      style={{
+      onPress={onPress}
+      style={({ pressed }) => ({
         minHeight: 78,
         paddingHorizontal: 16,
         paddingVertical: 12,
         flexDirection: "row",
         alignItems: "center",
         gap: 12,
-        backgroundColor: theme.elevated,
-      }}
+        backgroundColor: pressed && onPress ? theme.surface : theme.elevated,
+      })}
     >
       <View
         accessibilityElementsHidden
@@ -113,6 +117,6 @@ export function SettlementActivityRow({
           {settlementPaymentSummary(settlement)}
         </Text>
       </View>
-    </View>
+    </Pressable>
   );
 }

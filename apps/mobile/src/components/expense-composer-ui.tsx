@@ -24,6 +24,7 @@ export function ExpenseEntryCard({
   metadata,
   descriptionInputAccessoryViewID,
   amountInputAccessoryViewID,
+  autoFocusDescription = false,
 }: {
   icon: ReactNode;
   description: string;
@@ -37,6 +38,7 @@ export function ExpenseEntryCard({
   metadata?: ReactNode;
   descriptionInputAccessoryViewID?: string;
   amountInputAccessoryViewID?: string;
+  autoFocusDescription?: boolean;
 }) {
   const theme = useTheme();
 
@@ -64,6 +66,7 @@ export function ExpenseEntryCard({
         {icon}
         <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
           <TextInput
+            autoFocus={autoFocusDescription}
             accessibilityLabel="Description"
             value={description}
             onChangeText={onDescriptionChange}

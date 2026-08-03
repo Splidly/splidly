@@ -3,7 +3,7 @@ import {
   MenuView,
   type MenuAction,
 } from "@expo/ui/community/menu";
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import {
   Pressable,
   Text,
@@ -27,7 +27,6 @@ function PartyChoice({
   value,
   viewerId,
   members,
-  excludedUserId,
   onValueChange,
   disabled,
   testID,
@@ -36,7 +35,6 @@ function PartyChoice({
   value: SettlementMember | undefined;
   viewerId: string | undefined;
   members: SettlementMember[];
-  excludedUserId: string | undefined;
   onValueChange: (userId: string) => void;
   disabled: boolean;
   testID: string;
@@ -106,7 +104,11 @@ function PartyChoice({
 
   if (disabled) return content;
   const actions: MenuAction[] = members
-    .filter((member) => member.userId !== excludedUserId)
+    .toSorted((left, right) =>
+      left.displayName.localeCompare(right.displayName, undefined, {
+        sensitivity: "base",
+      }),
+    )
     .map((member) => ({
       id: member.userId,
       title: member.userId === viewerId ? "You" : member.displayName,
@@ -164,7 +166,6 @@ export function SettlementDirectionCard({
           value={from}
           viewerId={viewerId}
           members={members}
-          excludedUserId={to?.userId}
           onValueChange={onFromChange}
           disabled={locked}
           testID="settlement-paid-by"
@@ -202,7 +203,6 @@ export function SettlementDirectionCard({
           value={to}
           viewerId={viewerId}
           members={members}
-          excludedUserId={from?.userId}
           onValueChange={onToChange}
           disabled={locked}
           testID="settlement-paid-to"
@@ -219,6 +219,8 @@ export function SettlementAmountCard({
   onAmountBlur,
   onCurrencyPress,
   metadata,
+  onAmountFocus,
+  onAmountBlurInput,
 }: {
   amount: string;
   currency: CurrencyCode;
@@ -226,8 +228,11 @@ export function SettlementAmountCard({
   onAmountBlur?: () => void;
   onCurrencyPress: () => void;
   metadata?: ReactNode;
+  onAmountFocus?: (input: TextInput | null) => void;
+  onAmountBlurInput?: (input: TextInput | null) => void;
 }) {
   const theme = useTheme();
+  const amountInputRef = useRef<TextInput>(null);
   return (
     <View
       style={{
@@ -254,10 +259,15 @@ export function SettlementAmountCard({
       </Text>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
         <TextInput
+          ref={amountInputRef}
           accessibilityLabel="Amount"
           value={amount}
           onChangeText={onAmountChange}
-          onBlur={onAmountBlur}
+          onFocus={() => onAmountFocus?.(amountInputRef.current)}
+          onBlur={() => {
+            onAmountBlur?.();
+            onAmountBlurInput?.(amountInputRef.current);
+          }}
           keyboardType="decimal-pad"
           placeholder="0.00"
           placeholderTextColor={theme.subtle}

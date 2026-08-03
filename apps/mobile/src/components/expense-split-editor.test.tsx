@@ -225,6 +225,22 @@ describe("ExpenseSplitEditor", () => {
     expect(onSave).not.toHaveBeenCalled();
   });
 
+  it("toggles a person from the row and supports bulk selection", async () => {
+    const view = await render(<Harness onSave={jest.fn()} />, {
+      wrapper: Wrapper,
+    });
+    await fireEvent.press(view.getByText("Open editor"));
+
+    await fireEvent.press(view.getByText("Alex"));
+    expect(view.getByLabelText("1 person selected, Complete")).toBeTruthy();
+
+    await fireEvent.press(view.getByText("Deselect All"));
+    expect(view.getByLabelText("0 people selected, Incomplete")).toBeTruthy();
+
+    await fireEvent.press(view.getByText("Select All"));
+    expect(view.getByLabelText("2 people selected, Complete")).toBeTruthy();
+  });
+
   it("keeps its session mounted until the modal has finished closing", async () => {
     const view = await render(<Harness onSave={jest.fn()} />, {
       wrapper: Wrapper,

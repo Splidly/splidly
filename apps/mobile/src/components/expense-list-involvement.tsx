@@ -23,7 +23,7 @@ export function ExpenseListInvolvement({
     kind === "lent"
       ? "You lent"
       : kind === "borrowed"
-        ? "You borrowed"
+        ? "You owe"
         : kind === "paid"
           ? "You paid"
           : kind === "received"

@@ -187,7 +187,7 @@ export const splitInputSchema = z.discriminatedUnion("mode", [
       .array(
         z.object({
           id: z.string().min(1).max(100),
-          description: z.string().trim().min(1).max(160),
+          description: z.string().trim().max(160),
           amountMinor: z.string().regex(/^\d+$/),
           participantIds: z
             .array(z.string().min(1))
