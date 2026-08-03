@@ -64,6 +64,38 @@ export const profileRouter = router({
       return profile;
     }),
 
+  updateNotificationPreferences: protectedProcedure
+    .input(
+      z.object({
+        onlyWhenInvolved: z.boolean(),
+        summarizeBursts: z.boolean(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await requireProfile(ctx.db, ctx.session.user);
+      const [profile] = await ctx.db
+        .update(profiles)
+        .set({
+          notificationOnlyWhenInvolved: input.onlyWhenInvolved,
+          summarizeNotificationBursts: input.summarizeBursts,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(profiles.userId, ctx.session.user.id),
+            isNull(profiles.deletedAt),
+          ),
+        )
+        .returning();
+      if (!profile) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Profile no longer exists",
+        });
+      }
+      return profile;
+    }),
+
   deleteAccount: protectedProcedure
     .input(
       z.object({

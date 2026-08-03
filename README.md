@@ -47,6 +47,15 @@ and shutdown are logged. Secret-bearing fields are redacted and request bodies,
 cookies, authorization headers, APNs tokens, and SQL parameter values are never
 logged.
 
+`pnpm dev:server` and the server task started by `pnpm dev` render those events
+as readable, colorized blocks with HTTP, procedure, request, user, timing, and
+expanded error-stack details. Production remains newline-delimited JSON for log
+collection. To inspect raw JSON during local development, override the default:
+
+```sh
+LOG_FORMAT=json pnpm dev:server
+```
+
 Set `LOG_LEVEL` to `debug`, `info`, `warn`, `error`, or `fatal`. Local defaults
 use `debug`, while the production example uses `info`. Debug logging includes
 SQL text with placeholders and pool lifecycle events; use it temporarily in
@@ -132,9 +141,13 @@ Native APNs tokens are registered only after an authenticated, onboarded user
 grants notification permission. Expense create, update, and delete transactions
 enqueue one durable, recipient-specific delivery for every active iOS
 installation belonging to another active group member, including members who
-are not financially involved in the expense. Notifications include the full
-expense amount and describe the recipient's net involvement. The server retries
-transient APNs failures and disables tokens rejected as unregistered. Apply the
+are not financially involved in the expense by default. Each user can limit
+future notifications to expenses where they have a payment or split. They can
+also enable smart summaries: individual deliveries wait up to five minutes,
+and bursts of at least three updates from the same group are combined into one
+group-level notification. Notifications include the full expense amount and
+describe the recipient's net involvement. The server retries transient APNs
+failures and disables tokens rejected as unregistered. Apply the
 database migrations and make a fresh native build after adding notification
 support—the JavaScript bundle alone cannot add the iOS push entitlement.
 

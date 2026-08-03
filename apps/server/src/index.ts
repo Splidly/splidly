@@ -10,7 +10,7 @@ let logger = new Logger();
 
 async function main() {
   const env = readEnv();
-  logger = new Logger({ level: env.LOG_LEVEL }).child({
+  logger = new Logger({ format: env.LOG_FORMAT, level: env.LOG_LEVEL }).child({
     environment: env.NODE_ENV,
   });
   logger.info("server.starting", {

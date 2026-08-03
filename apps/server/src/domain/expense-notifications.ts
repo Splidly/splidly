@@ -10,12 +10,16 @@ import {
   notificationOutbox,
   profiles,
   pushInstallations,
+  type ExpenseEventNotificationPayload,
   type ExpenseNotificationPayload,
 } from "@splidly/db";
 import { formatMinor, type CurrencyCode } from "@splidly/shared";
 import type { DbTransaction } from "./finance";
 
 export type ExpenseNotificationAction = "create" | "update" | "delete";
+
+export const smartNotificationWindowMs = 5 * 60 * 1_000;
+export const smartNotificationThreshold = 3;
 
 function notificationMoney(amountMinor: bigint, currency: CurrencyCode) {
   return `${formatMinor(amountMinor, currency)} ${currency}`;
@@ -59,7 +63,7 @@ export function buildExpenseNotificationPayload(input: {
   recipientShareMinor?: bigint;
   sourceAmountMinor: bigint;
   sourceCurrency: CurrencyCode;
-}): ExpenseNotificationPayload {
+}): ExpenseEventNotificationPayload {
   const verb =
     input.action === "create"
       ? "added"
@@ -71,6 +75,7 @@ export function buildExpenseNotificationPayload(input: {
     expenseId: input.expenseId,
     expenseVersion: input.expenseVersion,
     groupId: input.groupId,
+    groupName: input.groupName,
     title: `${input.actorName} ${verb} “${input.description}”`,
     body: `${input.action === "delete" ? "Total was" : "Total"} ${notificationMoney(input.sourceAmountMinor, input.sourceCurrency)} in ${input.groupName} · ${expenseNotificationInvolvement({
       action: input.action,
@@ -83,6 +88,33 @@ export function buildExpenseNotificationPayload(input: {
         : {}),
     })}`,
   };
+}
+
+export function buildExpenseSummaryNotificationPayload(
+  payloads: ExpenseEventNotificationPayload[],
+): ExpenseNotificationPayload | undefined {
+  if (payloads.length < smartNotificationThreshold) return undefined;
+  const first = payloads[0];
+  if (!first) throw new Error("Cannot summarize an empty notification burst");
+  if (payloads.some((payload) => payload.groupId !== first.groupId)) {
+    throw new Error("Cannot summarize notifications from different groups");
+  }
+  const eventCount = payloads.length;
+  return {
+    eventType: "expense.summary",
+    groupId: first.groupId,
+    groupName: first.groupName,
+    eventCount,
+    title: `${eventCount} expense updates in ${first.groupName}`,
+    body: "Recent activity was grouped to keep notifications manageable.",
+  };
+}
+
+export function isExpenseRecipientInvolved(input: {
+  paymentMinor?: bigint;
+  shareMinor?: bigint;
+}) {
+  return input.paymentMinor !== undefined || input.shareMinor !== undefined;
 }
 
 export async function enqueueExpenseNotifications(
@@ -112,6 +144,8 @@ export async function enqueueExpenseNotifications(
     .select({
       id: pushInstallations.id,
       userId: pushInstallations.userId,
+      notificationOnlyWhenInvolved: profiles.notificationOnlyWhenInvolved,
+      summarizeNotificationBursts: profiles.summarizeNotificationBursts,
     })
     .from(pushInstallations)
     .innerJoin(
@@ -121,6 +155,7 @@ export async function enqueueExpenseNotifications(
         eq(groupMembers.groupId, input.groupId),
       ),
     )
+    .innerJoin(profiles, eq(profiles.userId, pushInstallations.userId))
     .where(
       and(
         ne(pushInstallations.userId, input.actorId),
@@ -152,39 +187,64 @@ export async function enqueueExpenseNotifications(
     splitRows.map((split) => [split.userId, split.amountMinor]),
   );
 
+  const now = new Date();
+  const notificationRows = installations.flatMap((installation) => {
+    const recipientPaymentMinor = payments.get(installation.userId);
+    const recipientShareMinor = splits.get(installation.userId);
+    if (
+      installation.notificationOnlyWhenInvolved &&
+      !isExpenseRecipientInvolved({
+        ...(recipientPaymentMinor !== undefined
+          ? { paymentMinor: recipientPaymentMinor }
+          : {}),
+        ...(recipientShareMinor !== undefined
+          ? { shareMinor: recipientShareMinor }
+          : {}),
+      })
+    ) {
+      return [];
+    }
+    const payload = buildExpenseNotificationPayload({
+      action: input.action,
+      actorName: actor?.displayName ?? "A group member",
+      description: input.description,
+      expenseId: input.expenseId,
+      expenseVersion: input.expenseVersion,
+      groupId: input.groupId,
+      groupName: group.name,
+      sourceAmountMinor: input.sourceAmountMinor,
+      sourceCurrency: input.sourceCurrency,
+      ...(recipientPaymentMinor !== undefined
+        ? { recipientPaymentMinor }
+        : {}),
+      ...(recipientShareMinor !== undefined
+        ? { recipientShareMinor }
+        : {}),
+    });
+    return [
+      {
+        eventKey: [
+          payload.eventType,
+          input.expenseId,
+          input.expenseVersion,
+          installation.id,
+        ].join(":"),
+        installationId: installation.id,
+        recipientUserId: installation.userId,
+        payload,
+        deliveryMode: installation.summarizeNotificationBursts
+          ? ("smart" as const)
+          : ("immediate" as const),
+        availableAt: installation.summarizeNotificationBursts
+          ? new Date(now.getTime() + smartNotificationWindowMs)
+          : now,
+      },
+    ];
+  });
+  if (notificationRows.length === 0) return;
+
   await tx
     .insert(notificationOutbox)
-    .values(
-      installations.map((installation) => {
-        const payload = buildExpenseNotificationPayload({
-          action: input.action,
-          actorName: actor?.displayName ?? "A group member",
-          description: input.description,
-          expenseId: input.expenseId,
-          expenseVersion: input.expenseVersion,
-          groupId: input.groupId,
-          groupName: group.name,
-          sourceAmountMinor: input.sourceAmountMinor,
-          sourceCurrency: input.sourceCurrency,
-          ...(payments.has(installation.userId)
-            ? { recipientPaymentMinor: payments.get(installation.userId)! }
-            : {}),
-          ...(splits.has(installation.userId)
-            ? { recipientShareMinor: splits.get(installation.userId)! }
-            : {}),
-        });
-        return {
-          eventKey: [
-            payload.eventType,
-            input.expenseId,
-            input.expenseVersion,
-            installation.id,
-          ].join(":"),
-          installationId: installation.id,
-          recipientUserId: installation.userId,
-          payload,
-        };
-      }),
-    )
+    .values(notificationRows)
     .onConflictDoNothing({ target: notificationOutbox.eventKey });
 }

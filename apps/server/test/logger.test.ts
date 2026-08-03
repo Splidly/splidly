@@ -78,6 +78,36 @@ describe("structured logger", () => {
       requestId: "request-async",
     });
   });
+
+  it("formats readable development blocks with context and stacks", () => {
+    const lines: string[] = [];
+    const logger = new Logger({
+      colors: false,
+      destination: { write: (line) => lines.push(line) },
+      format: "pretty",
+      level: "debug",
+    });
+    logger.error("trpc.procedure.failed", {
+      durationMs: 12.34,
+      error: new Error("database unavailable"),
+      httpMethod: "POST",
+      httpPath: "/trpc/groups.list",
+      procedure: "groups.list",
+      procedureType: "query",
+      requestId: "request-pretty",
+      status: 500,
+    });
+
+    expect(lines.join("")).toContain("ERROR trpc.procedure.failed");
+    expect(lines.join("")).toContain(
+      "http:      POST /trpc/groups.list → 500 (12.34 ms)",
+    );
+    expect(lines.join("")).toContain("procedure: query groups.list");
+    expect(lines.join("")).toContain("request:   request-pretty");
+    expect(lines.join("")).toContain("Error: database unavailable");
+    expect(lines.join("")).toContain("stack:\n");
+    expect(lines.join("")).toMatch(/\n\n$/);
+  });
 });
 
 describe("HTTP observability", () => {

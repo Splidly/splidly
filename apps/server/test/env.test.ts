@@ -17,11 +17,12 @@ const baseEnv = {
 };
 
 describe("server environment", () => {
-  it("defaults to info logging and accepts debug logging", () => {
+  it("defaults to JSON info logging and accepts development overrides", () => {
     expect(readEnv(baseEnv).LOG_LEVEL).toBe("info");
-    expect(readEnv({ ...baseEnv, LOG_LEVEL: "debug" }).LOG_LEVEL).toBe(
-      "debug",
-    );
+    expect(readEnv(baseEnv).LOG_FORMAT).toBe("json");
+    expect(
+      readEnv({ ...baseEnv, LOG_FORMAT: "pretty", LOG_LEVEL: "debug" }),
+    ).toMatchObject({ LOG_FORMAT: "pretty", LOG_LEVEL: "debug" });
   });
 
   it("accepts separately named Sign in with Apple and APNs credentials", () => {

@@ -23,6 +23,7 @@ const envSchema = z
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
+    LOG_FORMAT: z.enum(["json", "pretty"]).default("json"),
     LOG_LEVEL: z.enum(logLevels).default("info"),
     PORT: z.coerce.number().int().positive().default(4000),
     DATABASE_URL: z.string().url(),

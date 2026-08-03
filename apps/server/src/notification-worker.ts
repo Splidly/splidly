@@ -8,9 +8,13 @@ import {
   notificationOutbox,
   or,
   pushInstallations,
+  sql,
   type Database,
+  type ExpenseEventNotificationPayload,
+  type ExpenseNotificationPayload,
 } from "@splidly/db";
 import { createApnsClientFromFile, type ApnsResponse } from "./apns";
+import { buildExpenseSummaryNotificationPayload } from "./domain/expense-notifications";
 import type { Env } from "./env";
 import { durationMs, type Logger } from "./logger";
 
@@ -52,6 +56,12 @@ function retryDelayMs(attempts: number) {
 
 function errorMessage(response: ApnsResponse) {
   return `APNs ${response.status}${response.reason ? `: ${response.reason}` : ""}`;
+}
+
+function isExpenseEventPayload(
+  payload: ExpenseNotificationPayload,
+): payload is ExpenseEventNotificationPayload {
+  return payload.eventType !== "expense.summary";
 }
 
 export async function startNotificationWorker(
@@ -120,7 +130,9 @@ export async function startNotificationWorker(
         .select({
           id: notificationOutbox.id,
           attempts: notificationOutbox.attempts,
+          deliveryMode: notificationOutbox.deliveryMode,
           payload: notificationOutbox.payload,
+          status: notificationOutbox.status,
           installationId: pushInstallations.id,
           token: pushInstallations.token,
         })
@@ -156,7 +168,50 @@ export async function startNotificationWorker(
           installationId: candidate.installationId,
           notificationId: candidate.id,
         });
-        const [claimed] = await db
+        let notificationIds = [candidate.id];
+        let payload = candidate.payload;
+        let expectedClaimCount = 1;
+        if (
+          candidate.status === "pending" &&
+          candidate.deliveryMode === "smart" &&
+          isExpenseEventPayload(candidate.payload)
+        ) {
+          const pending = await db
+            .select({
+              id: notificationOutbox.id,
+              payload: notificationOutbox.payload,
+            })
+            .from(notificationOutbox)
+            .where(
+              and(
+                eq(
+                  notificationOutbox.installationId,
+                  candidate.installationId,
+                ),
+                eq(notificationOutbox.deliveryMode, "smart"),
+                eq(notificationOutbox.status, "pending"),
+                lte(notificationOutbox.createdAt, now),
+                sql`${notificationOutbox.payload}->>'groupId' = ${candidate.payload.groupId}`,
+              ),
+            )
+            .limit(batchSize);
+          const sameGroupEvents = pending.filter(
+            (row): row is {
+              id: string;
+              payload: ExpenseEventNotificationPayload;
+            } => isExpenseEventPayload(row.payload),
+          );
+          const summary = buildExpenseSummaryNotificationPayload(
+            sameGroupEvents.map((row) => row.payload),
+          );
+          if (summary) {
+            notificationIds = sameGroupEvents.map((row) => row.id);
+            expectedClaimCount = notificationIds.length;
+            payload = summary;
+          }
+        }
+
+        const claimed = await db
           .update(notificationOutbox)
           .set({
             status: "processing",
@@ -165,7 +220,7 @@ export async function startNotificationWorker(
           })
           .where(
             and(
-              eq(notificationOutbox.id, candidate.id),
+              inArray(notificationOutbox.id, notificationIds),
               or(
                 eq(notificationOutbox.status, "pending"),
                 and(
@@ -175,16 +230,36 @@ export async function startNotificationWorker(
               ),
             ),
           )
-          .returning({ id: notificationOutbox.id });
-        if (!claimed) {
+          .returning({
+            attempts: notificationOutbox.attempts,
+            id: notificationOutbox.id,
+          });
+        if (claimed.length !== expectedClaimCount) {
+          if (claimed.length > 0 && expectedClaimCount > 1) {
+            await db
+              .update(notificationOutbox)
+              .set({
+                status: "pending",
+                processingStartedAt: null,
+                updatedAt: now,
+              })
+              .where(
+                inArray(
+                  notificationOutbox.id,
+                  claimed.map((row) => row.id),
+                ),
+              );
+          }
           deliveryLogger.debug("notifications.delivery.claim-lost");
           continue;
         }
 
-        const attempts = candidate.attempts + 1;
+        const attempts =
+          Math.max(candidate.attempts, ...claimed.map((row) => row.attempts)) +
+          1;
         const deliveryStartedAt = performance.now();
         try {
-          const response = await apns.send(candidate.token, candidate.payload);
+          const response = await apns.send(candidate.token, payload);
           const disposition = classifyApnsResponse(response);
           if (disposition === "invalid-token") {
             const completedAt = new Date();
@@ -228,12 +303,16 @@ export async function startNotificationWorker(
                 lastError: null,
                 updatedAt: new Date(),
               })
-              .where(eq(notificationOutbox.id, candidate.id));
+              .where(inArray(notificationOutbox.id, notificationIds));
             deliveryLogger.info("notifications.delivery.completed", {
               apnsId: response.apnsId,
               attempts,
               durationMs: durationMs(deliveryStartedAt),
               status: response.status,
+              summarizedCount:
+                payload.eventType === "expense.summary"
+                  ? payload.eventCount
+                  : undefined,
             });
             continue;
           }
@@ -253,7 +332,7 @@ export async function startNotificationWorker(
               lastError,
               updatedAt: new Date(),
             })
-            .where(eq(notificationOutbox.id, candidate.id));
+            .where(inArray(notificationOutbox.id, notificationIds));
           const outcome = shouldRetry ? "retry-scheduled" : "failed";
           deliveryLogger.warn(`notifications.delivery.${outcome}`, {
             apnsId: response.apnsId,
@@ -279,7 +358,7 @@ export async function startNotificationWorker(
                   : "Unknown APNs delivery error",
               updatedAt: new Date(),
             })
-            .where(eq(notificationOutbox.id, candidate.id));
+            .where(inArray(notificationOutbox.id, notificationIds));
           deliveryLogger.error("notifications.delivery.error", {
             attempts,
             durationMs: durationMs(deliveryStartedAt),

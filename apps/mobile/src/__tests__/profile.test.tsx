@@ -4,6 +4,7 @@ import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import ProfileScreen from "../app/(tabs)/profile";
 
 const mockDeleteAccount = jest.fn();
+const mockUpdateNotificationPreferences = jest.fn();
 let mockDeleteMutationOptions:
   | {
       onError?: (
@@ -58,6 +59,8 @@ jest.mock("../lib/trpc", () => ({
             userId: "user-1",
             displayName: "Lasse",
             homeCurrency: "EUR",
+            notificationOnlyWhenInvolved: false,
+            summarizeNotificationBursts: false,
           },
         }),
       },
@@ -66,6 +69,13 @@ jest.mock("../lib/trpc", () => ({
           error: null,
           isPending: false,
           mutate: jest.fn(),
+        }),
+      },
+      updateNotificationPreferences: {
+        useMutation: () => ({
+          error: null,
+          isPending: false,
+          mutate: mockUpdateNotificationPreferences,
         }),
       },
       deleteAccount: {
@@ -127,6 +137,7 @@ describe("ProfileScreen account deletion", () => {
   beforeEach(() => {
     mockGroups = [];
     mockDeleteAccount.mockClear();
+    mockUpdateNotificationPreferences.mockClear();
     mockDeleteMutationOptions = undefined;
     alert = jest.spyOn(Alert, "alert").mockImplementation();
   });
@@ -197,5 +208,29 @@ describe("ProfileScreen account deletion", () => {
       expect.stringContaining("one or more groups"),
       expect.any(Array),
     );
+  });
+
+  it("saves notification filtering and summary preferences", async () => {
+    const view = await renderProfile();
+
+    await fireEvent(
+      view.getByLabelText("Only when involved"),
+      "valueChange",
+      true,
+    );
+    expect(mockUpdateNotificationPreferences).toHaveBeenLastCalledWith({
+      onlyWhenInvolved: true,
+      summarizeBursts: false,
+    });
+
+    await fireEvent(
+      view.getByLabelText("Smart summaries"),
+      "valueChange",
+      true,
+    );
+    expect(mockUpdateNotificationPreferences).toHaveBeenLastCalledWith({
+      onlyWhenInvolved: true,
+      summarizeBursts: true,
+    });
   });
 });

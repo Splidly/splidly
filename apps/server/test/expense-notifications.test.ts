@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   buildExpenseNotificationPayload,
+  buildExpenseSummaryNotificationPayload,
   expenseNotificationInvolvement,
+  isExpenseRecipientInvolved,
 } from "../src/domain/expense-notifications";
 
 describe("expense notification involvement", () => {
@@ -81,8 +83,46 @@ describe("expense notification payloads", () => {
       expenseId: "expense-id",
       expenseVersion: 3,
       groupId: "group-id",
+      groupName: "Lisbon",
       title: "Ada deleted “Dinner”",
       body: "Total was 72.00 EUR in Lisbon · You were owed 54.00 EUR",
     });
+  });
+
+  it("builds a group-level summary for a notification burst", () => {
+    const first = buildExpenseNotificationPayload({
+      action: "create",
+      actorName: "Ada",
+      description: "Dinner",
+      expenseId: "expense-1",
+      expenseVersion: 1,
+      groupId: "group-id",
+      groupName: "Lisbon",
+      sourceAmountMinor: 7_200n,
+      sourceCurrency: "EUR",
+    });
+
+    expect(buildExpenseSummaryNotificationPayload([first, first])).toBe(
+      undefined,
+    );
+
+    expect(
+      buildExpenseSummaryNotificationPayload([first, first, first]),
+    ).toEqual({
+      eventType: "expense.summary",
+      groupId: "group-id",
+      groupName: "Lisbon",
+      eventCount: 3,
+      title: "3 expense updates in Lisbon",
+      body: "Recent activity was grouped to keep notifications manageable.",
+    });
+  });
+});
+
+describe("expense notification recipients", () => {
+  it("counts a payment or split as involvement, including zero-valued rows", () => {
+    expect(isExpenseRecipientInvolved({})).toBe(false);
+    expect(isExpenseRecipientInvolved({ paymentMinor: 0n })).toBe(true);
+    expect(isExpenseRecipientInvolved({ shareMinor: 0n })).toBe(true);
   });
 });

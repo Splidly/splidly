@@ -25,14 +25,30 @@ const timestamps = {
 
 export type ApnsEnvironment = "development" | "production";
 
-export interface ExpenseNotificationPayload {
+export interface ExpenseEventNotificationPayload {
   eventType: "expense.created" | "expense.updated" | "expense.deleted";
   expenseId: string;
   expenseVersion: number;
   groupId: string;
+  groupName: string;
   title: string;
   body: string;
 }
+
+export interface ExpenseSummaryNotificationPayload {
+  eventType: "expense.summary";
+  groupId: string;
+  groupName: string;
+  eventCount: number;
+  title: string;
+  body: string;
+}
+
+export type ExpenseNotificationPayload =
+  | ExpenseEventNotificationPayload
+  | ExpenseSummaryNotificationPayload;
+
+export type NotificationDeliveryMode = "immediate" | "smart";
 
 export const users = pgTable("user", {
   id: text("id").primaryKey(),
@@ -109,6 +125,12 @@ export const profiles = pgTable("profile", {
   displayName: text("display_name").notNull(),
   avatarUrl: text("avatar_url"),
   homeCurrency: text("home_currency").notNull().default("EUR"),
+  notificationOnlyWhenInvolved: boolean("notification_only_when_involved")
+    .notNull()
+    .default(false),
+  summarizeNotificationBursts: boolean("summarize_notification_bursts")
+    .notNull()
+    .default(false),
   onboardedAt: timestamp("onboarded_at", { withTimezone: true }),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
   ...timestamps,
@@ -152,6 +174,10 @@ export const notificationOutbox = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     payload: jsonb("payload").$type<ExpenseNotificationPayload>().notNull(),
+    deliveryMode: text("delivery_mode")
+      .$type<NotificationDeliveryMode>()
+      .notNull()
+      .default("immediate"),
     status: text("status").notNull().default("pending"),
     attempts: integer("attempts").notNull().default(0),
     availableAt: timestamp("available_at", { withTimezone: true })

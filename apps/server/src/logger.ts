@@ -3,6 +3,7 @@ import { hostname } from "node:os";
 
 export const logLevels = ["debug", "info", "warn", "error", "fatal"] as const;
 export type LogLevel = (typeof logLevels)[number];
+export type LogFormat = "json" | "pretty";
 export type LogFields = Record<string, unknown>;
 
 const levelPriority: Record<LogLevel, number> = {
@@ -91,19 +92,133 @@ function serializeFields(fields: LogFields) {
 }
 
 export interface LoggerOptions {
+  colors?: boolean;
   destination?: { write(chunk: string): unknown };
+  format?: LogFormat;
   level?: LogLevel;
   service?: string;
 }
 
+const ansi = {
+  reset: "\u001b[0m",
+  dim: "\u001b[2m",
+  debug: "\u001b[90m",
+  info: "\u001b[36m",
+  warn: "\u001b[33m",
+  error: "\u001b[31m",
+  fatal: "\u001b[1;31m",
+} as const;
+
+function indent(value: string, spaces = 4) {
+  const prefix = " ".repeat(spaces);
+  return value
+    .split("\n")
+    .map((line) => `${prefix}${line}`)
+    .join("\n");
+}
+
+function detailValue(value: unknown) {
+  if (typeof value === "string") return value;
+  if (value === undefined) return "undefined";
+  return JSON.stringify(value, null, 2);
+}
+
+export function formatPrettyLog(entry: LogFields, colors = false) {
+  const level = logLevels.includes(entry.level as LogLevel)
+    ? (entry.level as LogLevel)
+    : "info";
+  const paint = (text: string, color: string) =>
+    colors ? `${color}${text}${ansi.reset}` : text;
+  const timestamp = typeof entry.timestamp === "string" ? entry.timestamp : "";
+  const environment =
+    typeof entry.environment === "string" ? ` [${entry.environment}]` : "";
+  const message = typeof entry.message === "string" ? entry.message : "log";
+  const lines = [
+    `${paint(timestamp, ansi.dim)} ${paint(level.toUpperCase().padEnd(5), ansi[level])}${environment} ${message}`,
+  ];
+
+  const method = typeof entry.httpMethod === "string" ? entry.httpMethod : undefined;
+  const path = typeof entry.httpPath === "string" ? entry.httpPath : undefined;
+  if (method || path) {
+    const status = typeof entry.status === "number" ? ` → ${entry.status}` : "";
+    const duration =
+      typeof entry.durationMs === "number" ? ` (${entry.durationMs} ms)` : "";
+    lines.push(`  http:      ${method ?? ""} ${path ?? ""}${status}${duration}`);
+  }
+  if (typeof entry.procedure === "string") {
+    const type =
+      typeof entry.procedureType === "string" ? `${entry.procedureType} ` : "";
+    lines.push(`  procedure: ${type}${entry.procedure}`);
+  }
+  if (typeof entry.requestId === "string") {
+    lines.push(`  request:   ${entry.requestId}`);
+  }
+  if (typeof entry.userId === "string") {
+    lines.push(`  user:      ${entry.userId}`);
+  }
+
+  const error = entry.error;
+  if (error && typeof error === "object") {
+    const details = error as Record<string, unknown>;
+    const name = typeof details.name === "string" ? details.name : "Error";
+    const errorMessage =
+      typeof details.message === "string" ? details.message : "Unknown error";
+    lines.push(`  error:     ${paint(`${name}: ${errorMessage}`, ansi.error)}`);
+    if (typeof details.stack === "string") {
+      lines.push("  stack:", indent(details.stack));
+    }
+    if (details.cause !== undefined) {
+      lines.push("  cause:", indent(detailValue(details.cause)));
+    }
+  }
+
+  const displayedKeys = new Set([
+    "durationMs",
+    "environment",
+    "error",
+    "hostname",
+    "httpMethod",
+    "httpPath",
+    "level",
+    "message",
+    "procedure",
+    "procedureType",
+    "processId",
+    "requestId",
+    "responseBytes",
+    "service",
+    "status",
+    "timestamp",
+    "userId",
+  ]);
+  for (const [key, value] of Object.entries(entry)) {
+    if (displayedKeys.has(key) || value === undefined) continue;
+    const formatted = detailValue(value);
+    if (formatted.includes("\n")) {
+      lines.push(`  ${key}:`, indent(formatted));
+    } else {
+      lines.push(`  ${key}: ${formatted}`);
+    }
+  }
+  return `${lines.join("\n")}\n\n`;
+}
+
 export class Logger {
   private readonly bindings: LogFields;
+  private readonly colors: boolean;
   private readonly destination: { write(chunk: string): unknown };
+  private readonly format: LogFormat;
   private readonly minimumPriority: number;
   private readonly service: string;
 
   constructor(options: LoggerOptions = {}, bindings: LogFields = {}) {
     this.destination = options.destination ?? process.stdout;
+    this.colors =
+      options.colors ??
+      (this.destination === process.stdout &&
+        Boolean(process.stdout.isTTY) &&
+        process.env.NO_COLOR === undefined);
+    this.format = options.format ?? "json";
     this.minimumPriority = levelPriority[options.level ?? "info"];
     this.service = options.service ?? "splidly-server";
     this.bindings = bindings;
@@ -112,7 +227,9 @@ export class Logger {
   child(bindings: LogFields) {
     return new Logger(
       {
+        colors: this.colors,
         destination: this.destination,
+        format: this.format,
         level: this.minimumLevel,
         service: this.service,
       },
@@ -161,7 +278,11 @@ export class Logger {
       ...this.bindings,
       ...fields,
     });
-    this.destination.write(`${JSON.stringify(entry)}\n`);
+    this.destination.write(
+      this.format === "pretty"
+        ? formatPrettyLog(entry, this.colors)
+        : `${JSON.stringify(entry)}\n`,
+    );
   }
 }
 

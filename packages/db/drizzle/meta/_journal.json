@@ -64,6 +64,13 @@
       "when": 1785530629854,
       "tag": "0008_demonic_vulture",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785791722675,
+      "tag": "0009_bored_wolf_cub",
+      "breakpoints": true
     }
   ]
 }

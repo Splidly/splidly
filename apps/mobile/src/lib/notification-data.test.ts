@@ -36,4 +36,17 @@ describe("expense notification data", () => {
       }),
     ).toBe(undefined);
   });
+
+  it("routes a smart summary to its group", () => {
+    const data = parseExpenseNotificationData({
+      eventType: "expense.summary",
+      groupId: "group-id",
+    });
+
+    expect(data).toEqual({
+      eventType: "expense.summary",
+      groupId: "group-id",
+    });
+    expect(notificationHref(data!)).toBe("/groups/group-id");
+  });
 });

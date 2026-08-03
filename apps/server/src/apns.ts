@@ -94,16 +94,25 @@ export class ApnsClient {
     payload: ExpenseNotificationPayload,
   ): Promise<ApnsResponse> {
     const authorization = await this.authorization();
+    const notificationData =
+      payload.eventType === "expense.summary"
+        ? {
+            eventType: payload.eventType,
+            groupId: payload.groupId,
+          }
+        : {
+            eventType: payload.eventType,
+            expenseId: payload.expenseId,
+            expenseVersion: String(payload.expenseVersion),
+            groupId: payload.groupId,
+          };
     const body = JSON.stringify({
       aps: {
         alert: { title: payload.title, body: payload.body },
         sound: "default",
         "thread-id": payload.groupId,
       },
-      eventType: payload.eventType,
-      expenseId: payload.expenseId,
-      expenseVersion: String(payload.expenseVersion),
-      groupId: payload.groupId,
+      ...notificationData,
     });
 
     return new Promise((resolve, reject) => {
