@@ -92,7 +92,6 @@ export default function OnboardingScreen() {
 
   return (
     <Screen
-      scroll={false}
       background="sheet"
       contentContainerStyle={styles.content}
     >
@@ -131,7 +130,6 @@ export default function OnboardingScreen() {
           value={displayName}
           onChangeText={setName}
           autoCapitalize="words"
-          autoFocus={!profile.isPending && !displayName.trim()}
           placeholder="Your name"
           returnKeyType="done"
           submitBehavior="blurAndSubmit"

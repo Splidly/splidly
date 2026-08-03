@@ -42,7 +42,7 @@ function Navigation() {
           options={{
             headerShown: false,
             ...formSheetOptions(theme.sheet),
-            sheetAllowedDetents: [0.62],
+            sheetAllowedDetents: "fitToContents",
             sheetInitialDetentIndex: 0,
             sheetGrabberVisible: false,
             sheetCornerRadius: 30,

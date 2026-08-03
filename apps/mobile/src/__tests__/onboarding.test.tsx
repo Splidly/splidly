@@ -1,4 +1,5 @@
 import { fireEvent, render } from "@testing-library/react-native";
+import { StyleSheet } from "react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import OnboardingScreen from "../app/onboarding";
 
@@ -98,7 +99,17 @@ describe("OnboardingScreen", () => {
 
     const input = view.getByLabelText("Display name");
     expect(input.props.value).toBe("");
-    expect(input.props.autoFocus).toBe(true);
+    expect(input.props.autoFocus).toBeUndefined();
+
+    const [scrollView] = view.container.queryAll(
+      (instance) =>
+        instance.props.contentInsetAdjustmentBehavior === "automatic",
+    );
+    expect(scrollView).toBeDefined();
+    expect(scrollView?.props.scrollEnabled).toBeUndefined();
+    expect(
+      StyleSheet.flatten(scrollView?.props.contentContainerStyle).flexGrow,
+    ).toBeUndefined();
 
     await fireEvent.changeText(input, "");
 
@@ -119,6 +130,6 @@ describe("OnboardingScreen", () => {
     expect(view.getByLabelText("Display name").props.value).toBe(
       "Lasse Petzel",
     );
-    expect(view.getByLabelText("Display name").props.autoFocus).toBe(false);
+    expect(view.getByLabelText("Display name").props.autoFocus).toBeUndefined();
   });
 });
