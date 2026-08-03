@@ -207,6 +207,24 @@ describe("ExpenseSplitEditor", () => {
     expect(view.getByTestId("allocation-floating-summary")).toBeTruthy();
   });
 
+  it("stays open and marks the split incomplete when everyone is deselected", async () => {
+    const onSave = jest.fn();
+    const view = await render(<Harness onSave={onSave} />, {
+      wrapper: Wrapper,
+    });
+    await fireEvent.press(view.getByText("Open editor"));
+
+    await fireEvent.press(view.getByLabelText("Include Alex"));
+    await fireEvent.press(view.getByLabelText("Include Bea"));
+
+    expect(
+      view.getByLabelText("0 people selected, Incomplete"),
+    ).toBeTruthy();
+
+    await fireEvent.press(view.getByLabelText("Save split"));
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
   it("keeps its session mounted until the modal has finished closing", async () => {
     const view = await render(<Harness onSave={jest.fn()} />, {
       wrapper: Wrapper,

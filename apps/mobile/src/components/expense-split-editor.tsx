@@ -152,10 +152,13 @@ export function ExpenseSplitEditor() {
     if (names.length === 2) return `${names[0]} and ${names[1]}`;
     return `${names[0]} + ${names.length - 1}`;
   };
-  const equalAmounts = allocateByWeights(
-    request.totalMinor,
-    draft.selectedIds.map(() => 1n),
-  );
+  const equalAmounts =
+    draft.selectedIds.length > 0
+      ? allocateByWeights(
+          request.totalMinor,
+          draft.selectedIds.map(() => 1n),
+        )
+      : [];
   const equalAmountsByUserId = Object.fromEntries(
     draft.selectedIds.map((userId, index) => [
       userId,
