@@ -103,8 +103,8 @@ function PartyChoice({
   );
 
   if (disabled) return content;
-  const actions: MenuAction[] = members
-    .toSorted((left, right) =>
+  const actions: MenuAction[] = [...members]
+    .sort((left, right) =>
       left.displayName.localeCompare(right.displayName, undefined, {
         sensitivity: "base",
       }),

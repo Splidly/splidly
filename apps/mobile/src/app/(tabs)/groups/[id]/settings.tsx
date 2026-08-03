@@ -147,8 +147,8 @@ export default function GroupSettingsScreen() {
             createInvite.mutate({ kind: "group", groupId: id })
           }
         />
-        {detail.data?.members
-          .toSorted((left, right) =>
+        {[...(detail.data?.members ?? [])]
+          .sort((left, right) =>
             left.displayName.localeCompare(right.displayName, undefined, {
               sensitivity: "base",
             }),

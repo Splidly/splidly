@@ -60,7 +60,7 @@ export function ExpensePaymentEditor() {
     request.totalMinor,
     request.currency,
   );
-  const participants = request.participants.toSorted((left, right) =>
+  const participants = [...request.participants].sort((left, right) =>
     left.displayName.localeCompare(right.displayName, undefined, {
       sensitivity: "base",
     }),
