@@ -10,7 +10,11 @@
       "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://splidly.site",
+        "EXPO_PUBLIC_APP_URL": "https://splidly.site"
+      }
     }
   },
   "submit": {
