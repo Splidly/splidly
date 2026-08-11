@@ -2,11 +2,12 @@ import {
   and,
   eq,
   expensePayments,
-  expenseSplits,
   expenses,
+  expenseSplits,
   financialRevisions,
   groupMembers,
   groups,
+  inArray,
   isNull,
   ledgerEntries,
   ledgerValuations,
@@ -15,39 +16,33 @@ import {
 } from "@splidly/db";
 import {
   allocateByWeights,
+  type CurrencyCode,
   detectExpenseIconKey,
+  type ExpenseIconKey,
+  type ExpenseMutation,
   expenseMutationSchema,
+  type RateSnapshot,
   rateSnapshotSchema,
   splitInputSchema,
   splitSourceAmount,
-  type CurrencyCode,
-  type ExpenseIconKey,
-  type ExpenseMutation,
-  type RateSnapshot,
 } from "@splidly/shared";
 import { TRPCError } from "@trpc/server";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
   convertWithRates,
+  type DbTransaction,
   loadHomeCurrencies,
   resolveRates,
   reverseActiveEntries,
-  type DbTransaction,
 } from "../domain/finance";
-import {
-  allocateByUser,
-  expenseTransfers,
-} from "../domain/expense-allocation";
+import { allocateByUser, expenseTransfers } from "../domain/expense-allocation";
 import {
   requireActiveGroupMember,
   requireFriendshipParticipant,
 } from "../domain/helpers";
 import { enqueueExpenseNotifications } from "../domain/expense-notifications";
-import {
-  protectedProcedure,
-  router,
-  type TrpcContext,
-} from "../trpc";
+import { protectedProcedure, router, type TrpcContext } from "../trpc";
 
 interface PreparedExpense {
   input: ExpenseMutation;
@@ -55,6 +50,8 @@ interface PreparedExpense {
   iconManuallySet: boolean;
   contextId: string;
   canonicalCurrency: CurrencyCode;
+  groupName?: string;
+  actorName?: string;
   payments: Map<string, bigint>;
   sourceShares: Map<string, bigint>;
   transfers: {
@@ -114,29 +111,63 @@ async function prepareExpense(
 
   let contextId: string;
   let canonicalCurrency: CurrencyCode;
-  let allowedIds: string[];
+  let groupName: string | undefined;
+  let actorName: string | undefined;
+  let homeCurrencies: Map<string, CurrencyCode>;
   if (input.context.type === "group") {
-    await requireActiveGroupMember(ctx.db, input.context.groupId, userId);
-    const [group] = await ctx.db
-      .select()
-      .from(groups)
-      .where(eq(groups.id, input.context.groupId))
+    const [membership] = await ctx.db
+      .select({ group: groups })
+      .from(groupMembers)
+      .innerJoin(groups, eq(groups.id, groupMembers.groupId))
+      .where(
+        and(
+          eq(groupMembers.groupId, input.context.groupId),
+          eq(groupMembers.userId, userId),
+          isNull(groupMembers.removedAt),
+        ),
+      )
       .limit(1);
-    if (!group || group.archivedAt) {
+    const group = membership?.group;
+    if (!group) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Not a group member" });
+    }
+    if (group.archivedAt) {
       throw new TRPCError({ code: "NOT_FOUND", message: "Group not found" });
     }
-    const members = await ctx.db
-      .select({ userId: groupMembers.userId })
+    const memberProfiles = await ctx.db
+      .select({
+        displayName: profiles.displayName,
+        homeCurrency: profiles.homeCurrency,
+        userId: groupMembers.userId,
+      })
       .from(groupMembers)
+      .innerJoin(profiles, eq(profiles.userId, groupMembers.userId))
       .where(
         and(
           eq(groupMembers.groupId, group.id),
+          inArray(groupMembers.userId, [...new Set([...involvedIds, userId])]),
           isNull(groupMembers.removedAt),
         ),
       );
-    allowedIds = members.map((member) => member.userId);
+    const profilesById = new Map(
+      memberProfiles.map((profile) => [profile.userId, profile]),
+    );
+    if (involvedIds.some((id) => !profilesById.has(id))) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Payer and participants must belong to this ledger",
+      });
+    }
+    homeCurrencies = new Map(
+      involvedIds.map((involvedId) => [
+        involvedId,
+        profilesById.get(involvedId)!.homeCurrency as CurrencyCode,
+      ]),
+    );
     contextId = group.id;
     canonicalCurrency = group.currency as CurrencyCode;
+    groupName = group.name;
+    actorName = profilesById.get(userId)?.displayName;
   } else {
     const friendship = await requireFriendshipParticipant(
       ctx.db,
@@ -145,16 +176,16 @@ async function prepareExpense(
     );
     contextId = friendship.id;
     canonicalCurrency = input.amount.currency;
-    allowedIds = [friendship.userLowId, friendship.userHighId];
-  }
-  if (involvedIds.some((id) => !allowedIds.includes(id))) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "Payer and participants must belong to this ledger",
-    });
+    const allowedIds = [friendship.userLowId, friendship.userHighId];
+    if (involvedIds.some((id) => !allowedIds.includes(id))) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Payer and participants must belong to this ledger",
+      });
+    }
+    homeCurrencies = await loadHomeCurrencies(ctx.db, involvedIds);
   }
 
-  const homeCurrencies = await loadHomeCurrencies(ctx.db, involvedIds);
   const targets = [
     canonicalCurrency,
     ...homeCurrencies.values(),
@@ -176,16 +207,15 @@ async function prepareExpense(
   );
   const canonicalPayments = allocateByUser(canonicalTotal, payments);
   const canonicalShares = allocateByUser(canonicalTotal, sourceShares);
-  const transfers = expenseTransfers(
-    canonicalPayments,
-    canonicalShares,
-  ).map((transfer) => ({
-    debtorId: transfer.debtorId,
-    creditorId: transfer.creditorId,
-    canonicalAmountMinor: transfer.sourceAmountMinor,
-    debtorHomeAmountMinor: 0n,
-    creditorHomeAmountMinor: 0n,
-  }));
+  const transfers = expenseTransfers(canonicalPayments, canonicalShares).map(
+    (transfer) => ({
+      debtorId: transfer.debtorId,
+      creditorId: transfer.creditorId,
+      canonicalAmountMinor: transfer.sourceAmountMinor,
+      debtorHomeAmountMinor: 0n,
+      creditorHomeAmountMinor: 0n,
+    }),
+  );
   for (const involvedId of involvedIds) {
     const transferIndexes = transfers.flatMap((transfer, index) =>
       transfer.debtorId === involvedId || transfer.creditorId === involvedId
@@ -194,8 +224,7 @@ async function prepareExpense(
     );
     if (transferIndexes.length === 0) continue;
     const sourceNet =
-      (payments.get(involvedId) ?? 0n) -
-      (sourceShares.get(involvedId) ?? 0n);
+      (payments.get(involvedId) ?? 0n) - (sourceShares.get(involvedId) ?? 0n);
     const homeCurrency = homeCurrencies.get(involvedId);
     if (!homeCurrency) {
       throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
@@ -231,6 +260,8 @@ async function prepareExpense(
     iconManuallySet: manualIconKey !== undefined,
     contextId,
     canonicalCurrency,
+    ...(groupName ? { groupName } : {}),
+    ...(actorName ? { actorName } : {}),
     payments,
     sourceShares,
     transfers,
@@ -270,42 +301,47 @@ async function writeExpenseFinancials(
     })),
   );
 
-  for (const transfer of prepared.transfers) {
-    const [entry] = await tx
-      .insert(ledgerEntries)
-      .values({
-        sourceType: "expense",
-        sourceId: expenseId,
-        contextType: prepared.input.context.type,
-        contextId: prepared.contextId,
-        debtorId: transfer.debtorId,
-        creditorId: transfer.creditorId,
-        canonicalCurrency: prepared.canonicalCurrency,
-        canonicalAmountMinor: transfer.canonicalAmountMinor,
-      })
-      .returning();
-    if (!entry) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-    const debtorCurrency = prepared.homeCurrencies.get(transfer.debtorId);
-    const creditorCurrency = prepared.homeCurrencies.get(transfer.creditorId);
-    if (!debtorCurrency || !creditorCurrency) {
-      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-    }
-    await tx.insert(ledgerValuations).values([
-      {
-        ledgerEntryId: entry.id,
-        userId: transfer.debtorId,
-        currency: debtorCurrency,
-        amountMinor: transfer.debtorHomeAmountMinor,
-      },
-      {
-        ledgerEntryId: entry.id,
-        userId: transfer.creditorId,
-        currency: creditorCurrency,
-        amountMinor: transfer.creditorHomeAmountMinor,
-      },
-    ]);
-  }
+  if (prepared.transfers.length === 0) return;
+  const entries = prepared.transfers.map((transfer) => ({
+    id: randomUUID(),
+    transfer,
+  }));
+  await tx.insert(ledgerEntries).values(
+    entries.map(({ id, transfer }) => ({
+      id,
+      sourceType: "expense",
+      sourceId: expenseId,
+      contextType: prepared.input.context.type,
+      contextId: prepared.contextId,
+      debtorId: transfer.debtorId,
+      creditorId: transfer.creditorId,
+      canonicalCurrency: prepared.canonicalCurrency,
+      canonicalAmountMinor: transfer.canonicalAmountMinor,
+    })),
+  );
+  await tx.insert(ledgerValuations).values(
+    entries.flatMap(({ id, transfer }) => {
+      const debtorCurrency = prepared.homeCurrencies.get(transfer.debtorId);
+      const creditorCurrency = prepared.homeCurrencies.get(transfer.creditorId);
+      if (!debtorCurrency || !creditorCurrency) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      }
+      return [
+        {
+          ledgerEntryId: id,
+          userId: transfer.debtorId,
+          currency: debtorCurrency,
+          amountMinor: transfer.debtorHomeAmountMinor,
+        },
+        {
+          ledgerEntryId: id,
+          userId: transfer.creditorId,
+          currency: creditorCurrency,
+          amountMinor: transfer.creditorHomeAmountMinor,
+        },
+      ];
+    }),
+  );
 }
 
 function revisionSnapshot(prepared: PreparedExpense) {
@@ -336,10 +372,7 @@ export const expensesRouter = router({
         .select()
         .from(expenses)
         .where(
-          and(
-            eq(expenses.id, input.expenseId),
-            isNull(expenses.deletedAt),
-          ),
+          and(eq(expenses.id, input.expenseId), isNull(expenses.deletedAt)),
         )
         .limit(1);
       if (!expense) throw new TRPCError({ code: "NOT_FOUND" });
@@ -360,38 +393,57 @@ export const expensesRouter = router({
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       }
 
-      const splitRows = await ctx.db
-        .select({
-          userId: expenseSplits.userId,
-          sourceAmountMinor: expenseSplits.sourceAmountMinor,
-          displayName: profiles.displayName,
-          avatarUrl: profiles.avatarUrl,
-          homeCurrency: profiles.homeCurrency,
-        })
-        .from(expenseSplits)
-        .innerJoin(profiles, eq(profiles.userId, expenseSplits.userId))
-        .where(eq(expenseSplits.expenseId, expense.id));
-      const [payer] = await ctx.db
-        .select({
-          userId: profiles.userId,
-          displayName: profiles.displayName,
-          avatarUrl: profiles.avatarUrl,
-          homeCurrency: profiles.homeCurrency,
-        })
-        .from(profiles)
-        .where(eq(profiles.userId, expense.payerId))
-        .limit(1);
-      const paymentRows = await ctx.db
-        .select({
-          userId: expensePayments.userId,
-          sourceAmountMinor: expensePayments.sourceAmountMinor,
-          displayName: profiles.displayName,
-          avatarUrl: profiles.avatarUrl,
-          homeCurrency: profiles.homeCurrency,
-        })
-        .from(expensePayments)
-        .innerJoin(profiles, eq(profiles.userId, expensePayments.userId))
-        .where(eq(expensePayments.expenseId, expense.id));
+      const [splitRows, payerRows, paymentRows, storedRates, revisions] =
+        await Promise.all([
+          ctx.db
+            .select({
+              userId: expenseSplits.userId,
+              sourceAmountMinor: expenseSplits.sourceAmountMinor,
+              displayName: profiles.displayName,
+              avatarUrl: profiles.avatarUrl,
+              homeCurrency: profiles.homeCurrency,
+            })
+            .from(expenseSplits)
+            .innerJoin(profiles, eq(profiles.userId, expenseSplits.userId))
+            .where(eq(expenseSplits.expenseId, expense.id)),
+          ctx.db
+            .select({
+              userId: profiles.userId,
+              displayName: profiles.displayName,
+              avatarUrl: profiles.avatarUrl,
+              homeCurrency: profiles.homeCurrency,
+            })
+            .from(profiles)
+            .where(eq(profiles.userId, expense.payerId))
+            .limit(1),
+          ctx.db
+            .select({
+              userId: expensePayments.userId,
+              sourceAmountMinor: expensePayments.sourceAmountMinor,
+              displayName: profiles.displayName,
+              avatarUrl: profiles.avatarUrl,
+              homeCurrency: profiles.homeCurrency,
+            })
+            .from(expensePayments)
+            .innerJoin(profiles, eq(profiles.userId, expensePayments.userId))
+            .where(eq(expensePayments.expenseId, expense.id)),
+          ctx.db
+            .select()
+            .from(rateSnapshots)
+            .where(eq(rateSnapshots.expenseId, expense.id)),
+          ctx.db
+            .select({ snapshot: financialRevisions.snapshot })
+            .from(financialRevisions)
+            .where(
+              and(
+                eq(financialRevisions.recordType, "expense"),
+                eq(financialRevisions.recordId, expense.id),
+                eq(financialRevisions.version, expense.version),
+              ),
+            )
+            .limit(1),
+        ]);
+      const payer = payerRows[0];
       const payers =
         paymentRows.length > 0
           ? paymentRows
@@ -403,10 +455,6 @@ export const expensesRouter = router({
                 },
               ]
             : [];
-      const storedRates = await ctx.db
-        .select()
-        .from(rateSnapshots)
-        .where(eq(rateSnapshots.expenseId, expense.id));
       const rates = storedRates.map((rate) =>
         rateSnapshotSchema.parse({
           base: rate.base,
@@ -417,17 +465,7 @@ export const expensesRouter = router({
           source: rate.source,
         }),
       );
-      const [revision] = await ctx.db
-        .select({ snapshot: financialRevisions.snapshot })
-        .from(financialRevisions)
-        .where(
-          and(
-            eq(financialRevisions.recordType, "expense"),
-            eq(financialRevisions.recordId, expense.id),
-            eq(financialRevisions.version, expense.version),
-          ),
-        )
-        .limit(1);
+      const revision = revisions[0];
       const storedSplit = splitInputSchema.safeParse(
         revision?.snapshot["split"],
       );
@@ -506,10 +544,14 @@ export const expensesRouter = router({
           await enqueueExpenseNotifications(tx, {
             action: "create",
             actorId: ctx.session.user.id,
+            ...(prepared.actorName ? { actorName: prepared.actorName } : {}),
             description: expense.description,
             expenseId: expense.id,
             expenseVersion: expense.version,
             groupId: expense.groupId,
+            ...(prepared.groupName ? { groupName: prepared.groupName } : {}),
+            payments: prepared.payments,
+            splits: prepared.sourceShares,
             sourceAmountMinor: expense.sourceAmountMinor,
             sourceCurrency: expense.sourceCurrency as CurrencyCode,
           });
@@ -626,10 +668,14 @@ export const expensesRouter = router({
           await enqueueExpenseNotifications(tx, {
             action: "update",
             actorId: ctx.session.user.id,
+            ...(prepared.actorName ? { actorName: prepared.actorName } : {}),
             description: updated.description,
             expenseId: updated.id,
             expenseVersion: updated.version,
             groupId: updated.groupId,
+            ...(prepared.groupName ? { groupName: prepared.groupName } : {}),
+            payments: prepared.payments,
+            splits: prepared.sourceShares,
             sourceAmountMinor: updated.sourceAmountMinor,
             sourceCurrency: updated.sourceCurrency as CurrencyCode,
           });
@@ -651,7 +697,9 @@ export const expensesRouter = router({
         .from(expenses)
         .where(eq(expenses.id, input.expenseId))
         .limit(1);
-      if (!current || current.deletedAt) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!current || current.deletedAt) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
       if (current.groupId) {
         await requireActiveGroupMember(
           ctx.db,

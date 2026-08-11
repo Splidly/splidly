@@ -1,9 +1,9 @@
 import {
   and,
   eq,
-  expenseSplits,
   expensePayments,
   expenses,
+  expenseSplits,
   financialRevisions,
   groupMembers,
   groups,
@@ -19,13 +19,13 @@ import {
 } from "@splidly/db";
 import {
   convertMinor,
+  type CurrencyCode,
   currencyCodeSchema,
   customImageDataUrlSchema,
   groupColorPresets,
   groupColorSchema,
   groupIconKeySchema,
   money,
-  type CurrencyCode,
 } from "@splidly/shared";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -34,7 +34,7 @@ import {
   viewerRepaymentBalances,
 } from "../domain/debt-simplification";
 import { expenseActivitySummary } from "../domain/expense-activity";
-import { requireActiveGroupMember } from "../domain/helpers";
+import { groupBy, requireActiveGroupMember } from "../domain/helpers";
 import { protectedProcedure, router } from "../trpc";
 
 function groupBalance(
@@ -78,10 +78,7 @@ async function removeGroupMember(input: {
     .select()
     .from(groupMembers)
     .where(
-      and(
-        eq(groupMembers.groupId, groupId),
-        isNull(groupMembers.removedAt),
-      ),
+      and(eq(groupMembers.groupId, groupId), isNull(groupMembers.removedAt)),
     );
   if (active.length <= 1) {
     throw new TRPCError({
@@ -93,10 +90,7 @@ async function removeGroupMember(input: {
     .update(groupMembers)
     .set({ removedAt: new Date() })
     .where(
-      and(
-        eq(groupMembers.groupId, groupId),
-        eq(groupMembers.userId, userId),
-      ),
+      and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, userId)),
     );
   return { removed: true };
 }
@@ -114,55 +108,62 @@ export const groupsRouter = router({
           isNull(groups.archivedAt),
         ),
       );
-
-    return Promise.all(
-      memberships.map(async ({ group }) => {
-        const entries = await ctx.db
-          .select()
-          .from(ledgerEntries)
-          .where(
-            and(
-              eq(ledgerEntries.contextType, "group"),
-              eq(ledgerEntries.contextId, group.id),
-            ),
-          );
-        const members = await ctx.db
-          .select({
-            userId: groupMembers.userId,
-            displayName: profiles.displayName,
-            avatarUrl: profiles.avatarUrl,
-          })
-          .from(groupMembers)
-          .innerJoin(profiles, eq(profiles.userId, groupMembers.userId))
-          .where(
-            and(
-              eq(groupMembers.groupId, group.id),
-              isNull(groupMembers.removedAt),
-            ),
-          );
-        const transfers = repaymentPlan(entries, group.simplifyDebts);
-        const memberBalances = viewerRepaymentBalances(
-          transfers,
-          members,
-          ctx.session.user.id,
-        ).map((member) => ({
-          userId: member.userId,
-          displayName: member.displayName,
-          avatarUrl:
-            members.find((candidate) => candidate.userId === member.userId)
-              ?.avatarUrl ?? null,
-          balance: money(group.currency, member.amountMinor),
-        }));
-        return {
-          ...group,
-          balance: money(
-            group.currency,
-            groupBalance(entries, ctx.session.user.id),
+    const groupIds = memberships.map(({ group }) => group.id);
+    if (groupIds.length === 0) return [];
+    const [allEntries, allMembers] = await Promise.all([
+      ctx.db
+        .select()
+        .from(ledgerEntries)
+        .where(
+          and(
+            eq(ledgerEntries.contextType, "group"),
+            inArray(ledgerEntries.contextId, groupIds),
           ),
-          memberBalances,
-        };
-      }),
-    );
+        ),
+      ctx.db
+        .select({
+          groupId: groupMembers.groupId,
+          userId: groupMembers.userId,
+          displayName: profiles.displayName,
+          avatarUrl: profiles.avatarUrl,
+        })
+        .from(groupMembers)
+        .innerJoin(profiles, eq(profiles.userId, groupMembers.userId))
+        .where(
+          and(
+            inArray(groupMembers.groupId, groupIds),
+            isNull(groupMembers.removedAt),
+          ),
+        ),
+    ]);
+    const entriesByGroup = groupBy(allEntries, (entry) => entry.contextId);
+    const membersByGroup = groupBy(allMembers, (member) => member.groupId);
+
+    return memberships.map(({ group }) => {
+      const entries = entriesByGroup.get(group.id) ?? [];
+      const members = membersByGroup.get(group.id) ?? [];
+      const transfers = repaymentPlan(entries, group.simplifyDebts);
+      const memberBalances = viewerRepaymentBalances(
+        transfers,
+        members,
+        ctx.session.user.id,
+      ).map((member) => ({
+        userId: member.userId,
+        displayName: member.displayName,
+        avatarUrl:
+          members.find((candidate) => candidate.userId === member.userId)
+            ?.avatarUrl ?? null,
+        balance: money(group.currency, member.amountMinor),
+      }));
+      return {
+        ...group,
+        balance: money(
+          group.currency,
+          groupBalance(entries, ctx.session.user.id),
+        ),
+        memberBalances,
+      };
+    });
   }),
 
   create: protectedProcedure
@@ -205,66 +206,87 @@ export const groupsRouter = router({
   detail: protectedProcedure
     .input(z.object({ groupId: z.uuid() }))
     .query(async ({ ctx, input }) => {
-      await requireActiveGroupMember(
-        ctx.db,
-        input.groupId,
-        ctx.session.user.id,
-      );
-      const [group] = await ctx.db
-        .select()
-        .from(groups)
-        .where(eq(groups.id, input.groupId))
-        .limit(1);
-      if (!group || group.archivedAt) {
-        throw new TRPCError({ code: "NOT_FOUND" });
-      }
-
-      const members = await ctx.db
-        .select({
-          userId: groupMembers.userId,
-          joinedAt: groupMembers.joinedAt,
-          displayName: profiles.displayName,
-          avatarUrl: profiles.avatarUrl,
-          homeCurrency: profiles.homeCurrency,
-        })
+      const [membership] = await ctx.db
+        .select({ group: groups })
         .from(groupMembers)
-        .innerJoin(profiles, eq(profiles.userId, groupMembers.userId))
+        .innerJoin(groups, eq(groups.id, groupMembers.groupId))
         .where(
           and(
             eq(groupMembers.groupId, input.groupId),
+            eq(groupMembers.userId, ctx.session.user.id),
             isNull(groupMembers.removedAt),
           ),
-        );
-      const activity = await ctx.db
-        .select()
-        .from(expenses)
-        .where(
-          and(
-            eq(expenses.groupId, input.groupId),
-            isNull(expenses.deletedAt),
-          ),
         )
-        .orderBy(expenses.occurredAt);
-      const settlementRecords = await ctx.db
-        .select({
-          id: settlements.id,
-          occurredAt: settlements.occurredAt,
-          createdAt: settlements.createdAt,
-          version: settlements.version,
-          notes: settlements.notes,
-          fromUserId: settlements.fromUserId,
-          toUserId: settlements.toUserId,
-          sourceCurrency: settlements.sourceCurrency,
-          sourceAmountMinor: settlements.sourceAmountMinor,
-        })
-        .from(settlements)
-        .where(
-          and(
-            eq(settlements.groupId, input.groupId),
-            isNull(settlements.deletedAt),
-          ),
-        )
-        .orderBy(settlements.occurredAt);
+        .limit(1);
+      const group = membership?.group;
+      if (!group) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Not a group member",
+        });
+      }
+      if (group.archivedAt) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+
+      const [members, activity, settlementRecords, groupEntries] =
+        await Promise.all([
+          ctx.db
+            .select({
+              userId: groupMembers.userId,
+              joinedAt: groupMembers.joinedAt,
+              displayName: profiles.displayName,
+              avatarUrl: profiles.avatarUrl,
+              homeCurrency: profiles.homeCurrency,
+            })
+            .from(groupMembers)
+            .innerJoin(profiles, eq(profiles.userId, groupMembers.userId))
+            .where(
+              and(
+                eq(groupMembers.groupId, input.groupId),
+                isNull(groupMembers.removedAt),
+              ),
+            ),
+          ctx.db
+            .select()
+            .from(expenses)
+            .where(
+              and(
+                eq(expenses.groupId, input.groupId),
+                isNull(expenses.deletedAt),
+              ),
+            )
+            .orderBy(expenses.occurredAt),
+          ctx.db
+            .select({
+              id: settlements.id,
+              occurredAt: settlements.occurredAt,
+              createdAt: settlements.createdAt,
+              version: settlements.version,
+              notes: settlements.notes,
+              fromUserId: settlements.fromUserId,
+              toUserId: settlements.toUserId,
+              sourceCurrency: settlements.sourceCurrency,
+              sourceAmountMinor: settlements.sourceAmountMinor,
+            })
+            .from(settlements)
+            .where(
+              and(
+                eq(settlements.groupId, input.groupId),
+                isNull(settlements.deletedAt),
+              ),
+            )
+            .orderBy(settlements.occurredAt),
+          ctx.db
+            .select()
+            .from(ledgerEntries)
+            .where(
+              and(
+                eq(ledgerEntries.contextType, "group"),
+                eq(ledgerEntries.contextId, group.id),
+              ),
+            ),
+        ]);
       const settlementUserIds = [
         ...new Set(
           settlementRecords.flatMap((settlement) => [
@@ -288,12 +310,7 @@ export const groupsRouter = router({
         settlementProfiles.map((profile) => [profile.userId, profile]),
       );
       const activityIds = activity.map((expense) => expense.id);
-      const [
-        activityRates,
-        activityPayments,
-        viewerSplits,
-        legacyPayers,
-      ] =
+      const [activityRates, activityPayments, viewerSplits, legacyPayers] =
         activity.length === 0
           ? [[], [], [], []]
           : await Promise.all([
@@ -338,10 +355,9 @@ export const groupsRouter = router({
                 })
                 .from(profiles)
                 .where(
-                  inArray(
-                    profiles.userId,
-                    [...new Set(activity.map((expense) => expense.payerId))],
-                  ),
+                  inArray(profiles.userId, [
+                    ...new Set(activity.map((expense) => expense.payerId)),
+                  ]),
                 ),
             ]);
       const activityPaymentsByExpense = new Map<
@@ -349,8 +365,7 @@ export const groupsRouter = router({
         (typeof activityPayments)[number][]
       >();
       for (const payment of activityPayments) {
-        const payments =
-          activityPaymentsByExpense.get(payment.expenseId) ?? [];
+        const payments = activityPaymentsByExpense.get(payment.expenseId) ?? [];
         payments.push(payment);
         activityPaymentsByExpense.set(payment.expenseId, payments);
       }
@@ -360,19 +375,7 @@ export const groupsRouter = router({
       const legacyPayersById = new Map(
         legacyPayers.map((profile) => [profile.userId, profile]),
       );
-      const groupEntries = await ctx.db
-        .select()
-        .from(ledgerEntries)
-        .where(
-          and(
-            eq(ledgerEntries.contextType, "group"),
-            eq(ledgerEntries.contextId, group.id),
-          ),
-        );
-      const transfers = repaymentPlan(
-        groupEntries,
-        group.simplifyDebts,
-      );
+      const transfers = repaymentPlan(groupEntries, group.simplifyDebts);
       const memberBalances = viewerRepaymentBalances(
         transfers,
         members,
@@ -449,12 +452,8 @@ export const groupsRouter = router({
       const settlementActivity = settlementRecords
         .reverse()
         .map((settlement) => {
-          const fromProfile = settlementProfilesById.get(
-            settlement.fromUserId,
-          );
-          const toProfile = settlementProfilesById.get(
-            settlement.toUserId,
-          );
+          const fromProfile = settlementProfilesById.get(settlement.fromUserId);
+          const toProfile = settlementProfilesById.get(settlement.toUserId);
           return {
             id: settlement.id,
             occurredAt: settlement.occurredAt,
@@ -540,9 +539,7 @@ export const groupsRouter = router({
           name: input.name,
           ...(input.iconKey ? { iconKey: input.iconKey } : {}),
           color: input.color ?? current.color,
-          ...(input.imageUrl !== undefined
-            ? { imageUrl: input.imageUrl }
-            : {}),
+          ...(input.imageUrl !== undefined ? { imageUrl: input.imageUrl } : {}),
           currency: input.currency,
           simplifyDebts: input.simplifyDebts,
           version: current.version + 1,

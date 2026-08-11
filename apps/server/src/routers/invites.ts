@@ -11,10 +11,7 @@ import {
 import { TRPCError } from "@trpc/server";
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
-import {
-  orderedPair,
-  requireActiveGroupMember,
-} from "../domain/helpers";
+import { orderedPair, requireActiveGroupMember } from "../domain/helpers";
 import { protectedProcedure, publicProcedure, router } from "../trpc";
 
 export function hashInviteToken(token: string): string {
@@ -49,29 +46,33 @@ export const invitesRouter = router({
     .input(z.object({ token: z.string().min(20).max(200) }))
     .query(async ({ ctx, input }) => {
       const invite = await readInvite(ctx.db, input.token);
-      const [inviter] = await ctx.db
-        .select({
-          userId: profiles.userId,
-          displayName: profiles.displayName,
-          avatarUrl: profiles.avatarUrl,
-        })
-        .from(profiles)
-        .where(eq(profiles.userId, invite.inviterId))
-        .limit(1);
-      const [group] = invite.groupId
-        ? await ctx.db
-            .select({
-              id: groups.id,
-              name: groups.name,
-              iconKey: groups.iconKey,
-              color: groups.color,
-              imageUrl: groups.imageUrl,
-              currency: groups.currency,
-            })
-            .from(groups)
-            .where(eq(groups.id, invite.groupId))
-            .limit(1)
-        : [];
+      const [inviterRows, groupRows] = await Promise.all([
+        ctx.db
+          .select({
+            userId: profiles.userId,
+            displayName: profiles.displayName,
+            avatarUrl: profiles.avatarUrl,
+          })
+          .from(profiles)
+          .where(eq(profiles.userId, invite.inviterId))
+          .limit(1),
+        invite.groupId
+          ? ctx.db
+              .select({
+                id: groups.id,
+                name: groups.name,
+                iconKey: groups.iconKey,
+                color: groups.color,
+                imageUrl: groups.imageUrl,
+                currency: groups.currency,
+              })
+              .from(groups)
+              .where(eq(groups.id, invite.groupId))
+              .limit(1)
+          : Promise.resolve([]),
+      ]);
+      const inviter = inviterRows[0];
+      const group = groupRows[0];
       return {
         kind: invite.kind as "group" | "friend",
         inviter,
@@ -97,8 +98,7 @@ export const invitesRouter = router({
       }
       const token = randomBytes(32).toString("base64url");
       const expiresAt = new Date(
-        Date.now() +
-          (input.kind === "group" ? 30 : 7) * 24 * 60 * 60 * 1_000,
+        Date.now() + (input.kind === "group" ? 30 : 7) * 24 * 60 * 60 * 1_000,
       );
       const [invite] = await ctx.db
         .insert(invites)
@@ -243,16 +243,24 @@ export const invitesRouter = router({
               isNull(groupMembers.removedAt),
             ),
           );
-        for (const member of existingMembers) {
-          if (member.userId === acceptingId) continue;
-          const [low, high] = orderedPair(member.userId, acceptingId);
+        const friendshipsToUpsert = existingMembers.flatMap((member) => {
+          if (member.userId === acceptingId) return [];
+          const [userLowId, userHighId] = orderedPair(
+            member.userId,
+            acceptingId,
+          );
+          return [
+            {
+              userLowId,
+              userHighId,
+              createdVia: "group",
+            },
+          ];
+        });
+        if (friendshipsToUpsert.length > 0) {
           await tx
             .insert(friendships)
-            .values({
-              userLowId: low,
-              userHighId: high,
-              createdVia: "group",
-            })
+            .values(friendshipsToUpsert)
             .onConflictDoUpdate({
               target: [friendships.userLowId, friendships.userHighId],
               set: { removedAt: null, updatedAt: new Date() },

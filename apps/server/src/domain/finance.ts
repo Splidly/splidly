@@ -1,11 +1,12 @@
 import {
   and,
   currencyQuotes,
+  type Database,
   eq,
+  inArray,
   ledgerEntries,
   ledgerValuations,
   profiles,
-  type Database,
 } from "@splidly/db";
 import {
   convertMinor,
@@ -46,7 +47,10 @@ export async function resolveRates(input: {
       });
     }
     if (quote.base !== input.base) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "Quote base mismatch" });
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Quote base mismatch",
+      });
     }
     automatic = quote.rates as RateSnapshot[];
   }
@@ -110,20 +114,25 @@ export async function loadHomeCurrencies(
   db: Database,
   userIds: string[],
 ): Promise<Map<string, CurrencyCode>> {
+  const uniqueUserIds = [...new Set(userIds)];
+  if (uniqueUserIds.length === 0) return new Map();
+
+  const profilesByUser = await db
+    .select({
+      homeCurrency: profiles.homeCurrency,
+      userId: profiles.userId,
+    })
+    .from(profiles)
+    .where(inArray(profiles.userId, uniqueUserIds));
   const values = new Map<string, CurrencyCode>();
-  for (const userId of [...new Set(userIds)]) {
-    const [profile] = await db
-      .select({ homeCurrency: profiles.homeCurrency })
-      .from(profiles)
-      .where(eq(profiles.userId, userId))
-      .limit(1);
-    if (!profile) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "Every participant must finish onboarding",
-      });
-    }
-    values.set(userId, profile.homeCurrency as CurrencyCode);
+  for (const profile of profilesByUser) {
+    values.set(profile.userId, profile.homeCurrency as CurrencyCode);
+  }
+  if (values.size !== uniqueUserIds.length) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Every participant must finish onboarding",
+    });
   }
   return values;
 }
@@ -150,10 +159,12 @@ export async function reverseActiveEntries(
   const active = existing.filter(
     (entry) => !entry.reversalOfId && !alreadyReversed.has(entry.id),
   );
-  for (const entry of active) {
-    const [reversal] = await tx
-      .insert(ledgerEntries)
-      .values({
+  if (active.length === 0) return;
+
+  const reversals = await tx
+    .insert(ledgerEntries)
+    .values(
+      active.map((entry) => ({
         sourceType,
         sourceId,
         contextType: entry.contextType,
@@ -163,22 +174,37 @@ export async function reverseActiveEntries(
         canonicalCurrency: entry.canonicalCurrency,
         canonicalAmountMinor: entry.canonicalAmountMinor,
         reversalOfId: entry.id,
-      })
-      .returning();
-    if (!reversal) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-    const values = await tx
-      .select()
-      .from(ledgerValuations)
-      .where(eq(ledgerValuations.ledgerEntryId, entry.id));
-    if (values.length > 0) {
-      await tx.insert(ledgerValuations).values(
-        values.map((value) => ({
-          ledgerEntryId: reversal.id,
-          userId: value.userId,
-          currency: value.currency,
-          amountMinor: value.amountMinor,
-        })),
-      );
-    }
+      })),
+    )
+    .returning({
+      id: ledgerEntries.id,
+      reversalOfId: ledgerEntries.reversalOfId,
+    });
+  const reversalIds = new Map(
+    reversals.flatMap((reversal) =>
+      reversal.reversalOfId ? [[reversal.reversalOfId, reversal.id]] : [],
+    ),
+  );
+  if (reversalIds.size !== active.length) {
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+  }
+  const values = await tx
+    .select()
+    .from(ledgerValuations)
+    .where(
+      inArray(
+        ledgerValuations.ledgerEntryId,
+        active.map((entry) => entry.id),
+      ),
+    );
+  if (values.length > 0) {
+    await tx.insert(ledgerValuations).values(
+      values.map((value) => ({
+        ledgerEntryId: reversalIds.get(value.ledgerEntryId)!,
+        userId: value.userId,
+        currency: value.currency,
+        amountMinor: value.amountMinor,
+      })),
+    );
   }
 }

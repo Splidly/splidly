@@ -1,11 +1,11 @@
 import {
   and,
+  type Database,
   eq,
   friendships,
   groupMembers,
   isNull,
   profiles,
-  type Database,
 } from "@splidly/db";
 import { TRPCError } from "@trpc/server";
 
@@ -13,11 +13,28 @@ export function orderedPair(a: string, b: string): [string, string] {
   return a < b ? [a, b] : [b, a];
 }
 
-export async function requireProfile(db: Database, user: {
-  id: string;
-  name: string;
-  image?: string | null | undefined;
-}) {
+export function groupBy<T, K>(
+  values: Iterable<T>,
+  keyFor: (value: T) => K,
+): Map<K, T[]> {
+  const groups = new Map<K, T[]>();
+  for (const value of values) {
+    const key = keyFor(value);
+    const group = groups.get(key);
+    if (group) group.push(value);
+    else groups.set(key, [value]);
+  }
+  return groups;
+}
+
+export async function requireProfile(
+  db: Database,
+  user: {
+    id: string;
+    name: string;
+    image?: string | null | undefined;
+  },
+) {
   const [existing] = await db
     .select()
     .from(profiles)

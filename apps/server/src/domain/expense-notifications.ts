@@ -1,6 +1,8 @@
 import {
   and,
   eq,
+  type ExpenseEventNotificationPayload,
+  type ExpenseNotificationPayload,
   expensePayments,
   expenseSplits,
   groupMembers,
@@ -10,10 +12,8 @@ import {
   notificationOutbox,
   profiles,
   pushInstallations,
-  type ExpenseEventNotificationPayload,
-  type ExpenseNotificationPayload,
 } from "@splidly/db";
-import { formatMinor, type CurrencyCode } from "@splidly/shared";
+import { type CurrencyCode, formatMinor } from "@splidly/shared";
 import type { DbTransaction } from "./finance";
 
 export type ExpenseNotificationAction = "create" | "update" | "delete";
@@ -37,10 +37,16 @@ export function expenseNotificationInvolvement(input: {
   const deleted = input.action === "delete";
 
   if (netMinor < 0n) {
-    return `You ${deleted ? "owed" : "owe"} ${notificationMoney(-netMinor, input.currency)}`;
+    return `You ${deleted ? "owed" : "owe"} ${notificationMoney(
+      -netMinor,
+      input.currency,
+    )}`;
   }
   if (netMinor > 0n) {
-    return `You ${deleted ? "were owed" : "are owed"} ${notificationMoney(netMinor, input.currency)}`;
+    return `You ${deleted ? "were owed" : "are owed"} ${notificationMoney(
+      netMinor,
+      input.currency,
+    )}`;
   }
   if (input.paymentMinor !== undefined || input.shareMinor !== undefined) {
     const amount = notificationMoney(shareMinor, input.currency);
@@ -71,13 +77,22 @@ export function buildExpenseNotificationPayload(input: {
         ? "updated"
         : "deleted";
   return {
-    eventType: `expense.${input.action === "create" ? "created" : input.action === "update" ? "updated" : "deleted"}`,
+    eventType: `expense.${
+      input.action === "create"
+        ? "created"
+        : input.action === "update"
+          ? "updated"
+          : "deleted"
+    }`,
     expenseId: input.expenseId,
     expenseVersion: input.expenseVersion,
     groupId: input.groupId,
     groupName: input.groupName,
     title: `${input.actorName} ${verb} “${input.description}”`,
-    body: `${input.action === "delete" ? "Total was" : "Total"} ${notificationMoney(input.sourceAmountMinor, input.sourceCurrency)} in ${input.groupName} · ${expenseNotificationInvolvement({
+    body: `${input.action === "delete" ? "Total was" : "Total"} ${notificationMoney(
+      input.sourceAmountMinor,
+      input.sourceCurrency,
+    )} in ${input.groupName} · ${expenseNotificationInvolvement({
       action: input.action,
       currency: input.sourceCurrency,
       ...(input.recipientPaymentMinor !== undefined
@@ -122,24 +137,32 @@ export async function enqueueExpenseNotifications(
   input: {
     action: ExpenseNotificationAction;
     actorId: string;
+    actorName?: string;
     description: string;
     expenseId: string;
     expenseVersion: number;
     groupId: string;
+    groupName?: string;
+    payments?: ReadonlyMap<string, bigint>;
+    splits?: ReadonlyMap<string, bigint>;
     sourceAmountMinor: bigint;
     sourceCurrency: CurrencyCode;
   },
 ) {
-  const [group] = await tx
-    .select({ name: groups.name })
-    .from(groups)
-    .where(eq(groups.id, input.groupId))
-    .limit(1);
-  const [actor] = await tx
-    .select({ displayName: profiles.displayName })
-    .from(profiles)
-    .where(eq(profiles.userId, input.actorId))
-    .limit(1);
+  const [group] = input.groupName
+    ? [{ name: input.groupName }]
+    : await tx
+        .select({ name: groups.name })
+        .from(groups)
+        .where(eq(groups.id, input.groupId))
+        .limit(1);
+  const [actor] = input.actorName
+    ? [{ displayName: input.actorName }]
+    : await tx
+        .select({ displayName: profiles.displayName })
+        .from(profiles)
+        .where(eq(profiles.userId, input.actorId))
+        .limit(1);
   const installations = await tx
     .select({
       id: pushInstallations.id,
@@ -166,26 +189,32 @@ export async function enqueueExpenseNotifications(
     );
   if (!group || installations.length === 0) return;
 
-  const paymentRows = await tx
-    .select({
-      amountMinor: expensePayments.sourceAmountMinor,
-      userId: expensePayments.userId,
-    })
-    .from(expensePayments)
-    .where(eq(expensePayments.expenseId, input.expenseId));
-  const splitRows = await tx
-    .select({
-      amountMinor: expenseSplits.sourceAmountMinor,
-      userId: expenseSplits.userId,
-    })
-    .from(expenseSplits)
-    .where(eq(expenseSplits.expenseId, input.expenseId));
-  const payments = new Map(
-    paymentRows.map((payment) => [payment.userId, payment.amountMinor]),
-  );
-  const splits = new Map(
-    splitRows.map((split) => [split.userId, split.amountMinor]),
-  );
+  const payments =
+    input.payments ??
+    new Map(
+      (
+        await tx
+          .select({
+            amountMinor: expensePayments.sourceAmountMinor,
+            userId: expensePayments.userId,
+          })
+          .from(expensePayments)
+          .where(eq(expensePayments.expenseId, input.expenseId))
+      ).map((payment) => [payment.userId, payment.amountMinor]),
+    );
+  const splits =
+    input.splits ??
+    new Map(
+      (
+        await tx
+          .select({
+            amountMinor: expenseSplits.sourceAmountMinor,
+            userId: expenseSplits.userId,
+          })
+          .from(expenseSplits)
+          .where(eq(expenseSplits.expenseId, input.expenseId))
+      ).map((split) => [split.userId, split.amountMinor]),
+    );
 
   const now = new Date();
   const notificationRows = installations.flatMap((installation) => {
@@ -214,12 +243,8 @@ export async function enqueueExpenseNotifications(
       groupName: group.name,
       sourceAmountMinor: input.sourceAmountMinor,
       sourceCurrency: input.sourceCurrency,
-      ...(recipientPaymentMinor !== undefined
-        ? { recipientPaymentMinor }
-        : {}),
-      ...(recipientShareMinor !== undefined
-        ? { recipientShareMinor }
-        : {}),
+      ...(recipientPaymentMinor !== undefined ? { recipientPaymentMinor } : {}),
+      ...(recipientShareMinor !== undefined ? { recipientShareMinor } : {}),
     });
     return [
       {

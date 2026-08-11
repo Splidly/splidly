@@ -1,7 +1,7 @@
 import type { Database } from "@splidly/db";
 import type { RateSnapshot } from "@splidly/shared";
 import { describe, expect, it } from "vitest";
-import { resolveRates } from "../src/domain/finance";
+import { loadHomeCurrencies, resolveRates } from "../src/domain/finance";
 
 const usdRate: RateSnapshot = {
   base: "EUR",
@@ -52,5 +52,52 @@ describe("resolveRates", () => {
     });
 
     expect(rates).toEqual([correction]);
+  });
+});
+
+describe("loadHomeCurrencies", () => {
+  it("loads every participant in one database query", async () => {
+    let queryCount = 0;
+    const db = {
+      select() {
+        queryCount += 1;
+        return {
+          from() {
+            return {
+              where: async () => [
+                { userId: "ada", homeCurrency: "EUR" },
+                { userId: "grace", homeCurrency: "USD" },
+              ],
+            };
+          },
+        };
+      },
+    } as unknown as Database;
+
+    const currencies = await loadHomeCurrencies(db, ["ada", "grace", "ada"]);
+
+    expect(queryCount).toBe(1);
+    expect(currencies).toEqual(
+      new Map([
+        ["ada", "EUR"],
+        ["grace", "USD"],
+      ]),
+    );
+  });
+
+  it("rejects the batch when a participant has no profile", async () => {
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: async () => [{ userId: "ada", homeCurrency: "EUR" }],
+        }),
+      }),
+    } as unknown as Database;
+
+    await expect(
+      loadHomeCurrencies(db, ["ada", "missing"]),
+    ).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+    });
   });
 });

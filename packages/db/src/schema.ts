@@ -215,12 +215,11 @@ export const friendships = pgTable(
     ...timestamps,
   },
   (table) => [
-    uniqueIndex("friendship_pair_unique").on(
-      table.userLowId,
-      table.userHighId,
-    ),
+    uniqueIndex("friendship_pair_unique").on(table.userLowId, table.userHighId),
     index("friendship_low_idx").on(table.userLowId),
     index("friendship_high_idx").on(table.userHighId),
+    index("friendship_active_low_idx").on(table.userLowId, table.removedAt),
+    index("friendship_active_high_idx").on(table.userHighId, table.removedAt),
   ],
 );
 
@@ -257,6 +256,7 @@ export const groupMembers = pgTable(
   (table) => [
     primaryKey({ columns: [table.groupId, table.userId] }),
     index("group_member_user_idx").on(table.userId),
+    index("group_member_active_user_idx").on(table.userId, table.removedAt),
   ],
 );
 
@@ -290,16 +290,18 @@ export const currencyQuotes = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     base: text("base").notNull(),
-    rates: jsonb("rates").$type<
-      {
-        base: string;
-        quote: string;
-        rate: string;
-        provider: string;
-        providerDate: string;
-        source: "automatic" | "manual";
-      }[]
-    >().notNull(),
+    rates: jsonb("rates")
+      .$type<
+        {
+          base: string;
+          quote: string;
+          rate: string;
+          provider: string;
+          providerDate: string;
+          source: "automatic" | "manual";
+        }[]
+      >()
+      .notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     ...timestamps,
   },
@@ -346,6 +348,16 @@ export const expenses = pgTable(
     ),
     index("expense_group_idx").on(table.groupId),
     index("expense_friendship_idx").on(table.friendshipId),
+    index("expense_active_group_idx").on(
+      table.groupId,
+      table.deletedAt,
+      table.occurredAt,
+    ),
+    index("expense_active_friendship_idx").on(
+      table.friendshipId,
+      table.deletedAt,
+      table.occurredAt,
+    ),
   ],
 );
 
@@ -425,6 +437,16 @@ export const settlements = pgTable(
     ),
     index("settlement_group_idx").on(table.groupId),
     index("settlement_friendship_idx").on(table.friendshipId),
+    index("settlement_active_group_idx").on(
+      table.groupId,
+      table.deletedAt,
+      table.occurredAt,
+    ),
+    index("settlement_active_friendship_idx").on(
+      table.friendshipId,
+      table.deletedAt,
+      table.occurredAt,
+    ),
   ],
 );
 

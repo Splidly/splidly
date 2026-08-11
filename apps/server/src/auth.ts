@@ -1,5 +1,5 @@
 import { expo } from "@better-auth/expo";
-import { authSchema, profiles, type Database } from "@splidly/db";
+import { authSchema, type Database, profiles } from "@splidly/db";
 import {
   betterAuth,
   type BetterAuthOptions,
@@ -66,6 +66,12 @@ export async function createAuth(
       provider: "pg",
       schema: authSchema,
     }),
+    session: {
+      cookieCache: {
+        enabled: true,
+        maxAge: 60,
+      },
+    },
     emailAndPassword: { enabled: env.NODE_ENV === "development" },
     socialProviders,
     trustedOrigins: [
@@ -95,10 +101,7 @@ export async function createAuth(
       user: {
         create: {
           after: async (user) => {
-            if (
-              env.NODE_ENV !== "development" ||
-              user.email !== demoEmail
-            ) {
+            if (env.NODE_ENV !== "development" || user.email !== demoEmail) {
               return;
             }
             await db

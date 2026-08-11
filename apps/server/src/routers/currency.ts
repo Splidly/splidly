@@ -22,6 +22,14 @@ const frankfurterCurrencySchema = z.object({
   symbol: z.string().nullable().optional(),
 });
 
+const currencyListCacheMs = 24 * 60 * 60 * 1_000;
+const rateCacheMs = 15 * 60 * 1_000;
+const serviceResponseCache = new Map<
+  string,
+  { expiresAt: number; value: unknown }
+>();
+const pendingServiceRequests = new Map<string, Promise<unknown>>();
+
 async function fetchCurrencyService(
   ctx: TrpcContext,
   url: string | URL,
@@ -58,11 +66,42 @@ async function fetchCurrencyService(
   }
 }
 
+async function cachedCurrencyServiceJson(
+  ctx: TrpcContext,
+  url: string | URL,
+  operation: "currencies" | "rates",
+) {
+  const key = `${operation}:${url}`;
+  const cached = serviceResponseCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const pending = pendingServiceRequests.get(key);
+  if (pending) return pending;
+
+  const request = (async () => {
+    const response = await fetchCurrencyService(ctx, url, operation);
+    if (!response.ok) throw new Error("Currency service request failed");
+    const rawValue: unknown = await response.json();
+    const value =
+      operation === "currencies"
+        ? z.array(frankfurterCurrencySchema).parse(rawValue)
+        : z.array(frankfurterRateSchema).parse(rawValue);
+    serviceResponseCache.set(key, {
+      expiresAt:
+        Date.now() +
+        (operation === "currencies" ? currencyListCacheMs : rateCacheMs),
+      value,
+    });
+    return value;
+  })().finally(() => pendingServiceRequests.delete(key));
+  pendingServiceRequests.set(key, request);
+  return request;
+}
+
 export const currencyRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
-    let response: Response;
+    let payload: unknown;
     try {
-      response = await fetchCurrencyService(
+      payload = await cachedCurrencyServiceJson(
         ctx,
         `${ctx.env.FRANKFURTER_URL}/v2/currencies`,
         "currencies",
@@ -73,13 +112,7 @@ export const currencyRouter = router({
         message: "Currency service unavailable",
       });
     }
-    if (!response.ok) {
-      throw new TRPCError({
-        code: "BAD_GATEWAY",
-        message: "Currency service unavailable",
-      });
-    }
-    return z.array(frankfurterCurrencySchema).parse(await response.json());
+    return z.array(frankfurterCurrencySchema).parse(payload);
   }),
 
   quote: protectedProcedure
@@ -92,25 +125,16 @@ export const currencyRouter = router({
         const url = new URL("/v2/rates", ctx.env.FRANKFURTER_URL);
         url.searchParams.set("base", input.base);
         url.searchParams.set("quotes", remoteTargets.join(","));
-        let response: Response;
+        let payload: unknown;
         try {
-          response = await fetchCurrencyService(ctx, url, "rates");
+          payload = await cachedCurrencyServiceJson(ctx, url, "rates");
         } catch {
           throw new TRPCError({
             code: "BAD_GATEWAY",
-            message:
-              "No fresh exchange rate is available. Try again shortly.",
+            message: "No fresh exchange rate is available. Try again shortly.",
           });
         }
-        if (!response.ok) {
-          throw new TRPCError({
-            code: "BAD_GATEWAY",
-            message: "Currency service unavailable",
-          });
-        }
-        remoteRates = z
-          .array(frankfurterRateSchema)
-          .parse(await response.json());
+        remoteRates = z.array(frankfurterRateSchema).parse(payload);
       }
 
       const today = new Date().toISOString().slice(0, 10);

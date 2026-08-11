@@ -8,14 +8,14 @@ import {
   isNull,
   ledgerEntries,
   ledgerValuations,
+  profiles,
   rateSnapshots,
   settlements,
-  profiles,
 } from "@splidly/db";
 import {
+  type CurrencyCode,
   rateSnapshotSchema,
   settlementMutationSchema,
-  type CurrencyCode,
 } from "@splidly/shared";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -73,24 +73,26 @@ export const settlementsRouter = router({
       } else {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       }
-      const people = await ctx.db
-        .select({
-          userId: profiles.userId,
-          displayName: profiles.displayName,
-          avatarUrl: profiles.avatarUrl,
-          homeCurrency: profiles.homeCurrency,
-        })
-        .from(profiles)
-        .where(
-          inArray(profiles.userId, [
-            settlement.fromUserId,
-            settlement.toUserId,
-          ]),
-        );
-      const storedRates = await ctx.db
-        .select()
-        .from(rateSnapshots)
-        .where(eq(rateSnapshots.settlementId, settlement.id));
+      const [people, storedRates] = await Promise.all([
+        ctx.db
+          .select({
+            userId: profiles.userId,
+            displayName: profiles.displayName,
+            avatarUrl: profiles.avatarUrl,
+            homeCurrency: profiles.homeCurrency,
+          })
+          .from(profiles)
+          .where(
+            inArray(profiles.userId, [
+              settlement.fromUserId,
+              settlement.toUserId,
+            ]),
+          ),
+        ctx.db
+          .select()
+          .from(rateSnapshots)
+          .where(eq(rateSnapshots.settlementId, settlement.id)),
+      ]);
       return {
         settlement,
         from: people.find((person) => person.userId === settlement.fromUserId),
@@ -564,7 +566,9 @@ export const settlementsRouter = router({
         .from(settlements)
         .where(eq(settlements.id, input.settlementId))
         .limit(1);
-      if (!current || current.deletedAt) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!current || current.deletedAt) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
       if (current.groupId) {
         await requireActiveGroupMember(
           ctx.db,

@@ -71,6 +71,13 @@
       "when": 1785791722675,
       "tag": "0009_bored_wolf_cub",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786488800821,
+      "tag": "0010_daffy_psynapse",
+      "breakpoints": true
     }
   ]
 }
