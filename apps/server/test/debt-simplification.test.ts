@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  memberRepaymentSummaries,
   repaymentPlan,
   viewerRepaymentBalances,
   type LedgerAmount,
@@ -63,16 +64,8 @@ describe("repaymentPlan", () => {
 
   it("cancels opposite obligations between the same pair when disabled", () => {
     expect(
-      repaymentPlan(
-        [
-          amount("a", "b", 1_000n),
-          amount("b", "a", 350n),
-        ],
-        false,
-      ),
-    ).toEqual([
-      { fromUserId: "a", toUserId: "b", amountMinor: 650n },
-    ]);
+      repaymentPlan([amount("a", "b", 1_000n), amount("b", "a", 350n)], false),
+    ).toEqual([{ fromUserId: "a", toUserId: "b", amountMinor: 650n }]);
   });
 
   it("returns the viewer's signed balances with every repayment counterparty", () => {
@@ -93,6 +86,89 @@ describe("repaymentPlan", () => {
     ).toEqual([
       { userId: "alex", displayName: "Alex", amountMinor: -800n },
       { userId: "sam", displayName: "Sam", amountMinor: 1_200n },
+    ]);
+  });
+});
+
+describe("memberRepaymentSummaries", () => {
+  it("lists every member with separate owed and lent relationships", () => {
+    expect(
+      memberRepaymentSummaries(
+        [
+          { fromUserId: "alex", toUserId: "sam", amountMinor: 1_000n },
+          { fromUserId: "bea", toUserId: "alex", amountMinor: 1_500n },
+        ],
+        [
+          { userId: "sam", displayName: "Sam", avatarUrl: null },
+          { userId: "alex", displayName: "Alex", avatarUrl: "alex.png" },
+          { userId: "bea", displayName: "Bea", avatarUrl: null },
+          { userId: "chris", displayName: "Chris", avatarUrl: null },
+        ],
+      ),
+    ).toEqual([
+      {
+        userId: "alex",
+        displayName: "Alex",
+        avatarUrl: "alex.png",
+        owesMinor: 1_000n,
+        lentMinor: 1_500n,
+        relationships: [
+          {
+            kind: "owes",
+            counterpartyId: "sam",
+            counterpartyDisplayName: "Sam",
+            counterpartyAvatarUrl: null,
+            amountMinor: 1_000n,
+          },
+          {
+            kind: "lent",
+            counterpartyId: "bea",
+            counterpartyDisplayName: "Bea",
+            counterpartyAvatarUrl: null,
+            amountMinor: 1_500n,
+          },
+        ],
+      },
+      {
+        userId: "bea",
+        displayName: "Bea",
+        avatarUrl: null,
+        owesMinor: 1_500n,
+        lentMinor: 0n,
+        relationships: [
+          {
+            kind: "owes",
+            counterpartyId: "alex",
+            counterpartyDisplayName: "Alex",
+            counterpartyAvatarUrl: "alex.png",
+            amountMinor: 1_500n,
+          },
+        ],
+      },
+      {
+        userId: "chris",
+        displayName: "Chris",
+        avatarUrl: null,
+        owesMinor: 0n,
+        lentMinor: 0n,
+        relationships: [],
+      },
+      {
+        userId: "sam",
+        displayName: "Sam",
+        avatarUrl: null,
+        owesMinor: 0n,
+        lentMinor: 1_000n,
+        relationships: [
+          {
+            kind: "lent",
+            counterpartyId: "alex",
+            counterpartyDisplayName: "Alex",
+            counterpartyAvatarUrl: "alex.png",
+            amountMinor: 1_000n,
+          },
+        ],
+      },
     ]);
   });
 });

@@ -25,6 +25,7 @@ import {
   TextInput,
   useColorScheme,
   View,
+  type AccessibilityState,
   type ColorValue,
   type ScrollViewProps,
   type TextInputProps,
@@ -196,6 +197,7 @@ export function Screen({
   bottomOverlayHeight = 62,
   refreshing,
   onRefresh,
+  onScroll,
 }: PropsWithChildren<{
   scroll?: boolean;
   bounces?: boolean;
@@ -209,6 +211,7 @@ export function Screen({
   bottomOverlayHeight?: number;
   refreshing?: boolean;
   onRefresh?: () => void;
+  onScroll?: ScrollViewProps["onScroll"];
 }>) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -267,6 +270,8 @@ export function Screen({
             <RefreshControl refreshing={refreshing ?? false} onRefresh={onRefresh} />
           ) : undefined
         }
+        onScroll={onScroll}
+        scrollEventThrottle={onScroll ? 16 : undefined}
         onLayout={onLayout}
         onContentSizeChange={onContentSizeChange}
       >
@@ -421,6 +426,9 @@ export function RowDivider({ inset = 64 }: { inset?: number }) {
 }
 
 export function ListRow({
+  accessibilityLabel,
+  accessibilityHint,
+  accessibilityState,
   title,
   subtitle,
   subtitleNumberOfLines = 2,
@@ -433,6 +441,9 @@ export function ListRow({
   destructive = false,
   showsDisclosureIndicator = true,
 }: {
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  accessibilityState?: AccessibilityState;
   title: string;
   subtitle?: string;
   subtitleNumberOfLines?: number;
@@ -518,6 +529,9 @@ export function ListRow({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={accessibilityState}
       onPress={onPress}
       style={({ pressed }) => [
         styles.listRow,

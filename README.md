@@ -76,7 +76,10 @@ pnpm --filter @splidly/mobile android
 Development builds show a **Continue as Demo User** action. The credential
 provider backing this shared local account is enabled only when
 `NODE_ENV=development`; production builds hide the action and production
-servers reject credential authentication.
+servers reject credential authentication. Docker Compose respects `NODE_ENV`
+from the root environment file, so a remotely hosted development server can
+support the same flow. Successful demo login also creates an idempotent
+`Lisbon Weekend` group with fictional members and expenses.
 
 For a physical device, set `API_PUBLIC_URL` and `EXPO_PUBLIC_API_URL` to an HTTPS development hostname reachable from that device.
 

@@ -25,9 +25,7 @@ import {
   SheetCloseButton,
 } from "../../../../components/ui";
 import { api } from "../../../../lib/trpc";
-import {
-  normalizeGroupColor,
-} from "../../../../lib/group-colors";
+import { normalizeGroupColor } from "../../../../lib/group-colors";
 import { spacing, useTheme } from "../../../../theme";
 
 export default function EditGroupScreen() {
@@ -55,6 +53,7 @@ export default function EditGroupScreen() {
     async onSuccess() {
       await Promise.all([
         utils.groups.detail.invalidate({ groupId: id }),
+        utils.groups.balances.invalidate({ groupId: id }),
         utils.groups.list.invalidate(),
       ]);
       router.back();
@@ -83,10 +82,7 @@ export default function EditGroupScreen() {
   }
 
   return (
-    <Screen
-      background="sheet"
-      contentContainerStyle={styles.content}
-    >
+    <Screen background="sheet" contentContainerStyle={styles.content}>
       <SheetCloseButton
         label="Close edit group"
         disabled={update.isPending}
@@ -94,9 +90,7 @@ export default function EditGroupScreen() {
       />
 
       <View style={styles.hero}>
-        <Text style={[styles.title, { color: theme.text }]}>
-          Edit group
-        </Text>
+        <Text style={[styles.title, { color: theme.text }]}>Edit group</Text>
         <Text style={[styles.subtitle, { color: theme.muted }]}>
           Update how this group appears.
         </Text>

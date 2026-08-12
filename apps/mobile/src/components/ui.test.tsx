@@ -119,6 +119,27 @@ describe("Screen", () => {
     expect(overflowingContentStyle.paddingBottom).toBe(16);
   });
 
+  it("forwards scroll events without changing native inset ownership", async () => {
+    const onScroll = jest.fn();
+    const view = await render(
+      <SafeAreaInsetsContext.Provider
+        value={{ top: 0, right: 0, bottom: 20, left: 0 }}
+      >
+        <Screen onScroll={onScroll}>
+          <Text>Content</Text>
+        </Screen>
+      </SafeAreaInsetsContext.Provider>,
+    );
+    const [scrollView] = view.container.queryAll(
+      (instance) =>
+        instance.props.contentInsetAdjustmentBehavior === "automatic",
+    );
+
+    expect(scrollView?.props.onScroll).toBe(onScroll);
+    expect(scrollView?.props.scrollEventThrottle).toBe(16);
+    expect(scrollView?.props.contentInsetAdjustmentBehavior).toBe("automatic");
+  });
+
   it("uses the elevated sheet background without changing scroll behavior", async () => {
     const view = await render(
       <SafeAreaInsetsContext.Provider

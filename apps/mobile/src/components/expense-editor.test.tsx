@@ -184,6 +184,7 @@ jest.mock("../lib/trpc", () => ({
       },
       groups: {
         detail: { invalidate: jest.fn() },
+        balances: { invalidate: jest.fn() },
         list: { invalidate: jest.fn() },
       },
     }),

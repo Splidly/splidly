@@ -183,6 +183,7 @@ jest.mock("../lib/trpc", () => ({
       groups: {
         list: { invalidate: jest.fn() },
         detail: { invalidate: jest.fn() },
+        balances: { invalidate: jest.fn() },
       },
       settlements: {
         detail: { invalidate: jest.fn() },
@@ -366,6 +367,27 @@ describe("NewSettlementScreen group context", () => {
         }
       ).router.dismissTo,
     ).toHaveBeenCalledWith("/groups/group-1");
+  });
+
+  it("returns to group balances when launched from the balances flow", async () => {
+    mockSettlementParams.returnTo = "balances";
+    const view = await render(
+      <SafeAreaInsetsContext.Provider
+        value={{ top: 0, right: 0, bottom: 0, left: 0 }}
+      >
+        <NewSettlementScreen />
+      </SafeAreaInsetsContext.Provider>,
+    );
+
+    await fireEvent.press(view.getByLabelText("Cancel payment"));
+
+    expect(
+      (
+        jest.requireMock("expo-router") as {
+          router: { dismissTo: jest.Mock };
+        }
+      ).router.dismissTo,
+    ).toHaveBeenCalledWith("/groups/group-1/balances");
   });
 
   it("dismisses to the group after a payment is recorded", async () => {

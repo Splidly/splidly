@@ -7,12 +7,7 @@ import {
   type QuoteResult,
 } from "@splidly/shared";
 import * as Crypto from "expo-crypto";
-import {
-  router,
-  Stack,
-  useLocalSearchParams,
-  type Href,
-} from "expo-router";
+import { router, Stack, useLocalSearchParams, type Href } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { beginCurrencySelection } from "../../lib/currency-selection";
@@ -51,6 +46,7 @@ export default function NewSettlementScreen() {
     canonicalCurrency: CurrencyCode;
     canonicalMinor?: string;
     settlementId?: string;
+    returnTo?: "balances" | "settings";
   }>();
   const editing = Boolean(params.settlementId);
   const theme = useTheme();
@@ -81,10 +77,7 @@ export default function NewSettlementScreen() {
     focusInput: focusBottomInput,
     blurInput: blurBottomInput,
     revealFocusedInput: revealBottomInput,
-  } = useKeyboardFocusScroll(
-    screenRef,
-    settlementOverlayHeight + 16,
-  );
+  } = useKeyboardFocusScroll(screenRef, settlementOverlayHeight + 16);
 
   let signedCanonicalMinor: bigint | undefined;
   try {
@@ -110,7 +103,9 @@ export default function NewSettlementScreen() {
   const [rateError, setRateError] = useState<string>();
   const [formError, setFormError] = useState<string>();
   const closeHref = (
-    params.friendshipId
+    params.type === "group" && params.returnTo
+      ? `/groups/${params.id}/${params.returnTo}`
+      : params.friendshipId
       ? `/friends/${params.friendshipId}`
       : params.type === "group"
         ? `/groups/${params.id}`
@@ -124,9 +119,7 @@ export default function NewSettlementScreen() {
   useEffect(() => {
     if (signedCanonicalMinor === undefined) return;
     const absolute =
-      signedCanonicalMinor < 0n
-        ? -signedCanonicalMinor
-        : signedCanonicalMinor;
+      signedCanonicalMinor < 0n ? -signedCanonicalMinor : signedCanonicalMinor;
     setAmount(formatMinor(absolute, params.canonicalCurrency));
   }, [params.canonicalCurrency, params.canonicalMinor]);
 
@@ -139,6 +132,9 @@ export default function NewSettlementScreen() {
         : utils.friends.detail.invalidate({
             friendshipId: params.friendshipId ?? params.id,
           }),
+      params.type === "group"
+        ? utils.groups.balances.invalidate({ groupId: params.id })
+        : Promise.resolve(),
       params.settlementId
         ? utils.settlements.detail.invalidate({
             settlementId: params.settlementId,
@@ -199,9 +195,7 @@ export default function NewSettlementScreen() {
   const fromMember = contextMembers.find(
     (member) => member.userId === fromUserId,
   );
-  const toMember = contextMembers.find(
-    (member) => member.userId === toUserId,
-  );
+  const toMember = contextMembers.find((member) => member.userId === toUserId);
   const sourceMinor = useMemo(() => {
     try {
       const parsed = parseDecimalToMinor(amount, currency);
@@ -217,7 +211,11 @@ export default function NewSettlementScreen() {
         fromMember?.homeCurrency,
         toMember?.homeCurrency,
       ].filter((value): value is CurrencyCode => Boolean(value)),
-    [fromMember?.homeCurrency, params.canonicalCurrency, toMember?.homeCurrency],
+    [
+      fromMember?.homeCurrency,
+      params.canonicalCurrency,
+      toMember?.homeCurrency,
+    ],
   );
   const currentRateBasis = rateBasis(currency, rateTargets);
   const needsQuote = rateTargets.some((target) => target !== currency);
@@ -244,9 +242,7 @@ export default function NewSettlementScreen() {
   useEffect(() => {
     if (!profile.data || contextMembers.length < 2) return;
     const legacyNegative =
-      signedCanonicalMinor !== undefined
-        ? signedCanonicalMinor < 0n
-        : false;
+      signedCanonicalMinor !== undefined ? signedCanonicalMinor < 0n : false;
     const initialFrom =
       params.fromUserId ??
       (params.friendId
@@ -350,10 +346,13 @@ export default function NewSettlementScreen() {
     if (!activeQuote) return;
     const refreshIn =
       new Date(activeQuote.expiresAt).getTime() - Date.now() - 5_000;
-    const timeout = setTimeout(() => {
-      setActiveQuote(undefined);
-      setActiveRateBasis("");
-    }, Math.max(0, refreshIn));
+    const timeout = setTimeout(
+      () => {
+        setActiveQuote(undefined);
+        setActiveRateBasis("");
+      },
+      Math.max(0, refreshIn),
+    );
     return () => clearTimeout(timeout);
   }, [activeQuote]);
 
@@ -461,20 +460,11 @@ export default function NewSettlementScreen() {
       return undefined;
     }
     const rate = (
-      storedRatesReady
-        ? settlementDetail.data?.rates
-        : activeQuote?.rates
-    )?.find(
-      (candidate) => candidate.quote === params.canonicalCurrency,
-    );
+      storedRatesReady ? settlementDetail.data?.rates : activeQuote?.rates
+    )?.find((candidate) => candidate.quote === params.canonicalCurrency);
     if (!rate) return undefined;
     return formatConvertedMoney(
-      convertMinor(
-        sourceMinor,
-        currency,
-        params.canonicalCurrency,
-        rate.rate,
-      ),
+      convertMinor(sourceMinor, currency, params.canonicalCurrency, rate.rate),
       params.canonicalCurrency,
     );
   }, [

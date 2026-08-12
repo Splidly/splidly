@@ -21,10 +21,7 @@ import {
 } from "react-native";
 import { beginCurrencySelection } from "../lib/currency-selection";
 import { api } from "../lib/trpc";
-import {
-  formatConvertedMoney,
-  formatExchangeRate,
-} from "../lib/money-display";
+import { formatConvertedMoney, formatExchangeRate } from "../lib/money-display";
 import { expensePaymentStatus } from "../lib/expense-payments";
 import {
   createExpenseSplitDraft,
@@ -137,6 +134,9 @@ export function ExpenseEditor({
               friendshipId: context.friendshipId,
             })
           : Promise.resolve(),
+      context?.type === "group"
+        ? utils.groups.balances.invalidate({ groupId: context.groupId })
+        : Promise.resolve(),
     ]);
     router.back();
   }
@@ -228,10 +228,7 @@ export function ExpenseEditor({
     focusInput: focusBottomInput,
     blurInput: blurBottomInput,
     revealFocusedInput: revealBottomInput,
-  } = useKeyboardFocusScroll(
-    screenRef,
-    expenseOverlayHeight + 16,
-  );
+  } = useKeyboardFocusScroll(screenRef, expenseOverlayHeight + 16);
   const detectedIconKey = useMemo(
     () => detectExpenseIconKey(description),
     [description],
@@ -260,11 +257,7 @@ export function ExpenseEditor({
   const effectiveSplitDraft = useMemo(
     () =>
       splitDraft ??
-      createExpenseSplitDraft(
-        participants,
-        sourceMinor ?? 0n,
-        currency,
-      ),
+      createExpenseSplitDraft(participants, sourceMinor ?? 0n, currency),
     [currency, participants, sourceMinor, splitDraft],
   );
   const selectedIds = useMemo(
@@ -331,9 +324,9 @@ export function ExpenseEditor({
           ? group.data?.group.currency
           : profile.data?.homeCurrency
       ) as CurrencyCode | undefined;
-      setPayerIds([
-        profile.data?.userId ?? participants[0]?.userId ?? "",
-      ].filter(Boolean));
+      setPayerIds(
+        [profile.data?.userId ?? participants[0]?.userId ?? ""].filter(Boolean),
+      );
       setCurrency(initialCurrency ?? "EUR");
       initialized.current = key;
       return;
@@ -348,8 +341,7 @@ export function ExpenseEditor({
       expense.sourceAmountMinor,
       initialCurrency,
     );
-    const initialSelectedIds =
-      expenseSplitParticipantIds(initialSplitDraft);
+    const initialSelectedIds = expenseSplitParticipantIds(initialSplitDraft);
     const storedPayers = detail.data.payers ?? [];
     const initialPayers =
       storedPayers.length > 0
@@ -378,9 +370,7 @@ export function ExpenseEditor({
       ),
     );
     setDescription(expense.description);
-    setManualIconKey(
-      expense.iconManuallySet ? expense.iconKey : undefined,
-    );
+    setManualIconKey(expense.iconManuallySet ? expense.iconKey : undefined);
     setNotes(expense.notes);
     setAmount(formatMinor(expense.sourceAmountMinor, initialCurrency));
     setCurrency(initialCurrency);
@@ -495,13 +485,15 @@ export function ExpenseEditor({
 
   useEffect(() => {
     if (!quoteExpiresAt) return;
-    const refreshIn =
-      new Date(quoteExpiresAt).getTime() - Date.now() - 5_000;
-    const timeout = setTimeout(() => {
-      setQuoteId(undefined);
-      setQuoteExpiresAt(undefined);
-      setPreviewBasis("");
-    }, Math.max(0, refreshIn));
+    const refreshIn = new Date(quoteExpiresAt).getTime() - Date.now() - 5_000;
+    const timeout = setTimeout(
+      () => {
+        setQuoteId(undefined);
+        setQuoteExpiresAt(undefined);
+        setPreviewBasis("");
+      },
+      Math.max(0, refreshIn),
+    );
     return () => clearTimeout(timeout);
   }, [quoteExpiresAt]);
 
@@ -586,12 +578,10 @@ export function ExpenseEditor({
   const saving = create.isPending || update.isPending;
   const saveError = create.error ?? update.error;
   const payerNames = payerIds
-    .map(
-      (payerId) =>
-        payerId === profile.data?.userId
-          ? "You"
-          : participants.find((person) => person.userId === payerId)
-              ?.displayName,
+    .map((payerId) =>
+      payerId === profile.data?.userId
+        ? "You"
+        : participants.find((person) => person.userId === payerId)?.displayName,
     )
     .filter((name): name is string => Boolean(name));
   const paymentSummary =
@@ -622,9 +612,7 @@ export function ExpenseEditor({
   };
   const openPaymentAllocation = () => {
     if (sourceMinor === undefined) {
-      setFormError(
-        "Enter a valid expense amount before assigning payment",
-      );
+      setFormError("Enter a valid expense amount before assigning payment");
       return;
     }
     setFormError(undefined);
@@ -785,9 +773,7 @@ export function ExpenseEditor({
           />
           <View style={{ flexDirection: "row", gap: 12 }}>
             <AllocationChoiceCard
-              title={
-                onlyCurrentUserPaid ? "Paid by You" : "Paid by"
-              }
+              title={onlyCurrentUserPaid ? "Paid by You" : "Paid by"}
               accessibilityLabel="Paid by"
               {...(sourceMinor === undefined
                 ? { subtitle: "Add an amount first" }
@@ -836,7 +822,9 @@ export function ExpenseEditor({
               }}
             />
             {notesExpanded ? (
-              <View style={{ paddingHorizontal: 16, paddingVertical: 13, gap: 6 }}>
+              <View
+                style={{ paddingHorizontal: 16, paddingVertical: 13, gap: 6 }}
+              >
                 <Text
                   style={{
                     color: theme.muted,

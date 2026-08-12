@@ -1,15 +1,33 @@
 import { fireEvent, render } from "@testing-library/react-native";
+import { HeaderHeightContext } from "expo-router/build/react-navigation/elements/Header/HeaderHeightContext";
 import { StyleSheet } from "react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import GroupDetailScreen from "../app/(tabs)/groups/[id]";
 
 jest.mock("expo-router", () => {
   const React = require("react") as typeof import("react");
-  const Screen = () => null;
+  const Screen = ({ options }: { options?: { title?: string } }) => {
+    const { Text } = require("react-native") as typeof import("react-native");
+    return <Text testID="group-navigation-title">{options?.title ?? ""}</Text>;
+  };
   const Toolbar = ({ children }: { children: React.ReactNode }) => (
     <>{children}</>
   );
-  Toolbar.Button = () => null;
+  Toolbar.Button = ({
+    accessibilityLabel,
+    onPress,
+  }: {
+    accessibilityLabel: string;
+    onPress: () => void;
+  }) => {
+    const { Pressable, Text } =
+      require("react-native") as typeof import("react-native");
+    return (
+      <Pressable accessibilityLabel={accessibilityLabel} onPress={onPress}>
+        <Text>{accessibilityLabel}</Text>
+      </Pressable>
+    );
+  };
   return {
     router: {
       push: jest.fn(),
@@ -147,11 +165,13 @@ describe("GroupDetailScreen actions", () => {
 
   it("opens one settle-up sheet instead of rendering balance actions", async () => {
     const view = await render(
-      <SafeAreaInsetsContext.Provider
-        value={{ top: 0, right: 0, bottom: 0, left: 0 }}
-      >
-        <GroupDetailScreen />
-      </SafeAreaInsetsContext.Provider>,
+      <HeaderHeightContext.Provider value={100}>
+        <SafeAreaInsetsContext.Provider
+          value={{ top: 0, right: 0, bottom: 0, left: 0 }}
+        >
+          <GroupDetailScreen />
+        </SafeAreaInsetsContext.Provider>
+      </HeaderHeightContext.Provider>,
     );
 
     expect(view.getByLabelText("You owe Alex 12.34 €")).toBeTruthy();
@@ -163,9 +183,7 @@ describe("GroupDetailScreen actions", () => {
     expect(view.getByText("10.00 €")).toBeTruthy();
     expect(view.getByText("Payment")).toBeTruthy();
     expect(view.getByTestId("settlement-activity-row")).toBeTruthy();
-    expect(
-      view.getByLabelText("Payment. Alex paid you 6.00 €"),
-    ).toBeTruthy();
+    expect(view.getByLabelText("Payment. Alex paid you 6.00 €")).toBeTruthy();
     expect(view.getByText("Alex paid you 6.00 €")).toBeTruthy();
     expect(view.queryByText("You received")).toBeNull();
     expect(view.queryByText("6.00 €")).toBeNull();
@@ -182,6 +200,43 @@ describe("GroupDetailScreen actions", () => {
     expect(view.queryByText(/20 Jul ·/)).toBeNull();
     expect(view.queryByText("Open balances")).toBeNull();
     expect(view.queryByText("Statistics")).toBeNull();
+    expect(view.getByTestId("group-navigation-title").props.children).toBe("");
+    await fireEvent(view.getByTestId("group-identity-header"), "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 58 } },
+    });
+    const [groupScrollView] = view.container.queryAll(
+      (instance) =>
+        instance.props.contentInsetAdjustmentBehavior === "automatic",
+    );
+    if (!groupScrollView) throw new Error("Group ScrollView was not rendered");
+    await fireEvent.scroll(groupScrollView, {
+      nativeEvent: {
+        contentInset: { top: 0, left: 0, bottom: 0, right: 0 },
+        contentOffset: { x: 0, y: -42 },
+        contentSize: { width: 300, height: 900 },
+        layoutMeasurement: { width: 300, height: 700 },
+        zoomScale: 1,
+      },
+    });
+    expect(view.getByTestId("group-navigation-title").props.children).toBe(
+      "Lisbon",
+    );
+    await fireEvent.scroll(groupScrollView, {
+      nativeEvent: {
+        contentInset: { top: 0, left: 0, bottom: 0, right: 0 },
+        contentOffset: { x: 0, y: -100 },
+        contentSize: { width: 300, height: 900 },
+        layoutMeasurement: { width: 300, height: 700 },
+        zoomScale: 1,
+      },
+    });
+    expect(view.getByTestId("group-navigation-title").props.children).toBe("");
+    await fireEvent.press(view.getByLabelText("Lisbon members and balances"));
+    expect(mockPush).toHaveBeenCalledWith("/groups/group-1/settings");
+    mockPush.mockClear();
+    await fireEvent.press(view.getByLabelText("Lisbon settings"));
+    expect(mockPush).toHaveBeenCalledWith("/groups/group-1/settings");
+    mockPush.mockClear();
     await fireEvent.press(view.getByTestId("settlement-activity-row"));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: "/settlement/new",

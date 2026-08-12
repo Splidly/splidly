@@ -1,5 +1,5 @@
 import { expo } from "@better-auth/expo";
-import { authSchema, type Database, profiles } from "@splidly/db";
+import { authSchema, type Database, eq, profiles } from "@splidly/db";
 import {
   betterAuth,
   type BetterAuthOptions,
@@ -8,6 +8,7 @@ import {
 } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { createAppleClientSecretFromFile } from "./apple-client-secret";
+import { ensureDemoData } from "./demo-data";
 import type { Env } from "./env";
 import type { Logger } from "./logger";
 
@@ -114,6 +115,21 @@ export async function createAuth(
               })
               .onConflictDoNothing();
             logger.info("auth.demo-profile.ensured", { userId: user.id });
+          },
+        },
+      },
+      session: {
+        create: {
+          after: async (session) => {
+            if (env.NODE_ENV !== "development") return;
+            const [user] = await db
+              .select({ email: authSchema.user.email })
+              .from(authSchema.user)
+              .where(eq(authSchema.user.id, session.userId))
+              .limit(1);
+            if (user?.email !== demoEmail) return;
+            await ensureDemoData(db, session.userId);
+            logger.info("auth.demo-data.ensured", { userId: session.userId });
           },
         },
       },

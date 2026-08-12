@@ -14,13 +14,57 @@ export function GroupBalanceSummary({
   lines,
   currency,
   totalMinor,
+  onPress,
+  accessibilityLabel = "Open group balances",
 }: {
   lines: readonly GroupSummaryLine[];
   currency?: CurrencyCode;
   totalMinor?: bigint;
+  onPress?: () => void;
+  accessibilityLabel?: string;
 }) {
   const theme = useTheme();
   const [expanded, setExpanded] = useState(false);
+  if (onPress) {
+    const collapsedTotal =
+      lines.length > 3 && currency && totalMinor !== undefined
+        ? formatConvertedMoney(totalMinor, currency)
+        : undefined;
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityHint="Shows every balance in this group"
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.summaryButton,
+          { opacity: pressed ? 0.62 : 1 },
+        ]}
+      >
+        <View style={styles.summaryCopy}>
+          {collapsedTotal ? (
+            <Text style={[styles.summaryLine, { color: theme.text }]}>
+              Outstanding · {collapsedTotal}
+            </Text>
+          ) : (
+            lines.map((line) => (
+              <BalanceSummaryLine
+                key={line.key}
+                line={line}
+                style={styles.summaryLine}
+              />
+            ))
+          )}
+        </View>
+        <Text
+          accessibilityElementsHidden
+          style={[styles.summaryDisclosure, { color: theme.subtle }]}
+        >
+          ›
+        </Text>
+      </Pressable>
+    );
+  }
   if (lines.length > 3 && currency && totalMinor !== undefined) {
     const total = formatConvertedMoney(totalMinor, currency);
     return (
@@ -156,6 +200,22 @@ const styles = StyleSheet.create({
   summary: {
     paddingHorizontal: 4,
     gap: 4,
+  },
+  summaryButton: {
+    minHeight: 44,
+    paddingHorizontal: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  summaryCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  summaryDisclosure: {
+    fontSize: 25,
+    fontWeight: "300",
+    lineHeight: 28,
   },
   summaryLine: {
     fontSize: 15,

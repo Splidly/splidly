@@ -19,6 +19,21 @@ export type ViewerRepaymentBalance = RepaymentMember & {
   amountMinor: bigint;
 };
 
+export type MemberRepaymentRelationship = {
+  kind: "owes" | "lent";
+  counterpartyId: string;
+  counterpartyDisplayName: string;
+  counterpartyAvatarUrl: string | null;
+  amountMinor: bigint;
+};
+
+export type MemberRepaymentSummary = RepaymentMember & {
+  avatarUrl: string | null;
+  owesMinor: bigint;
+  lentMinor: bigint;
+  relationships: MemberRepaymentRelationship[];
+};
+
 function netBalances(entries: LedgerAmount[]) {
   const balances = new Map<string, bigint>();
   for (const entry of entries) {
@@ -148,9 +163,7 @@ export function viewerRepaymentBalances(
     const viewerIsDebtor = transfer.fromUserId === viewerId;
     if (!viewerIsCreditor && !viewerIsDebtor) continue;
 
-    const memberId = viewerIsCreditor
-      ? transfer.fromUserId
-      : transfer.toUserId;
+    const memberId = viewerIsCreditor ? transfer.fromUserId : transfer.toUserId;
     const signedAmount = viewerIsCreditor
       ? transfer.amountMinor
       : -transfer.amountMinor;
@@ -167,7 +180,62 @@ export function viewerRepaymentBalances(
       amountMinor: balancesByMember.get(member.userId) ?? 0n,
     }))
     .filter((member) => member.amountMinor !== 0n)
-    .sort((left, right) =>
-      left.displayName.localeCompare(right.displayName),
-    );
+    .sort((left, right) => left.displayName.localeCompare(right.displayName));
+}
+
+export function memberRepaymentSummaries(
+  transfers: RepaymentTransfer[],
+  members: (RepaymentMember & { avatarUrl?: string | null })[],
+): MemberRepaymentSummary[] {
+  const summaries = new Map<string, MemberRepaymentSummary>(
+    members.map((member) => [
+      member.userId,
+      {
+        userId: member.userId,
+        displayName: member.displayName,
+        avatarUrl: member.avatarUrl ?? null,
+        owesMinor: 0n,
+        lentMinor: 0n,
+        relationships: [],
+      },
+    ]),
+  );
+
+  for (const transfer of transfers) {
+    const debtor = summaries.get(transfer.fromUserId);
+    const creditor = summaries.get(transfer.toUserId);
+    if (!debtor || !creditor) continue;
+
+    debtor.owesMinor += transfer.amountMinor;
+    debtor.relationships.push({
+      kind: "owes",
+      counterpartyId: creditor.userId,
+      counterpartyDisplayName: creditor.displayName,
+      counterpartyAvatarUrl: creditor.avatarUrl,
+      amountMinor: transfer.amountMinor,
+    });
+    creditor.lentMinor += transfer.amountMinor;
+    creditor.relationships.push({
+      kind: "lent",
+      counterpartyId: debtor.userId,
+      counterpartyDisplayName: debtor.displayName,
+      counterpartyAvatarUrl: debtor.avatarUrl,
+      amountMinor: transfer.amountMinor,
+    });
+  }
+
+  return [...summaries.values()]
+    .map((summary) => ({
+      ...summary,
+      relationships: summary.relationships.sort((left, right) =>
+        left.kind === right.kind
+          ? left.counterpartyDisplayName.localeCompare(
+              right.counterpartyDisplayName,
+            )
+          : left.kind === "owes"
+            ? -1
+            : 1,
+      ),
+    }))
+    .sort((left, right) => left.displayName.localeCompare(right.displayName));
 }

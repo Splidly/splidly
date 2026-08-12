@@ -30,6 +30,7 @@ import {
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
+  memberRepaymentSummaries,
   repaymentPlan,
   viewerRepaymentBalances,
 } from "../domain/debt-simplification";
@@ -165,6 +166,85 @@ export const groupsRouter = router({
       };
     });
   }),
+
+  balances: protectedProcedure
+    .input(z.object({ groupId: z.uuid() }))
+    .query(async ({ ctx, input }) => {
+      const [membership] = await ctx.db
+        .select({ group: groups })
+        .from(groupMembers)
+        .innerJoin(groups, eq(groups.id, groupMembers.groupId))
+        .where(
+          and(
+            eq(groupMembers.groupId, input.groupId),
+            eq(groupMembers.userId, ctx.session.user.id),
+            isNull(groupMembers.removedAt),
+          ),
+        )
+        .limit(1);
+      const group = membership?.group;
+      if (!group) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Not a group member",
+        });
+      }
+      if (group.archivedAt) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Group not found" });
+      }
+
+      const [members, entries] = await Promise.all([
+        ctx.db
+          .select({
+            userId: groupMembers.userId,
+            displayName: profiles.displayName,
+            avatarUrl: profiles.avatarUrl,
+          })
+          .from(groupMembers)
+          .innerJoin(profiles, eq(profiles.userId, groupMembers.userId))
+          .where(
+            and(
+              eq(groupMembers.groupId, input.groupId),
+              isNull(groupMembers.removedAt),
+            ),
+          ),
+        ctx.db
+          .select()
+          .from(ledgerEntries)
+          .where(
+            and(
+              eq(ledgerEntries.contextType, "group"),
+              eq(ledgerEntries.contextId, input.groupId),
+            ),
+          ),
+      ]);
+      const transfers = repaymentPlan(entries, group.simplifyDebts);
+      const currency = group.currency as CurrencyCode;
+
+      return {
+        group: {
+          id: group.id,
+          name: group.name,
+          currency,
+          simplifyDebts: group.simplifyDebts,
+        },
+        members: memberRepaymentSummaries(transfers, members).map((member) => ({
+          userId: member.userId,
+          displayName: member.displayName,
+          avatarUrl: member.avatarUrl,
+          isViewer: member.userId === ctx.session.user.id,
+          owes: money(currency, member.owesMinor),
+          lent: money(currency, member.lentMinor),
+          relationships: member.relationships.map((relationship) => ({
+            kind: relationship.kind,
+            counterpartyId: relationship.counterpartyId,
+            counterpartyDisplayName: relationship.counterpartyDisplayName,
+            counterpartyAvatarUrl: relationship.counterpartyAvatarUrl,
+            amount: money(currency, relationship.amountMinor),
+          })),
+        })),
+      };
+    }),
 
   create: protectedProcedure
     .input(
@@ -388,6 +468,23 @@ export const groupsRouter = router({
             ?.avatarUrl ?? null,
         balance: money(group.currency, member.amountMinor),
       }));
+      const balanceMembers = memberRepaymentSummaries(transfers, members).map(
+        (member) => ({
+          userId: member.userId,
+          displayName: member.displayName,
+          avatarUrl: member.avatarUrl,
+          isViewer: member.userId === ctx.session.user.id,
+          owes: money(group.currency, member.owesMinor),
+          lent: money(group.currency, member.lentMinor),
+          relationships: member.relationships.map((relationship) => ({
+            kind: relationship.kind,
+            counterpartyId: relationship.counterpartyId,
+            counterpartyDisplayName: relationship.counterpartyDisplayName,
+            counterpartyAvatarUrl: relationship.counterpartyAvatarUrl,
+            amount: money(group.currency, relationship.amountMinor),
+          })),
+        }),
+      );
       const expenseActivity = activity.reverse().map((expense) => {
         const sourceCurrency = expense.sourceCurrency as CurrencyCode;
         const canonicalCurrency = group.currency as CurrencyCode;
@@ -482,6 +579,7 @@ export const groupsRouter = router({
         group,
         members,
         memberBalances,
+        balanceMembers,
         expenses: expenseActivity,
         settlements: settlementActivity,
       };

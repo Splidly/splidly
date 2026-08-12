@@ -1,4 +1,6 @@
 import { Stack, router, useLocalSearchParams, type Href } from "expo-router";
+import { HeaderHeightContext } from "expo-router/build/react-navigation/elements/Header/HeaderHeightContext";
+import { use, useRef, useState } from "react";
 import { View, useColorScheme } from "react-native";
 import { ActivityTimeline } from "../../../../components/activity-timeline";
 import { normalizeGroupIconKey } from "../../../../components/group-icon";
@@ -28,13 +30,27 @@ import type { CurrencyCode } from "@splidly/shared";
 
 export default function GroupDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const headerHeight = use(HeaderHeightContext) ?? 0;
+  const [compactTitleVisible, setCompactTitleVisible] = useState(
+    process.env.EXPO_OS !== "ios",
+  );
+  const compactTitleVisibleRef = useRef(process.env.EXPO_OS !== "ios");
+  const groupIdentityBottomRef = useRef(0);
   const colorScheme = useColorScheme() === "dark" ? "dark" : "light";
   const detail = api.groups.detail.useQuery({ groupId: id });
   if (detail.isPending) {
-    return <Screen><LoadingState /></Screen>;
+    return (
+      <Screen>
+        <LoadingState />
+      </Screen>
+    );
   }
   if (detail.error || !detail.data) {
-    return <Screen><ErrorState message={detail.error?.message} /></Screen>;
+    return (
+      <Screen>
+        <ErrorState message={detail.error?.message} />
+      </Screen>
+    );
   }
   const { group, members, memberBalances, expenses, settlements } = detail.data;
   const activity = [
@@ -57,11 +73,7 @@ export default function GroupDetailScreen() {
     members.length,
     group.currency,
   );
-  const actionColors = groupActionColorsFor(
-    group.color,
-    group.id,
-    colorScheme,
-  );
+  const actionColors = groupActionColorsFor(group.color, group.id, colorScheme);
   const outstandingMinor = memberBalances.reduce((total, member) => {
     const minor = BigInt(member.balance.minor);
     return total + (minor < 0n ? -minor : minor);
@@ -71,14 +83,34 @@ export default function GroupDetailScreen() {
       <Screen
         refreshing={detail.isRefetching}
         onRefresh={() => void detail.refetch()}
+        onScroll={(event) => {
+          if (process.env.EXPO_OS !== "ios") return;
+          const visibleContentTop =
+            event.nativeEvent.contentOffset.y +
+            Math.max(event.nativeEvent.contentInset.top, headerHeight);
+          const nextVisible =
+            groupIdentityBottomRef.current > 0 &&
+            visibleContentTop >= groupIdentityBottomRef.current;
+          if (nextVisible === compactTitleVisibleRef.current) return;
+          compactTitleVisibleRef.current = nextVisible;
+          setCompactTitleVisible(nextVisible);
+        }}
       >
-        <GroupSummaryHeader
-          iconKey={normalizeGroupIconKey(group.iconKey)}
-          name={group.name}
-          colorKey={group.id}
-          color={group.color}
-          imageUrl={group.imageUrl}
-        />
+        <View
+          testID="group-identity-header"
+          onLayout={(event) => {
+            const { y, height } = event.nativeEvent.layout;
+            groupIdentityBottomRef.current = y + height;
+          }}
+        >
+          <GroupSummaryHeader
+            iconKey={normalizeGroupIconKey(group.iconKey)}
+            name={group.name}
+            colorKey={group.id}
+            color={group.color}
+            imageUrl={group.imageUrl}
+          />
+        </View>
         <View style={{ flexDirection: "row", gap: 10 }}>
           <View style={{ flex: 1 }}>
             <PrimaryButton
@@ -112,6 +144,8 @@ export default function GroupDetailScreen() {
           lines={balanceLines}
           currency={group.currency as CurrencyCode}
           totalMinor={outstandingMinor}
+          accessibilityLabel={`${group.name} members and balances`}
+          onPress={() => router.push(`/groups/${group.id}/settings`)}
         />
         {activity.length === 0 ? (
           <Section>
@@ -165,9 +199,7 @@ export default function GroupDetailScreen() {
                       useNameFallback={!expense.iconManuallySet}
                     />
                   }
-                  onPress={() =>
-                    router.push(`/expense/${expense.id}` as Href)
-                  }
+                  onPress={() => router.push(`/expense/${expense.id}` as Href)}
                 />
               );
             }}
@@ -176,7 +208,7 @@ export default function GroupDetailScreen() {
       </Screen>
       <Stack.Screen
         options={{
-          title: group.name,
+          title: compactTitleVisible ? group.name : "",
           ...(process.env.EXPO_OS !== "ios" && {
             headerRight: () => (
               <HeaderButton

@@ -9,7 +9,7 @@ services:
     ports:
       - "127.0.0.1:${API_BIND_PORT:-4000}:4000"
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${NODE_ENV:-production}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       PORT: "4000"
       DATABASE_URL: postgresql://${POSTGRES_USER:-splidly}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-splidly}

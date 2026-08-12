@@ -35,6 +35,9 @@ export default function ExpenseDetailScreen() {
         expense?.groupId
           ? utils.groups.detail.invalidate({ groupId: expense.groupId })
           : Promise.resolve(),
+        expense?.groupId
+          ? utils.groups.balances.invalidate({ groupId: expense.groupId })
+          : Promise.resolve(),
         expense?.friendshipId
           ? utils.friends.detail.invalidate({
               friendshipId: expense.friendshipId,
@@ -62,8 +65,7 @@ export default function ExpenseDetailScreen() {
 
   const { expense, payers, rates, split, splits } = detail.data;
   const currency = expense.sourceCurrency as CurrencyCode;
-  const editExpense = () =>
-    router.push(`/expense/${expense.id}/edit` as Href);
+  const editExpense = () => router.push(`/expense/${expense.id}/edit` as Href);
 
   function confirmDelete() {
     Alert.alert(
@@ -170,10 +172,7 @@ export default function ExpenseDetailScreen() {
         ) : null}
 
         <Section title="Split">
-          <ListRow
-            title="Method"
-            value={expenseSplitModeLabels[split.mode]}
-          />
+          <ListRow title="Method" value={expenseSplitModeLabels[split.mode]} />
           <RowDivider inset={16} />
           {splits.map((split, index) => (
             <View key={split.userId}>

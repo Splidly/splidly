@@ -39,7 +39,14 @@ export default function GroupsStackLayout() {
         }}
       />
       <Stack.Screen name="[id]/index" options={{ title: "Group" }} />
-      <Stack.Screen name="[id]/settings" options={{ title: "Group Settings" }} />
+      <Stack.Screen
+        name="[id]/balances/index"
+        options={{ title: "Group Balances" }}
+      />
+      <Stack.Screen
+        name="[id]/settings"
+        options={{ title: "Group Settings" }}
+      />
       <Stack.Screen
         name="[id]/edit"
         options={{

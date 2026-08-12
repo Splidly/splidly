@@ -1,17 +1,80 @@
 import { fireEvent, render } from "@testing-library/react-native";
+import { Alert } from "react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import GroupSettingsScreen from "../app/(tabs)/groups/[id]/settings";
 
 const mockUpdateMutate = jest.fn();
+const mockRemoveMutate = jest.fn();
 
-jest.mock("expo-router", () => ({
-  router: {
-    push: jest.fn(),
-    back: jest.fn(),
-    dismissTo: jest.fn(),
-  },
-  useLocalSearchParams: () => ({ id: "group-1" }),
-}));
+jest.mock("react-native-reanimated", () => {
+  const { View } = jest.requireActual(
+    "react-native",
+  ) as typeof import("react-native");
+  return {
+    __esModule: true,
+    default: { View },
+    FadeIn: { duration: () => undefined },
+    FadeOut: { duration: () => undefined },
+  };
+});
+
+jest.mock("react-native-gesture-handler/ReanimatedSwipeable", () => {
+  const React = require("react") as typeof import("react");
+  const { View } =
+    require("react-native") as typeof import("react-native");
+  return function MockSwipeable({
+    children,
+    renderRightActions,
+    testID,
+  }: {
+    children: React.ReactNode;
+    renderRightActions: (
+      progress: { value: number },
+      translation: { value: number },
+      methods: { close: () => void },
+    ) => React.ReactNode;
+    testID: string;
+  }) {
+    return (
+      <View testID={testID}>
+        {children}
+        {renderRightActions(
+          { value: 1 },
+          { value: -88 },
+          { close: jest.fn() },
+        )}
+      </View>
+    );
+  };
+});
+
+jest.mock("expo-router", () => {
+  const React = require("react") as typeof import("react");
+  const { Pressable } =
+    require("react-native") as typeof import("react-native");
+  const Screen = () => null;
+  const Toolbar = ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  );
+  Toolbar.Button = ({
+    accessibilityLabel,
+    onPress,
+  }: {
+    accessibilityLabel: string;
+    onPress: () => void;
+  }) => (
+    <Pressable accessibilityLabel={accessibilityLabel} onPress={onPress} />
+  );
+  return {
+    router: {
+      push: jest.fn(),
+      back: jest.fn(),
+      dismissTo: jest.fn(),
+    },
+    Stack: { Screen, Toolbar },
+    useLocalSearchParams: () => ({ id: "group-1" }),
+  };
+});
 
 const mockPush = (
   jest.requireMock("expo-router") as {
@@ -28,6 +91,7 @@ jest.mock("../lib/trpc", () => ({
     useUtils: () => ({
       groups: {
         detail: { invalidate: jest.fn() },
+        balances: { invalidate: jest.fn() },
         list: { invalidate: jest.fn() },
       },
     }),
@@ -62,6 +126,51 @@ jest.mock("../lib/trpc", () => ({
                 homeCurrency: "USD",
               },
             ],
+            balanceMembers: [
+              {
+                userId: "user-1",
+                displayName: "Lasse",
+                avatarUrl: null,
+                isViewer: true,
+                owes: { currency: "EUR", minor: "0" },
+                lent: { currency: "EUR", minor: "500" },
+                relationships: [
+                  {
+                    kind: "lent",
+                    counterpartyId: "user-2",
+                    counterpartyDisplayName: "Alex",
+                    counterpartyAvatarUrl: null,
+                    amount: { currency: "EUR", minor: "500" },
+                  },
+                ],
+              },
+              {
+                userId: "user-3",
+                displayName: "Zoe",
+                avatarUrl: null,
+                isViewer: false,
+                owes: { currency: "EUR", minor: "0" },
+                lent: { currency: "EUR", minor: "0" },
+                relationships: [],
+              },
+              {
+                userId: "user-2",
+                displayName: "Alex",
+                avatarUrl: null,
+                isViewer: false,
+                owes: { currency: "EUR", minor: "500" },
+                lent: { currency: "EUR", minor: "0" },
+                relationships: [
+                  {
+                    kind: "owes",
+                    counterpartyId: "user-1",
+                    counterpartyDisplayName: "Lasse",
+                    counterpartyAvatarUrl: null,
+                    amount: { currency: "EUR", minor: "500" },
+                  },
+                ],
+              },
+            ],
           },
           error: null,
           isPending: false,
@@ -77,7 +186,7 @@ jest.mock("../lib/trpc", () => ({
       },
       removeMember: {
         useMutation: () => ({
-          mutate: jest.fn(),
+          mutate: mockRemoveMutate,
           error: null,
           isPending: false,
         }),
@@ -113,6 +222,8 @@ describe("GroupSettingsScreen", () => {
   beforeEach(() => {
     mockPush.mockClear();
     mockUpdateMutate.mockClear();
+    mockRemoveMutate.mockClear();
+    jest.spyOn(Alert, "alert").mockClear();
   });
 
   it("shows a read-only group summary and opens the edit sheet", async () => {
@@ -171,7 +282,7 @@ describe("GroupSettingsScreen", () => {
     });
   });
 
-  it("sorts members and keeps removal on the dedicated control", async () => {
+  it("combines sorted members with balances, disclosures, and swipe removal", async () => {
     const view = await render(
       <SafeAreaInsetsContext.Provider
         value={{ top: 0, right: 0, bottom: 0, left: 0 }}
@@ -181,9 +292,38 @@ describe("GroupSettingsScreen", () => {
     );
 
     expect(
-      view.getAllByText(/^(Alex|Lasse|Zoe)$/).map((node) => node.props.children),
-    ).toEqual(["Alex", "Lasse", "Zoe"]);
+      view
+        .getAllByText(/^(Alex|Lasse \(You\)|Zoe)$/)
+        .map((node) => node.props.children),
+    ).toEqual(["Alex", "Lasse (You)", "Zoe"]);
+    expect(view.getByText("Owes 5.00 €")).toBeTruthy();
+    expect(view.getByText("Lent 5.00 €")).toBeTruthy();
+    expect(view.getByText("Settled up")).toBeTruthy();
+    expect(view.getByTestId("member-swipe-user-2")).toBeTruthy();
+    expect(view.queryByTestId("member-swipe-user-1")).toBeNull();
     expect(view.getByLabelText("Remove Alex")).toBeTruthy();
-    expect(view.getByText("Alex").parent?.parent?.props.onPress).toBeUndefined();
+    expect(view.getByLabelText("Remove Zoe")).toBeTruthy();
+
+    await fireEvent.press(view.getByLabelText("Alex. Owes 5.00 €"));
+    expect(view.getByLabelText("Alex owes 5.00 € to you")).toBeTruthy();
+
+    await fireEvent.press(view.getByLabelText("Lasse (You). Lent 5.00 €"));
+    expect(view.getAllByLabelText("Alex owes 5.00 € to you")).toHaveLength(2);
+
+    await fireEvent.press(view.getByLabelText("Remove Alex"));
+    expect(Alert.alert).toHaveBeenCalledWith(
+      "Settle with Alex first",
+      "A member can only be removed after their group balance reaches zero.",
+      [{ text: "OK" }],
+    );
+    expect(mockRemoveMutate).not.toHaveBeenCalled();
+
+    await fireEvent.press(view.getByLabelText("Remove Zoe"));
+    expect(Alert.alert).toHaveBeenCalledWith(
+      "Remove Zoe?",
+      "They can rejoin later with a new invitation.",
+      expect.any(Array),
+    );
   });
+
 });

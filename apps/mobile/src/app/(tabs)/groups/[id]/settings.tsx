@@ -1,15 +1,12 @@
 import type { CurrencyCode } from "@splidly/shared";
-import {
-  router,
-  useLocalSearchParams,
-  type Href,
-} from "expo-router";
+import { router, useLocalSearchParams, type Href } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, Pressable, Switch, Text, View } from "react-native";
+import { Alert, Switch, View } from "react-native";
+import type { GroupBalanceMember } from "../../../../components/group-balances";
 import { normalizeGroupIconKey } from "../../../../components/group-icon";
 import { GroupSummaryHeader } from "../../../../components/group-summary-header";
+import { SwipeableGroupMember } from "../../../../components/swipeable-group-member";
 import {
-  Avatar,
   ErrorState,
   ListRow,
   LoadingState,
@@ -21,16 +18,17 @@ import { shareInvite } from "../../../../lib/share-invite";
 import { normalizeGroupColor } from "../../../../lib/group-colors";
 import { currencySymbolWithCode } from "../../../../lib/money-display";
 import { api } from "../../../../lib/trpc";
-import { useTheme } from "../../../../theme";
 
 export default function GroupSettingsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const theme = useTheme();
   const detail = api.groups.detail.useQuery({ groupId: id });
   const me = api.profile.me.useQuery();
   const utils = api.useUtils();
   const group = detail.data?.group;
   const [simplifyDebts, setSimplifyDebts] = useState(true);
+  const [expandedUserIds, setExpandedUserIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
   useEffect(() => {
     if (!group) return;
     setSimplifyDebts(group.simplifyDebts);
@@ -39,6 +37,7 @@ export default function GroupSettingsScreen() {
     async onSuccess() {
       await Promise.all([
         utils.groups.detail.invalidate({ groupId: id }),
+        utils.groups.balances.invalidate({ groupId: id }),
         utils.groups.list.invalidate(),
       ]);
     },
@@ -48,12 +47,14 @@ export default function GroupSettingsScreen() {
   });
   const removeMember = api.groups.removeMember.useMutation({
     async onSuccess() {
-      await detail.refetch();
+      await Promise.all([
+        detail.refetch(),
+        utils.groups.balances.invalidate({ groupId: id }),
+      ]);
     },
   });
   const createInvite = api.invites.create.useMutation({
-    onSuccess: (invite) =>
-      void shareInvite(invite.url),
+    onSuccess: (invite) => void shareInvite(invite.url),
   });
   const leave = api.groups.leave.useMutation({
     async onSuccess() {
@@ -74,7 +75,11 @@ export default function GroupSettingsScreen() {
     },
   });
   if (detail.isPending) {
-    return <Screen><LoadingState /></Screen>;
+    return (
+      <Screen>
+        <LoadingState />
+      </Screen>
+    );
   }
   if (detail.error || !group) {
     return (
@@ -86,142 +91,129 @@ export default function GroupSettingsScreen() {
     );
   }
 
-  return (
-    <Screen>
-      <GroupSummaryHeader
-        iconKey={normalizeGroupIconKey(group.iconKey)}
-        name={group.name}
-        colorKey={group.id}
-        color={group.color}
-        imageUrl={group.imageUrl}
-        lines={[
-          {
-            key: "currency",
-            label: currencySymbolWithCode(
-              group.currency as CurrencyCode,
-            ),
-            text: currencySymbolWithCode(
-              group.currency as CurrencyCode,
-            ),
-            tone: "muted",
-          },
-        ]}
-        onEdit={() =>
-          router.push(`/groups/${group.id}/edit` as Href)
-        }
-      />
-      <Section
-        title="Balances"
-        footer="When enabled, everyone’s net group balance is combined into the smallest repayment plan instead of preserving who originally paid for whom."
-      >
-        <ListRow
-          title="Simplify debts"
-          subtitle="Use fewer payments to settle the group"
-          trailing={
-            <Switch
-              accessibilityLabel="Simplify debts"
-              disabled={updateSimplification.isPending}
-              value={simplifyDebts}
-              onValueChange={(nextValue) => {
-                setSimplifyDebts(nextValue);
-                updateSimplification.mutate({
-                  groupId: id,
-                  expectedVersion: group.version,
-                  name: group.name,
-                  iconKey: normalizeGroupIconKey(group.iconKey),
-                  color: normalizeGroupColor(group.color, group.id),
-                  currency: group.currency as CurrencyCode,
-                  simplifyDebts: nextValue,
-                });
-              }}
-            />
-          }
-        />
-      </Section>
-      <Section title="Members">
-        <ListRow
-          title={createInvite.isPending ? "Creating invitation…" : "Invite people"}
-          subtitle="Share a link to join this group"
-          showsDisclosureIndicator={false}
-          onPress={() =>
-            createInvite.mutate({ kind: "group", groupId: id })
-          }
-        />
-        {[...(detail.data?.members ?? [])]
-          .sort((left, right) =>
-            left.displayName.localeCompare(right.displayName, undefined, {
-              sensitivity: "base",
+  const balanceMembers = [...detail.data.balanceMembers].sort((left, right) =>
+    left.displayName.localeCompare(right.displayName, undefined, {
+      sensitivity: "base",
+    }),
+  );
+  const viewerUserId =
+    balanceMembers.find((member) => member.isViewer)?.userId ??
+    me.data?.userId ??
+    "";
+  function requestMemberRemoval(member: GroupBalanceMember) {
+    const hasOpenBalance =
+      BigInt(member.owes.minor) > 0n || BigInt(member.lent.minor) > 0n;
+    if (hasOpenBalance) {
+      Alert.alert(
+        `Settle with ${member.displayName} first`,
+        "A member can only be removed after their group balance reaches zero.",
+        [{ text: "OK" }],
+      );
+      return;
+    }
+    Alert.alert(
+      `Remove ${member.displayName}?`,
+      "They can rejoin later with a new invitation.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: () =>
+            removeMember.mutate({
+              groupId: id,
+              userId: member.userId,
             }),
-          )
-          .map((member) => {
-            const isMe = member.userId === me.data?.userId;
-            return (
-              <View key={member.userId}>
-                <RowDivider />
-                <ListRow
-                  title={member.displayName}
-                  showsDisclosureIndicator={false}
-                  subtitle={
-                    isMe
-                      ? "You"
-                      : `Home currency · ${currencySymbolWithCode(
-                          member.homeCurrency as CurrencyCode,
-                        )}`
-                  }
-                  leading={
-                    <Avatar
-                      name={member.displayName}
-                      colorKey={member.userId}
-                      imageUrl={member.avatarUrl}
-                    />
-                  }
-                  trailing={
-                    !isMe ? (
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={`Remove ${member.displayName}`}
-                        disabled={removeMember.isPending}
-                        hitSlop={8}
-                        onPress={() =>
-                          Alert.alert(
-                            `Remove ${member.displayName}?`,
-                            "They can rejoin later with a new invitation.",
-                            [
-                              { text: "Cancel", style: "cancel" },
-                              {
-                                text: "Remove",
-                                style: "destructive",
-                                onPress: () =>
-                                  removeMember.mutate({
-                                    groupId: id,
-                                    userId: member.userId,
-                                  }),
-                              },
-                            ],
-                          )
-                        }
-                        style={({ pressed }) => ({
-                          opacity:
-                            pressed || removeMember.isPending ? 0.5 : 1,
-                        })}
-                      >
-                        <Text
-                          style={{
-                            color: theme.negative,
-                            fontWeight: "600",
-                          }}
-                        >
-                          Remove
-                        </Text>
-                      </Pressable>
-                    ) : undefined
-                  }
-                />
-              </View>
-            );
-          })}
-      </Section>
-      <Section title="Group actions">
+        },
+      ],
+    );
+  }
+
+  return (
+    <>
+      <Screen>
+        <GroupSummaryHeader
+          iconKey={normalizeGroupIconKey(group.iconKey)}
+          name={group.name}
+          colorKey={group.id}
+          color={group.color}
+          imageUrl={group.imageUrl}
+          lines={[
+            {
+              key: "currency",
+              label: currencySymbolWithCode(group.currency as CurrencyCode),
+              text: currencySymbolWithCode(group.currency as CurrencyCode),
+              tone: "muted",
+            },
+          ]}
+          onEdit={() => router.push(`/groups/${group.id}/edit` as Href)}
+        />
+        <Section
+          title="Balances"
+          footer="When enabled, everyone’s net group balance is combined into the smallest repayment plan instead of preserving who originally paid for whom."
+        >
+          <ListRow
+            title="Simplify debts"
+            subtitle="Use fewer payments to settle the group"
+            trailing={
+              <Switch
+                accessibilityLabel="Simplify debts"
+                disabled={updateSimplification.isPending}
+                value={simplifyDebts}
+                onValueChange={(nextValue) => {
+                  setSimplifyDebts(nextValue);
+                  updateSimplification.mutate({
+                    groupId: id,
+                    expectedVersion: group.version,
+                    name: group.name,
+                    iconKey: normalizeGroupIconKey(group.iconKey),
+                    color: normalizeGroupColor(group.color, group.id),
+                    currency: group.currency as CurrencyCode,
+                    simplifyDebts: nextValue,
+                  });
+                }}
+              />
+            }
+          />
+        </Section>
+        <Section
+          title="Members & balances"
+          footer="Tap a member for details. Swipe left to remove a member after their balance is settled."
+        >
+          <ListRow
+            title={
+              createInvite.isPending
+                ? "Creating invitation…"
+                : "Invite people"
+            }
+            subtitle="Share a link to join this group"
+            showsDisclosureIndicator={false}
+            onPress={() =>
+              createInvite.mutate({ kind: "group", groupId: id })
+            }
+          />
+          {balanceMembers.map((member) => (
+            <View key={member.userId}>
+              <RowDivider />
+              <SwipeableGroupMember
+                member={member}
+                viewerUserId={viewerUserId}
+                expanded={expandedUserIds.has(member.userId)}
+                removalPending={removeMember.isPending}
+                onToggle={() =>
+                  setExpandedUserIds((current) => {
+                    const next = new Set(current);
+                    if (next.has(member.userId)) next.delete(member.userId);
+                    else next.add(member.userId);
+                    return next;
+                  })
+                }
+                onRemove={() => requestMemberRemoval(member)}
+              />
+            </View>
+          ))}
+        </Section>
+        <Section title="Group actions">
         <ListRow
           title="Leave group"
           destructive
@@ -290,15 +282,22 @@ export default function GroupSettingsScreen() {
             />
           </>
         ) : null}
-      </Section>
-      {updateSimplification.error ? (
-        <ErrorState message={updateSimplification.error.message} />
-      ) : null}
-      {removeMember.error ? <ErrorState message={removeMember.error.message} /> : null}
-      {leave.error ? <ErrorState message={leave.error.message} /> : null}
-      {archive.error ? <ErrorState message={archive.error.message} /> : null}
-      {createInvite.error ? <ErrorState message={createInvite.error.message} /> : null}
-      {deleteGroup.error ? <ErrorState message={deleteGroup.error.message} /> : null}
-    </Screen>
+        </Section>
+        {updateSimplification.error ? (
+          <ErrorState message={updateSimplification.error.message} />
+        ) : null}
+        {removeMember.error ? (
+          <ErrorState message={removeMember.error.message} />
+        ) : null}
+        {leave.error ? <ErrorState message={leave.error.message} /> : null}
+        {archive.error ? <ErrorState message={archive.error.message} /> : null}
+        {createInvite.error ? (
+          <ErrorState message={createInvite.error.message} />
+        ) : null}
+        {deleteGroup.error ? (
+          <ErrorState message={deleteGroup.error.message} />
+        ) : null}
+      </Screen>
+    </>
   );
 }

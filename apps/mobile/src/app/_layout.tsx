@@ -83,13 +83,12 @@ function Navigation() {
         <Stack.Screen
           name="settlement/group"
           options={{
-            headerShown: false,
+            title: "Settle Up",
             ...formSheetOptions(theme.sheet),
             sheetAllowedDetents: "fitToContents",
             sheetInitialDetentIndex: 0,
             sheetGrabberVisible: false,
             sheetCornerRadius: 30,
-            gestureEnabled: false,
             headerBackButtonMenuEnabled: false,
           }}
         />

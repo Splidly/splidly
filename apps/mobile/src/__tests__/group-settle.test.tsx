@@ -2,13 +2,40 @@ import { fireEvent, render } from "@testing-library/react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import SettleGroupScreen from "../app/settlement/group";
 
-jest.mock("expo-router", () => ({
-  router: {
-    dismissTo: jest.fn(),
-    replace: jest.fn(),
-  },
-  useLocalSearchParams: () => ({ id: "group-1" }),
-}));
+let mockGroupSettleParams: {
+  id: string;
+  returnTo?: "balances" | "settings";
+} = {
+  id: "group-1",
+  returnTo: "balances",
+};
+
+jest.mock("expo-router", () => {
+  const React = require("react") as typeof import("react");
+  const { Pressable } =
+    require("react-native") as typeof import("react-native");
+  const Screen = () => null;
+  const Toolbar = ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  );
+  Toolbar.Button = ({
+    accessibilityLabel,
+    onPress,
+  }: {
+    accessibilityLabel: string;
+    onPress: () => void;
+  }) => (
+    <Pressable accessibilityLabel={accessibilityLabel} onPress={onPress} />
+  );
+  return {
+    router: {
+      dismissTo: jest.fn(),
+      replace: jest.fn(),
+    },
+    Stack: { Screen, Toolbar },
+    useLocalSearchParams: () => mockGroupSettleParams,
+  };
+});
 
 jest.mock("../lib/trpc", () => ({
   api: {
@@ -91,11 +118,21 @@ function renderScreen() {
 
 describe("SettleGroupScreen", () => {
   beforeEach(() => {
+    mockGroupSettleParams = { id: "group-1", returnTo: "balances" };
     mockReplace.mockClear();
     mockDismissTo.mockClear();
   });
 
-  it("dismisses directly to the group overview", async () => {
+  it("dismisses back to the balances screen that opened it", async () => {
+    const view = await renderScreen();
+
+    await fireEvent.press(view.getByLabelText("Close settle up"));
+
+    expect(mockDismissTo).toHaveBeenCalledWith("/groups/group-1/balances");
+  });
+
+  it("still dismisses to the group when opened from the overview", async () => {
+    mockGroupSettleParams = { id: "group-1" };
     const view = await renderScreen();
 
     await fireEvent.press(view.getByLabelText("Close settle up"));
@@ -103,13 +140,23 @@ describe("SettleGroupScreen", () => {
     expect(mockDismissTo).toHaveBeenCalledWith("/groups/group-1");
   });
 
+  it("dismisses back to settings when opened from the combined member list", async () => {
+    mockGroupSettleParams = { id: "group-1", returnTo: "settings" };
+    const view = await renderScreen();
+
+    await fireEvent.press(view.getByLabelText("Close settle up"));
+
+    expect(mockDismissTo).toHaveBeenCalledWith("/groups/group-1/settings");
+  });
+
   it("opens a prefilled payment form for the viewer's balance", async () => {
     const view = await renderScreen();
 
-    expect(view.getByText("Alex pays you")).toBeTruthy();
+    expect(view.getByText("Alex")).toBeTruthy();
+    expect(view.getByText("Pays you")).toBeTruthy();
     expect(view.getByText("12.34 €")).toBeTruthy();
     expect(view.queryByText("Alex pays Flo")).toBeNull();
-    await fireEvent.press(view.getByText("Alex pays you"));
+    await fireEvent.press(view.getByLabelText("Receive 12.34 € from Alex"));
 
     expect(mockReplace).toHaveBeenCalledWith({
       pathname: "/settlement/new",
@@ -120,6 +167,7 @@ describe("SettleGroupScreen", () => {
         toUserId: "user-1",
         canonicalCurrency: "EUR",
         canonicalMinor: "1234",
+        returnTo: "balances",
       },
     });
   });
@@ -136,6 +184,7 @@ describe("SettleGroupScreen", () => {
         id: "group-1",
         fromUserId: "user-1",
         canonicalCurrency: "EUR",
+        returnTo: "balances",
       },
     });
   });
