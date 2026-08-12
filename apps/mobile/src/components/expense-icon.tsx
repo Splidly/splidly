@@ -214,6 +214,10 @@ const optionsByKey = new Map(
   expenseIconOptions.map((option) => [option.key, option]),
 );
 
+export function expenseIconLabel(iconKey: ExpenseIconKey) {
+  return optionsByKey.get(iconKey)?.label ?? "Other";
+}
+
 function isExpenseIconKey(value: unknown): value is ExpenseIconKey {
   return (
     typeof value === "string" &&

@@ -211,16 +211,32 @@ export default function GroupDetailScreen() {
           title: compactTitleVisible ? group.name : "",
           ...(process.env.EXPO_OS !== "ios" && {
             headerRight: () => (
-              <HeaderButton
-                label={`${group.name} settings`}
-                glyph="⚙"
-                onPress={() => router.push(`/groups/${group.id}/settings`)}
-              />
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <HeaderButton
+                  label={`${group.name} statistics`}
+                  glyph="▥"
+                  onPress={() =>
+                    router.push(`/groups/${group.id}/statistics` as Href)
+                  }
+                />
+                <HeaderButton
+                  label={`${group.name} settings`}
+                  glyph="⚙"
+                  onPress={() => router.push(`/groups/${group.id}/settings`)}
+                />
+              </View>
             ),
           }),
         }}
       />
       <Stack.Toolbar placement="right">
+        <Stack.Toolbar.Button
+          icon="chart.bar.xaxis"
+          accessibilityLabel={`${group.name} statistics`}
+          onPress={() =>
+            router.push(`/groups/${group.id}/statistics` as Href)
+          }
+        />
         <Stack.Toolbar.Button
           icon="gearshape"
           accessibilityLabel={`${group.name} settings`}

@@ -7,6 +7,7 @@ import {
   financialRevisions,
   groupMembers,
   groups,
+  gte,
   inArray,
   invites,
   isNull,
@@ -35,6 +36,11 @@ import {
   viewerRepaymentBalances,
 } from "../domain/debt-simplification";
 import { expenseActivitySummary } from "../domain/expense-activity";
+import { allocateByUser } from "../domain/expense-allocation";
+import {
+  buildGroupStatistics,
+  resolveGroupStatisticsIconKey,
+} from "../domain/group-statistics";
 import { groupBy, requireActiveGroupMember } from "../domain/helpers";
 import { protectedProcedure, router } from "../trpc";
 
@@ -242,6 +248,213 @@ export const groupsRouter = router({
             counterpartyAvatarUrl: relationship.counterpartyAvatarUrl,
             amount: money(currency, relationship.amountMinor),
           })),
+        })),
+      };
+    }),
+
+  statistics: protectedProcedure
+    .input(
+      z.object({
+        groupId: z.uuid(),
+        range: z.enum(["all", "12-months", "30-days"]).default("all"),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      await requireActiveGroupMember(
+        ctx.db,
+        input.groupId,
+        ctx.session.user.id,
+      );
+      const [group] = await ctx.db
+        .select()
+        .from(groups)
+        .where(eq(groups.id, input.groupId))
+        .limit(1);
+      if (!group || group.archivedAt) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Group not found" });
+      }
+
+      const from = new Date();
+      if (input.range === "30-days") from.setUTCDate(from.getUTCDate() - 30);
+      if (input.range === "12-months") {
+        from.setUTCFullYear(from.getUTCFullYear() - 1);
+      }
+      const expenseConditions = [
+        eq(expenses.groupId, input.groupId),
+        isNull(expenses.deletedAt),
+      ];
+      if (input.range !== "all") {
+        expenseConditions.push(gte(expenses.occurredAt, from));
+      }
+
+      const [members, expenseRecords] = await Promise.all([
+        ctx.db
+          .select({
+            userId: groupMembers.userId,
+            displayName: profiles.displayName,
+            avatarUrl: profiles.avatarUrl,
+          })
+          .from(groupMembers)
+          .innerJoin(profiles, eq(profiles.userId, groupMembers.userId))
+          .where(eq(groupMembers.groupId, input.groupId)),
+        ctx.db
+          .select()
+          .from(expenses)
+          .where(and(...expenseConditions))
+          .orderBy(expenses.occurredAt),
+      ]);
+      const expenseIds = expenseRecords.map((expense) => expense.id);
+      const [paymentRecords, splitRecords, rateRecords] =
+        expenseIds.length === 0
+          ? [[], [], []]
+          : await Promise.all([
+              ctx.db
+                .select()
+                .from(expensePayments)
+                .where(inArray(expensePayments.expenseId, expenseIds)),
+              ctx.db
+                .select()
+                .from(expenseSplits)
+                .where(inArray(expenseSplits.expenseId, expenseIds)),
+              ctx.db
+                .select({
+                  expenseId: rateSnapshots.expenseId,
+                  base: rateSnapshots.base,
+                  quote: rateSnapshots.quote,
+                  rate: rateSnapshots.rate,
+                })
+                .from(rateSnapshots)
+                .where(inArray(rateSnapshots.expenseId, expenseIds)),
+            ]);
+      const paymentsByExpense = groupBy(
+        paymentRecords,
+        (payment) => payment.expenseId,
+      );
+      const splitsByExpense = groupBy(
+        splitRecords,
+        (split) => split.expenseId,
+      );
+      const ratesByExpense = groupBy(
+        rateRecords,
+        (rate) => rate.expenseId ?? "",
+      );
+      let unconvertedExpenseCount = 0;
+      const canonicalCurrency = group.currency as CurrencyCode;
+      const statisticsExpenses = expenseRecords.flatMap((expense) => {
+        const sourceCurrency = expense.sourceCurrency as CurrencyCode;
+        const rate = ratesByExpense
+          .get(expense.id)
+          ?.find(
+            (candidate) =>
+              candidate.base === sourceCurrency &&
+              candidate.quote === canonicalCurrency,
+          );
+        if (sourceCurrency !== canonicalCurrency && !rate) {
+          unconvertedExpenseCount += 1;
+          return [];
+        }
+        const canonicalAmountMinor =
+          sourceCurrency === canonicalCurrency
+            ? expense.sourceAmountMinor
+            : convertMinor(
+                expense.sourceAmountMinor,
+                sourceCurrency,
+                canonicalCurrency,
+                rate!.rate,
+              );
+        const sourcePayments = new Map(
+          (paymentsByExpense.get(expense.id) ?? []).map((payment) => [
+            payment.userId,
+            payment.sourceAmountMinor,
+          ]),
+        );
+        if (sourcePayments.size === 0) {
+          sourcePayments.set(expense.payerId, expense.sourceAmountMinor);
+        }
+        const sourceShares = new Map(
+          (splitsByExpense.get(expense.id) ?? []).map((split) => [
+            split.userId,
+            split.sourceAmountMinor,
+          ]),
+        );
+        if (sourceShares.size === 0) {
+          unconvertedExpenseCount += 1;
+          return [];
+        }
+        return [
+          {
+            id: expense.id,
+            description: expense.description,
+            iconKey: resolveGroupStatisticsIconKey(expense),
+            occurredAt: expense.occurredAt,
+            canonicalAmountMinor,
+            canonicalPayments: allocateByUser(
+              canonicalAmountMinor,
+              sourcePayments,
+            ),
+            canonicalShares: allocateByUser(
+              canonicalAmountMinor,
+              sourceShares,
+            ),
+          },
+        ];
+      });
+      const statistics = buildGroupStatistics({
+        expenses: statisticsExpenses,
+        members,
+        viewerUserId: ctx.session.user.id,
+        bucket: input.range === "30-days" ? "day" : "month",
+      });
+      const asMoney = (amountMinor: bigint) =>
+        money(canonicalCurrency, amountMinor);
+
+      return {
+        group: {
+          id: group.id,
+          name: group.name,
+          color: group.color,
+          currency: canonicalCurrency,
+        },
+        range: input.range,
+        unconvertedExpenseCount,
+        totalSpent: asMoney(statistics.totalSpentMinor),
+        viewerPaid: asMoney(statistics.viewerPaidMinor),
+        viewerShare: asMoney(statistics.viewerShareMinor),
+        expenseCount: statistics.expenseCount,
+        categories: statistics.categories.map((category) => ({
+          iconKey: category.iconKey,
+          amount: asMoney(category.amountMinor),
+        })),
+        timeline: statistics.timeline.map((point) => ({
+          period: point.period,
+          amount: asMoney(point.amountMinor),
+        })),
+        members: statistics.members.map((member) => ({
+          userId: member.userId,
+          displayName: member.displayName,
+          avatarUrl: member.avatarUrl,
+          isViewer: member.isViewer,
+          paid: asMoney(member.paidMinor),
+          share: asMoney(member.shareMinor),
+        })),
+        expenses: [...statisticsExpenses].reverse().map((expense) => ({
+          id: expense.id,
+          description: expense.description,
+          iconKey: expense.iconKey,
+          occurredAt: expense.occurredAt,
+          amount: asMoney(expense.canonicalAmountMinor),
+          payments: [...expense.canonicalPayments].map(
+            ([userId, amountMinor]) => ({
+              userId,
+              amount: asMoney(amountMinor),
+            }),
+          ),
+          shares: [...expense.canonicalShares].map(
+            ([userId, amountMinor]) => ({
+              userId,
+              amount: asMoney(amountMinor),
+            }),
+          ),
         })),
       };
     }),

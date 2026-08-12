@@ -40,6 +40,14 @@ export default function GroupsStackLayout() {
       />
       <Stack.Screen name="[id]/index" options={{ title: "Group" }} />
       <Stack.Screen
+        name="[id]/statistics"
+        options={{ title: "Statistics" }}
+      />
+      <Stack.Screen
+        name="[id]/statistics-expenses"
+        options={{ title: "Expenses" }}
+      />
+      <Stack.Screen
         name="[id]/balances/index"
         options={{ title: "Group Balances" }}
       />

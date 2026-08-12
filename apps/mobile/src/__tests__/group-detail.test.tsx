@@ -199,7 +199,7 @@ describe("GroupDetailScreen actions", () => {
     ).toBe(14);
     expect(view.queryByText(/20 Jul ·/)).toBeNull();
     expect(view.queryByText("Open balances")).toBeNull();
-    expect(view.queryByText("Statistics")).toBeNull();
+    expect(view.getByLabelText("Lisbon statistics")).toBeTruthy();
     expect(view.getByTestId("group-navigation-title").props.children).toBe("");
     await fireEvent(view.getByTestId("group-identity-header"), "layout", {
       nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 58 } },
@@ -236,6 +236,9 @@ describe("GroupDetailScreen actions", () => {
     mockPush.mockClear();
     await fireEvent.press(view.getByLabelText("Lisbon settings"));
     expect(mockPush).toHaveBeenCalledWith("/groups/group-1/settings");
+    mockPush.mockClear();
+    await fireEvent.press(view.getByLabelText("Lisbon statistics"));
+    expect(mockPush).toHaveBeenCalledWith("/groups/group-1/statistics");
     mockPush.mockClear();
     await fireEvent.press(view.getByTestId("settlement-activity-row"));
     expect(mockPush).toHaveBeenCalledWith({
