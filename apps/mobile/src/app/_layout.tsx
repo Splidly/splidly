@@ -15,6 +15,7 @@ import {
 import { ApiProvider } from "../lib/trpc";
 import { useTheme } from "../theme";
 import { ExpensePaymentSessionProvider } from "../components/expense-payment-session";
+import { ExpenseItemSplitSessionProvider } from "../components/expense-item-split-session";
 import { ExpenseSplitSessionProvider } from "../components/expense-split-session";
 import { NotificationCoordinator } from "../components/notification-coordinator";
 
@@ -81,6 +82,16 @@ function Navigation() {
           }}
         />
         <Stack.Screen
+          name="expense/item-split"
+          options={{
+            title: "Customize item",
+            ...formSheetOptions(theme.sheet),
+            sheetAllowedDetents: [0.72, 1],
+            sheetInitialDetentIndex: 0,
+            sheetGrabberVisible: true,
+          }}
+        />
+        <Stack.Screen
           name="settlement/group"
           options={{
             title: "Settle Up",
@@ -127,7 +138,9 @@ export default function RootLayout() {
         <NotificationCoordinator />
         <ExpensePaymentSessionProvider>
           <ExpenseSplitSessionProvider>
-            <Navigation />
+            <ExpenseItemSplitSessionProvider>
+              <Navigation />
+            </ExpenseItemSplitSessionProvider>
           </ExpenseSplitSessionProvider>
         </ExpensePaymentSessionProvider>
       </ApiProvider>

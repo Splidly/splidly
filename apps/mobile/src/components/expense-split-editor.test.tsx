@@ -7,6 +7,7 @@ import {
   type SplitParticipant,
 } from "../lib/expense-split";
 import { ExpenseSplitEditor } from "./expense-split-editor";
+import { ExpenseItemSplitSessionProvider } from "./expense-item-split-session";
 import {
   ExpenseSplitSessionProvider,
   useExpenseSplitSession,
@@ -63,7 +64,7 @@ jest.mock("expo-router", () => {
     <>{children}</>
   );
   return {
-    router: { back: jest.fn() },
+    router: { back: jest.fn(), push: jest.fn() },
     Stack: { Screen, Toolbar },
   };
 });
@@ -105,7 +106,9 @@ function Wrapper({ children }: { children: ReactNode }) {
       value={{ top: 0, right: 0, bottom: 0, left: 0 }}
     >
       <ExpenseSplitSessionProvider>
-        {children}
+        <ExpenseItemSplitSessionProvider>
+          {children}
+        </ExpenseItemSplitSessionProvider>
       </ExpenseSplitSessionProvider>
     </SafeAreaInsetsContext.Provider>
   );
@@ -177,13 +180,48 @@ describe("ExpenseSplitEditor", () => {
     await fireEvent.press(view.getByText("＋ Add item"));
 
     const peoplePicker = view.getByTestId("item-people-picker-0");
-    expect(
-      peoplePicker.props.actions.every(
-        (action: { state: string }) => action.state === "off",
-      ),
-    ).toBe(true);
+    expect(peoplePicker.props.actions).toMatchObject([
+      {
+        title: "Selection",
+        displayInline: true,
+        subactions: [
+          { title: "Select All" },
+          { title: "Deselect All" },
+        ],
+      },
+      {
+        title: "People",
+        displayInline: true,
+        subactions: [
+          { id: "a", state: "off" },
+          { id: "b", state: "off" },
+        ],
+      },
+    ]);
     expect(view.getByText("For")).toBeTruthy();
     expect(view.queryByText("Shared by")).toBeNull();
+
+    const { router } = jest.requireMock("expo-router") as {
+      router: { push: jest.Mock };
+    };
+    router.push.mockClear();
+    const emptyAllocationPicker = view.getByTestId(
+      "item-allocation-picker-0",
+    );
+    expect(
+      emptyAllocationPicker.props.actions.filter(
+        (action: { state?: string }) => action.state === "on",
+      ),
+    ).toHaveLength(1);
+    expect(
+      emptyAllocationPicker.props.actions.find(
+        (action: { id: string }) => action.id === "custom",
+      ).attributes,
+    ).toEqual({ disabled: true });
+    await fireEvent(emptyAllocationPicker, "pressAction", {
+      nativeEvent: { event: "custom" },
+    });
+    expect(router.push).not.toHaveBeenCalled();
 
     await fireEvent(peoplePicker, "pressAction", {
       nativeEvent: { event: "a" },
@@ -192,9 +230,18 @@ describe("ExpenseSplitEditor", () => {
       view
         .getByTestId("item-people-picker-0")
         .props.actions.find(
-          (action: { id: string }) => action.id === "a",
-        ).state,
+          (action: { id: string }) => action.id === "__people__",
+        ).subactions.find((action: { id: string }) => action.id === "a").state,
     ).toBe("on");
+    expect(view.getByText("Split")).toBeTruthy();
+    expect(view.getByText("Equally")).toBeTruthy();
+
+    await fireEvent(
+      view.getByTestId("item-allocation-picker-0"),
+      "pressAction",
+      { nativeEvent: { event: "custom" } },
+    );
+    expect(router.push).toHaveBeenCalledWith("/expense/item-split");
   });
 
   it("keeps allocation progress in the floating bottom overlay", async () => {

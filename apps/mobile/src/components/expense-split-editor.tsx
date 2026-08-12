@@ -8,8 +8,10 @@ import { router, Stack } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import {
+  expenseItemAllocationModeLabels,
   expenseSplitModeLabels,
   expenseSplitStatus,
+  initializeExpenseItemAllocation,
   type ExpenseSplitDraft,
   type ExpenseSplitMode,
 } from "../lib/expense-split";
@@ -26,6 +28,7 @@ import {
   InlineAmountInput,
 } from "./expense-allocation-ui";
 import { useExpenseSplitSession } from "./expense-split-session";
+import { useExpenseItemSplitSession } from "./expense-item-split-session";
 import {
   ErrorState,
   HeaderButton,
@@ -49,6 +52,7 @@ function isExpenseSplitMode(value: string): value is ExpenseSplitMode {
 export function ExpenseSplitEditor() {
   const theme = useTheme();
   const session = useExpenseSplitSession();
+  const itemSplitSession = useExpenseItemSplitSession();
   const request = session.request;
   const [draft, setDraft] = useState<ExpenseSplitDraft | undefined>(
     request?.draft,
@@ -441,23 +445,97 @@ export function ExpenseSplitEditor() {
             {draft.items.map((item, itemIndex) => {
               const peopleActions: MenuAction[] = [
                 {
-                  id: "__select_all__",
-                  title: "Select All",
-                  state: "off" as const,
+                  id: "__selection__",
+                  title: "Selection",
+                  displayInline: true,
+                  subactions: [
+                    {
+                      id: "__select_all__",
+                      title: "Select All",
+                      image: "checkmark.circle",
+                    },
+                    {
+                      id: "__deselect_all__",
+                      title: "Deselect All",
+                      image: "circle",
+                    },
+                  ],
                 },
                 {
-                  id: "__deselect_all__",
-                  title: "Deselect All",
-                  state: "off" as const,
+                  id: "__people__",
+                  title: "People",
+                  displayInline: true,
+                  subactions: participants.map((person) => ({
+                    id: person.userId,
+                    title: person.displayName,
+                    state: item.participantIds.includes(person.userId)
+                      ? ("on" as const)
+                      : ("off" as const),
+                  })),
                 },
-                ...participants.map((person) => ({
-                  id: person.userId,
-                  title: person.displayName,
-                  state: item.participantIds.includes(person.userId)
-                    ? ("on" as const)
-                    : ("off" as const),
-                })),
               ];
+              const allocationActions: MenuAction[] = [
+                {
+                  id: "equal",
+                  title: "Equally",
+                  ...(item.allocationMode === "equal"
+                    ? { state: "on" as const }
+                    : {}),
+                },
+                {
+                  id: "custom",
+                  title: "Customize…",
+                  ...(item.allocationMode !== "equal"
+                    ? { state: "on" as const }
+                    : {}),
+                  ...(item.participantIds.length === 0
+                    ? { attributes: { disabled: true } }
+                    : {}),
+                },
+              ];
+              const updateItemParticipants = (
+                candidate: typeof item,
+                participantIds: string[],
+              ) => {
+                const updated = { ...candidate, participantIds };
+                return candidate.allocationMode === "equal"
+                  ? updated
+                  : initializeExpenseItemAllocation(
+                      updated,
+                      candidate.allocationMode,
+                      request.currency,
+                    );
+              };
+              const openCustomItemSplit = () => {
+                if (item.participantIds.length === 0) return;
+                const customItem =
+                  item.allocationMode === "equal"
+                    ? initializeExpenseItemAllocation(
+                        item,
+                        "exact",
+                        request.currency,
+                      )
+                    : item;
+                itemSplitSession.open({
+                  currency: request.currency,
+                  participants,
+                  item: customItem,
+                  onSave: (savedItem) =>
+                    setDraft((current) =>
+                      current
+                        ? {
+                            ...current,
+                            items: current.items.map((candidate) =>
+                              candidate.id === savedItem.id
+                                ? savedItem
+                                : candidate,
+                            ),
+                          }
+                        : current,
+                    ),
+                });
+                router.push("/expense/item-split");
+              };
               return (
                 <View
                   key={item.id}
@@ -603,25 +681,25 @@ export function ExpenseSplitEditor() {
                               items: current.items.map((candidate) => {
                                 if (candidate.id !== item.id) return candidate;
                                 if (nativeEvent.event === "__select_all__") {
-                                  return {
-                                    ...candidate,
-                                    participantIds: participants.map(
+                                  return updateItemParticipants(
+                                    candidate,
+                                    participants.map(
                                       (person) => person.userId,
                                     ),
-                                  };
+                                  );
                                 }
                                 if (
                                   nativeEvent.event === "__deselect_all__"
                                 ) {
-                                  return { ...candidate, participantIds: [] };
+                                  return updateItemParticipants(candidate, []);
                                 }
                                 const included =
                                   candidate.participantIds.includes(
                                     nativeEvent.event,
                                   );
-                                return {
-                                  ...candidate,
-                                  participantIds: included
+                                return updateItemParticipants(
+                                  candidate,
+                                  included
                                     ? candidate.participantIds.filter(
                                         (id) => id !== nativeEvent.event,
                                       )
@@ -629,7 +707,7 @@ export function ExpenseSplitEditor() {
                                         ...candidate.participantIds,
                                         nativeEvent.event,
                                       ],
-                                };
+                                );
                               }),
                             }
                           : current,
@@ -666,6 +744,72 @@ export function ExpenseSplitEditor() {
                       </Text>
                     </View>
                   </MenuView>
+                  <View
+                    style={{
+                      height: 1,
+                      marginLeft: 16,
+                      backgroundColor: theme.border,
+                    }}
+                  />
+                  <MenuView
+                    title="Split this item"
+                    actions={allocationActions}
+                    testID={`item-allocation-picker-${itemIndex}`}
+                    onPressAction={({ nativeEvent }) => {
+                      if (nativeEvent.event === "equal") {
+                        setDraft((current) =>
+                          current
+                            ? {
+                                ...current,
+                                items: current.items.map((candidate) =>
+                                  candidate.id === item.id
+                                    ? initializeExpenseItemAllocation(
+                                        candidate,
+                                        "equal",
+                                        request.currency,
+                                      )
+                                    : candidate,
+                                ),
+                              }
+                            : current,
+                        );
+                        return;
+                      }
+                      if (nativeEvent.event === "custom") {
+                        openCustomItemSplit();
+                      }
+                    }}
+                  >
+                    <View
+                      accessibilityRole="button"
+                      style={{
+                        minHeight: 52,
+                        paddingHorizontal: 16,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 12,
+                      }}
+                    >
+                      <Text style={{ color: theme.text, fontSize: 17 }}>
+                        Split
+                      </Text>
+                      <Text
+                        numberOfLines={1}
+                        style={{
+                          color: theme.primary,
+                          flex: 1,
+                          textAlign: "right",
+                          fontSize: 15,
+                          fontWeight: "600",
+                        }}
+                      >
+                        {expenseItemAllocationModeLabels[item.allocationMode]}
+                      </Text>
+                      <Text style={{ color: theme.subtle, fontSize: 24 }}>
+                        ›
+                      </Text>
+                    </View>
+                  </MenuView>
                 </View>
               );
             })}
@@ -683,6 +827,10 @@ export function ExpenseSplitEditor() {
                             description: "",
                             amount: "",
                             participantIds: [],
+                            allocationMode: "equal",
+                            exactAmounts: {},
+                            percentages: {},
+                            shares: {},
                           },
                         ],
                       }
@@ -717,8 +865,8 @@ export function ExpenseSplitEditor() {
                 lineHeight: 18,
               }}
             >
-              Item costs must add up to the expense total. Items assigned to
-              several people are divided evenly between them.
+              Item costs must add up to the expense total. Each item can be
+              split equally or customized with amounts, percentages, or shares.
             </Text>
           </View>
         )}

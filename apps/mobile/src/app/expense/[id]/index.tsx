@@ -12,7 +12,10 @@ import {
   Section,
 } from "../../../components/ui";
 import { ExpenseIcon } from "../../../components/expense-icon";
-import { expenseSplitModeLabels } from "../../../lib/expense-split";
+import {
+  expenseItemAllocationModeLabels,
+  expenseSplitModeLabels,
+} from "../../../lib/expense-split";
 import {
   currencySymbol,
   formatExchangeRate,
@@ -200,13 +203,17 @@ export default function ExpenseDetailScreen() {
                 {index > 0 ? <RowDivider inset={16} /> : null}
                 <ListRow
                   title={item.description || `Item ${index + 1}`}
-                  subtitle={item.participantIds
+                  subtitle={`${item.participantIds
                     .map(
                       (userId) =>
                         splits.find((person) => person.userId === userId)
                           ?.displayName ?? "Unknown",
                     )
-                    .join(", ")}
+                    .join(", ")} · ${
+                    expenseItemAllocationModeLabels[
+                      item.allocation?.mode ?? "equal"
+                    ]
+                  }`}
                   trailing={
                     <MoneyValue
                       minor={BigInt(item.amountMinor)}

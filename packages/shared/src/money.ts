@@ -176,14 +176,34 @@ export function splitSourceAmount(
       ) {
         throw new Error("A participant may only appear once per item");
       }
-      const amounts = allocateByWeights(
-        BigInt(item.amountMinor),
-        item.participantIds.map(() => 1n),
-      );
-      item.participantIds.forEach((userId, index) => {
+      const allocation = item.allocation ?? { mode: "equal" as const };
+      const equalAmounts =
+        allocation.mode === "equal"
+          ? allocateByWeights(
+              BigInt(item.amountMinor),
+              item.participantIds.map(() => 1n),
+            )
+          : undefined;
+      const itemAmounts =
+        allocation.mode === "equal"
+          ? new Map(
+              item.participantIds.map((userId, index) => [
+                userId,
+                equalAmounts?.[index] ?? 0n,
+              ]),
+            )
+          : splitSourceAmount(BigInt(item.amountMinor), allocation);
+      const allocatedIds = [...itemAmounts.keys()];
+      if (
+        allocatedIds.length !== item.participantIds.length ||
+        allocatedIds.some((userId) => !item.participantIds.includes(userId))
+      ) {
+        throw new Error("Item allocation must match its participants");
+      }
+      itemAmounts.forEach((amount, userId) => {
         result.set(
           userId,
-          (result.get(userId) ?? 0n) + (amounts[index] ?? 0n),
+          (result.get(userId) ?? 0n) + amount,
         );
       });
     }

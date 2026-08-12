@@ -129,4 +129,63 @@ describe("money", () => {
       }),
     ).toThrow("must equal");
   });
+
+  it("supports percentage and weighted allocations inside itemized splits", () => {
+    expect(
+      splitSourceAmount(20_00n, {
+        mode: "itemized",
+        items: [
+          {
+            id: "meal",
+            description: "Meal",
+            amountMinor: "1000",
+            participantIds: ["a", "b"],
+            allocation: {
+              mode: "percentage",
+              shares: [
+                { userId: "a", percentage: "25" },
+                { userId: "b", percentage: "75" },
+              ],
+            },
+          },
+          {
+            id: "drinks",
+            description: "Drinks",
+            amountMinor: "1000",
+            participantIds: ["a", "b"],
+            allocation: {
+              mode: "shares",
+              shares: [
+                { userId: "a", shares: "3" },
+                { userId: "b", shares: "1" },
+              ],
+            },
+          },
+        ],
+      }),
+    ).toEqual(
+      new Map([
+        ["a", 1_000n],
+        ["b", 1_000n],
+      ]),
+    );
+
+    expect(() =>
+      splitSourceAmount(10_00n, {
+        mode: "itemized",
+        items: [
+          {
+            id: "meal",
+            description: "Meal",
+            amountMinor: "1000",
+            participantIds: ["a", "b"],
+            allocation: {
+              mode: "exact",
+              shares: [{ userId: "a", amountMinor: "1000" }],
+            },
+          },
+        ],
+      }),
+    ).toThrow("must match its participants");
+  });
 });

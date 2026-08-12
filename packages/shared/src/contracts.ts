@@ -122,6 +122,61 @@ export const paymentInputSchema = z
 
 export type PaymentInput = z.infer<typeof paymentInputSchema>;
 
+const itemAllocationSchema = z.discriminatedUnion("mode", [
+  z.object({ mode: z.literal("equal") }),
+  z.object({
+    mode: z.literal("exact"),
+    shares: z
+      .array(
+        z.object({
+          userId: z.string().min(1),
+          amountMinor: z.string().regex(/^\d+$/),
+        }),
+      )
+      .min(1)
+      .superRefine((shares, context) =>
+        uniqueParticipantIds(
+          shares.map((share) => share.userId),
+          context,
+        ),
+      ),
+  }),
+  z.object({
+    mode: z.literal("percentage"),
+    shares: z
+      .array(
+        z.object({
+          userId: z.string().min(1),
+          percentage: z.string().regex(/^\d{1,3}(?:\.\d{1,4})?$/),
+        }),
+      )
+      .min(1)
+      .superRefine((shares, context) =>
+        uniqueParticipantIds(
+          shares.map((share) => share.userId),
+          context,
+        ),
+      ),
+  }),
+  z.object({
+    mode: z.literal("shares"),
+    shares: z
+      .array(
+        z.object({
+          userId: z.string().min(1),
+          shares: z.string().regex(/^\d+$/),
+        }),
+      )
+      .min(1)
+      .superRefine((shares, context) =>
+        uniqueParticipantIds(
+          shares.map((share) => share.userId),
+          context,
+        ),
+      ),
+  }),
+]);
+
 export const splitInputSchema = z.discriminatedUnion("mode", [
   z.object({
     mode: z.literal("equal"),
@@ -193,6 +248,7 @@ export const splitInputSchema = z.discriminatedUnion("mode", [
             .array(z.string().min(1))
             .min(1)
             .superRefine(uniqueParticipantIds),
+          allocation: itemAllocationSchema.optional(),
         }),
       )
       .min(1),

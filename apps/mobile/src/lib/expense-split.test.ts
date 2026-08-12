@@ -23,6 +23,10 @@ describe("expense split drafts", () => {
           description: "",
           amount: "70",
           participantIds: [],
+          allocationMode: "equal" as const,
+          exactAmounts: {},
+          percentages: {},
+          shares: {},
         },
       ],
     };
@@ -140,6 +144,10 @@ describe("expense split drafts", () => {
               description: "Meal",
               amount: "60",
               participantIds: ["a", "b"],
+              allocationMode: "equal",
+              exactAmounts: {},
+              percentages: {},
+              shares: {},
             },
           ],
         },
@@ -147,5 +155,53 @@ describe("expense split drafts", () => {
         currency,
       ),
     ).toMatchObject({ valid: false, assignedMinor: 6_000n });
+  });
+
+  it("restores and submits custom allocations within itemized splits", () => {
+    const draft = expenseSplitDraftFromInput(
+      {
+        mode: "itemized",
+        items: [
+          {
+            id: "meal",
+            description: "Meal",
+            amountMinor: "1000",
+            participantIds: ["a", "b"],
+            allocation: {
+              mode: "percentage",
+              shares: [
+                { userId: "a", percentage: "25" },
+                { userId: "b", percentage: "75" },
+              ],
+            },
+          },
+        ],
+      },
+      participants,
+      1_000n,
+      currency,
+    );
+
+    expect(draft.items[0]).toMatchObject({
+      allocationMode: "percentage",
+      percentages: { a: "25", b: "75" },
+    });
+    expect(expenseSplitStatus(draft, 1_000n, currency)).toMatchObject({
+      valid: true,
+      input: {
+        mode: "itemized",
+        items: [
+          {
+            allocation: {
+              mode: "percentage",
+              shares: [
+                { userId: "a", percentage: "25" },
+                { userId: "b", percentage: "75" },
+              ],
+            },
+          },
+        ],
+      },
+    });
   });
 });

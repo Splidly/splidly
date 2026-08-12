@@ -16,18 +16,40 @@ export type SplitParticipant = {
 
 export type ExpenseSplitMode = SplitInput["mode"];
 
+type ItemizedSplitInput = Extract<SplitInput, { mode: "itemized" }>;
+export type ExpenseItemAllocationInput = NonNullable<
+  ItemizedSplitInput["items"][number]["allocation"]
+>;
+export type ExpenseItemAllocationMode = ExpenseItemAllocationInput["mode"];
+
+export const expenseItemAllocationModeLabels: Record<
+  ExpenseItemAllocationMode,
+  string
+> = {
+  equal: "Equally",
+  exact: "Custom amounts",
+  percentage: "Percentages",
+  shares: "Shares",
+};
+
+export type ExpenseSplitItemDraft = {
+  id: string;
+  description: string;
+  amount: string;
+  participantIds: string[];
+  allocationMode: ExpenseItemAllocationMode;
+  exactAmounts: Record<string, string>;
+  percentages: Record<string, string>;
+  shares: Record<string, string>;
+};
+
 export type ExpenseSplitDraft = {
   mode: ExpenseSplitMode;
   selectedIds: string[];
   exactAmounts: Record<string, string>;
   percentages: Record<string, string>;
   shares: Record<string, string>;
-  items: {
-    id: string;
-    description: string;
-    amount: string;
-    participantIds: string[];
-  }[];
+  items: ExpenseSplitItemDraft[];
 };
 
 export const expenseSplitModeLabels: Record<ExpenseSplitMode, string> = {
@@ -77,6 +99,83 @@ function equalExactAmounts(
   );
 }
 
+function itemAmountMinor(
+  item: Pick<ExpenseSplitItemDraft, "amount">,
+  currency: CurrencyCode,
+) {
+  try {
+    return parseDecimalToMinor(item.amount || "0", currency);
+  } catch {
+    return 0n;
+  }
+}
+
+export function initializeExpenseItemAllocation(
+  item: ExpenseSplitItemDraft,
+  mode: ExpenseItemAllocationMode,
+  currency: CurrencyCode,
+): ExpenseSplitItemDraft {
+  const totalMinor = itemAmountMinor(item, currency);
+  return {
+    ...item,
+    allocationMode: mode,
+    ...(mode === "exact"
+      ? {
+          exactAmounts: equalExactAmounts(
+            item.participantIds,
+            totalMinor,
+            currency,
+          ),
+        }
+      : mode === "percentage"
+        ? { percentages: equalPercentages(item.participantIds) }
+        : mode === "shares"
+          ? {
+              shares: Object.fromEntries(
+                item.participantIds.map((userId) => [userId, "1"]),
+              ),
+            }
+          : {}),
+  };
+}
+
+export function expenseItemAllocationInput(
+  item: ExpenseSplitItemDraft,
+  currency: CurrencyCode,
+): ExpenseItemAllocationInput {
+  if (item.allocationMode === "equal") return { mode: "equal" };
+  if (item.allocationMode === "exact") {
+    return {
+      mode: "exact",
+      shares: item.participantIds.map((userId) => ({
+        userId,
+        amountMinor: parseDecimalToMinor(
+          item.exactAmounts[userId] ?? "0",
+          currency,
+        ).toString(),
+      })),
+    };
+  }
+  if (item.allocationMode === "percentage") {
+    return {
+      mode: "percentage",
+      shares: item.participantIds.map((userId) => ({
+        userId,
+        percentage: (item.percentages[userId] ?? "0")
+          .trim()
+          .replace(",", "."),
+      })),
+    };
+  }
+  return {
+    mode: "shares",
+    shares: item.participantIds.map((userId) => ({
+      userId,
+      shares: (item.shares[userId] ?? "0").trim(),
+    })),
+  };
+}
+
 export function createExpenseSplitDraft(
   participants: readonly SplitParticipant[],
   totalMinor: bigint,
@@ -123,6 +222,40 @@ export function expenseSplitDraftFromInput(
         description: item.description,
         amount: formatMinor(BigInt(item.amountMinor), currency),
         participantIds: item.participantIds,
+        allocationMode: item.allocation?.mode ?? "equal",
+        exactAmounts:
+          item.allocation?.mode === "exact"
+            ? Object.fromEntries(
+                item.allocation.shares.map((share) => [
+                  share.userId,
+                  formatMinor(BigInt(share.amountMinor), currency),
+                ]),
+              )
+            : equalExactAmounts(
+                item.participantIds,
+                BigInt(item.amountMinor),
+                currency,
+              ),
+        percentages:
+          item.allocation?.mode === "percentage"
+            ? Object.fromEntries(
+                item.allocation.shares.map((share) => [
+                  share.userId,
+                  share.percentage,
+                ]),
+              )
+            : equalPercentages(item.participantIds),
+        shares:
+          item.allocation?.mode === "shares"
+            ? Object.fromEntries(
+                item.allocation.shares.map((share) => [
+                  share.userId,
+                  share.shares,
+                ]),
+              )
+            : Object.fromEntries(
+                item.participantIds.map((userId) => [userId, "1"]),
+              ),
       })),
     };
   }
@@ -172,6 +305,75 @@ export type ExpenseSplitStatus = {
   totalShares: bigint | undefined;
   message: string;
 };
+
+export type ExpenseItemAllocationStatus = Omit<
+  ExpenseSplitStatus,
+  "input"
+> & {
+  input?: ExpenseItemAllocationInput;
+};
+
+export function expenseItemAllocationStatus(
+  item: ExpenseSplitItemDraft,
+  currency: CurrencyCode,
+): ExpenseItemAllocationStatus {
+  let assignedMinor: bigint | undefined;
+  let assignedPercentage: number | undefined;
+  let totalShares: bigint | undefined;
+  try {
+    const totalMinor = parseDecimalToMinor(item.amount || "0", currency);
+    if (totalMinor <= 0n) throw new Error("Enter the item cost first");
+    if (item.participantIds.length === 0) {
+      throw new Error("Choose at least one person");
+    }
+    const input = expenseItemAllocationInput(item, currency);
+    if (input.mode === "exact") {
+      if (input.shares.some((share) => BigInt(share.amountMinor) < 0n)) {
+        throw new Error("Custom amounts cannot be negative");
+      }
+      assignedMinor = input.shares.reduce(
+        (sum, share) => sum + BigInt(share.amountMinor),
+        0n,
+      );
+    } else if (input.mode === "percentage") {
+      assignedPercentage = input.shares.reduce(
+        (sum, share) => sum + Number(share.percentage || "0"),
+        0,
+      );
+    } else if (input.mode === "shares") {
+      if (input.shares.some((share) => !/^\d+$/.test(share.shares))) {
+        throw new Error("Shares must be whole numbers");
+      }
+      totalShares = input.shares.reduce(
+        (sum, share) => sum + BigInt(share.shares),
+        0n,
+      );
+    }
+    splitSourceAmount(
+      totalMinor,
+      input.mode === "equal"
+        ? { mode: "equal", participantIds: item.participantIds }
+        : input,
+    );
+    return {
+      valid: true,
+      input,
+      assignedMinor,
+      assignedPercentage,
+      totalShares,
+      message: "Fully assigned",
+    };
+  } catch (cause) {
+    return {
+      valid: false,
+      assignedMinor,
+      assignedPercentage,
+      totalShares,
+      message:
+        cause instanceof Error ? cause.message : "Complete the item split",
+    };
+  }
+}
 
 export function expenseSplitStatus(
   draft: ExpenseSplitDraft,
@@ -231,15 +433,19 @@ export function expenseSplitStatus(
       );
       input = { mode: "shares", shares };
     } else {
-      const items = draft.items.map((item) => ({
-        id: item.id,
-        description: item.description.trim(),
-        amountMinor: parseDecimalToMinor(
-          item.amount || "0",
-          currency,
-        ).toString(),
-        participantIds: item.participantIds,
-      }));
+      const items = draft.items.map((item) => {
+        const allocation = expenseItemAllocationInput(item, currency);
+        return {
+          id: item.id,
+          description: item.description.trim(),
+          amountMinor: parseDecimalToMinor(
+            item.amount || "0",
+            currency,
+          ).toString(),
+          participantIds: item.participantIds,
+          ...(allocation.mode === "equal" ? {} : { allocation }),
+        };
+      });
       if (items.length === 0) throw new Error("Add at least one item");
       assignedMinor = items.reduce(
         (sum, item) => sum + BigInt(item.amountMinor),

@@ -87,6 +87,24 @@ describe("expense allocation contracts", () => {
           },
         ],
       },
+      {
+        mode: "itemized",
+        items: [
+          {
+            id: "item-custom",
+            description: "Shared meal",
+            amountMinor: "100",
+            participantIds: ["a", "b"],
+            allocation: {
+              mode: "percentage",
+              shares: [
+                { userId: "a", percentage: "40" },
+                { userId: "b", percentage: "60" },
+              ],
+            },
+          },
+        ],
+      },
     ] as const;
 
     for (const value of values) {
