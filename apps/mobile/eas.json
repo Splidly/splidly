@@ -12,8 +12,7 @@
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://splidly.site",
-        "EXPO_PUBLIC_APP_URL": "https://splidly.site"
+        "EXPO_PUBLIC_USE_RN_FETCH": "1"
       }
     }
   },

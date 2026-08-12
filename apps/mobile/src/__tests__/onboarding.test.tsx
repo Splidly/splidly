@@ -1,5 +1,5 @@
 import { fireEvent, render } from "@testing-library/react-native";
-import { StyleSheet } from "react-native";
+import { AppState, StyleSheet } from "react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import OnboardingScreen from "../app/onboarding";
 
@@ -131,5 +131,20 @@ describe("OnboardingScreen", () => {
       "Lasse Petzel",
     );
     expect(view.getByLabelText("Display name").props.autoFocus).toBeUndefined();
+  });
+
+  it("does not cancel account setup when the app changes state", async () => {
+    const addEventListener = jest.spyOn(AppState, "addEventListener");
+
+    await render(
+      <SafeAreaInsetsContext.Provider
+        value={{ top: 0, right: 0, bottom: 0, left: 0 }}
+      >
+        <OnboardingScreen />
+      </SafeAreaInsetsContext.Provider>,
+    );
+
+    expect(addEventListener).not.toHaveBeenCalled();
+    addEventListener.mockRestore();
   });
 });

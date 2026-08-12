@@ -4,7 +4,6 @@ import {
 } from "@react-native-google-signin/google-signin";
 import { useQueryClient } from "@tanstack/react-query";
 import * as AppleAuthentication from "expo-apple-authentication";
-import * as Linking from "expo-linking";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
@@ -29,7 +28,7 @@ GoogleSignin.configure({
     : {}),
 });
 
-const authCallbackURL = Linking.createURL("/sign-in");
+const authCallbackPath = "/sign-in" as const;
 
 export default function SignInScreen() {
   const theme = useTheme();
@@ -79,7 +78,7 @@ export default function SignInScreen() {
       const result = await authClient.signIn.social({
         provider: "google",
         idToken: { token: idToken },
-        callbackURL: authCallbackURL,
+        callbackURL: authCallbackPath,
       });
       if (result.error) throw new Error(result.error.message);
       await finishSignIn();
@@ -115,13 +114,13 @@ export default function SignInScreen() {
               ? { user: { name: { firstName: fullName } } }
               : {}),
           },
-          callbackURL: authCallbackURL,
+          callbackURL: authCallbackPath,
         });
         if (result.error) throw new Error(result.error.message);
       } else {
         const result = await authClient.signIn.social({
           provider: "apple",
-          callbackURL: authCallbackURL,
+          callbackURL: authCallbackPath,
         });
         if (result.error) throw new Error(result.error.message);
       }

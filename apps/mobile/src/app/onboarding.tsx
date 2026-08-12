@@ -1,8 +1,8 @@
 import type { CurrencyCode } from "@splidly/shared";
 import { getLocales } from "expo-localization";
 import { router } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, StyleSheet, Text, View } from "react-native";
+import { useCallback, useRef, useState } from "react";
+import { StyleSheet, Text, View } from "react-native";
 import {
   Avatar,
   ErrorState,
@@ -66,14 +66,6 @@ export default function OnboardingScreen() {
       cancelling.current = false;
     }
   }, [cancel, utils]);
-
-  useEffect(() => {
-    const subscription = AppState.addEventListener("change", (state) => {
-      if (state !== "background") return;
-      void cancelSetup();
-    });
-    return () => subscription.remove();
-  }, [cancelSetup]);
 
   const displayName = name ?? providerDisplayName(profile.data?.displayName);
 
