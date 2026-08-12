@@ -6,6 +6,7 @@ import { useState, type PropsWithChildren } from "react";
 import superjson from "superjson";
 import { authClient } from "./auth-client";
 import { API_URL } from "./env";
+import { friendlyFetch } from "./network";
 
 export const api = createTRPCReact<AppRouter>();
 
@@ -25,6 +26,8 @@ export function ApiProvider({ children }: PropsWithChildren) {
         httpBatchLink({
           transformer: superjson,
           url: `${API_URL}/trpc`,
+          fetch: (input, init) =>
+            friendlyFetch(input, init as RequestInit | undefined),
           headers() {
             const cookie = authClient.getCookie();
             return cookie ? { Cookie: cookie } : {};

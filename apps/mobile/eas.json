@@ -10,10 +10,7 @@
       "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true,
-      "env": {
-        "EXPO_PUBLIC_USE_RN_FETCH": "1"
-      }
+      "autoIncrement": true
     }
   },
   "submit": {

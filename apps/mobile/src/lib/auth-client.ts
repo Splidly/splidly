@@ -2,9 +2,11 @@ import { expoClient } from "@better-auth/expo/client";
 import * as SecureStore from "expo-secure-store";
 import { createAuthClient } from "better-auth/react";
 import { API_URL } from "./env";
+import { friendlyFetch } from "./network";
 
 const client = createAuthClient({
   baseURL: API_URL,
+  fetchOptions: { customFetchImpl: friendlyFetch },
   plugins: [
     expoClient({
       scheme: "splidly",
