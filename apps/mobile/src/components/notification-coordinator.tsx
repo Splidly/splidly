@@ -1,6 +1,6 @@
 import * as Notifications from "expo-notifications";
-import { router } from "expo-router";
-import { useCallback, useEffect, useRef } from "react";
+import { router, usePathname } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Platform } from "react-native";
 import { authClient } from "../lib/auth-client";
 import { getApnsEnvironment } from "../lib/apns-environment";
@@ -35,6 +35,7 @@ function notificationsAllowed(
 }
 
 export function NotificationCoordinator() {
+  const pathname = usePathname();
   const session = authClient.useSession();
   const profile = api.profile.me.useQuery(undefined, {
     enabled: Boolean(session.data?.user),
@@ -43,6 +44,8 @@ export function NotificationCoordinator() {
     api.push.register.useMutation();
   const utils = api.useUtils();
   const handledResponseId = useRef<string | undefined>(undefined);
+  const [pendingResponse, setPendingResponse] =
+    useState<ExpenseNotificationData>();
 
   const registerToken = useCallback(
     async (token: Notifications.DevicePushToken) => {
@@ -82,11 +85,31 @@ export function NotificationCoordinator() {
       if (!data) return;
       handledResponseId.current = responseId;
       refreshForNotification(data);
-      router.push(notificationHref(data));
-      void Notifications.clearLastNotificationResponseAsync();
+      setPendingResponse(data);
     },
     [refreshForNotification],
   );
+
+  useEffect(() => {
+    if (
+      !pendingResponse ||
+      pathname === "/" ||
+      !session.data?.user.id ||
+      !profile.data?.onboardedAt
+    ) {
+      return;
+    }
+    // The index route owns the startup auth redirect. Waiting until it has
+    // moved away from "/" prevents that redirect from replacing this route.
+    setPendingResponse(undefined);
+    router.push(notificationHref(pendingResponse));
+    void Notifications.clearLastNotificationResponseAsync();
+  }, [
+    pathname,
+    pendingResponse,
+    profile.data?.onboardedAt,
+    session.data?.user.id,
+  ]);
 
   useEffect(() => {
     if (
