@@ -2,6 +2,7 @@ import type { CurrencyCode } from "@splidly/shared";
 import { router, Stack, useLocalSearchParams, type Href } from "expo-router";
 import { Alert, Text, View } from "react-native";
 import { ExpenseDetailHero } from "../../../components/expense-detail-hero";
+import { ExpenseParticipantAmount } from "../../../components/expense-participant-amount";
 import {
   Avatar,
   ErrorState,
@@ -101,7 +102,8 @@ export default function ExpenseDetailScreen() {
     <>
       <Screen
         background="sheet"
-        contentContainerStyle={{ paddingTop: 12, gap: 20 }}
+        formSheetBottomClearance
+        contentContainerStyle={{ paddingTop: 8, gap: 16 }}
       >
         <ExpenseDetailHero
           description={expense.description}
@@ -125,7 +127,6 @@ export default function ExpenseDetailScreen() {
               {index > 0 ? <RowDivider /> : null}
               <ListRow
                 title={payer.displayName}
-                subtitle="Paid toward this expense"
                 leading={
                   <Avatar
                     name={payer.displayName}
@@ -134,9 +135,11 @@ export default function ExpenseDetailScreen() {
                   />
                 }
                 trailing={
-                  <MoneyValue
-                    minor={payer.sourceAmountMinor}
-                    currency={sourceCurrency}
+                  <ExpenseParticipantAmount
+                    sourceAmountMinor={payer.sourceAmountMinor}
+                    sourceCurrency={sourceCurrency}
+                    homeCurrency={payer.homeCurrency as CurrencyCode}
+                    rates={rates}
                   />
                 }
               />
@@ -145,16 +148,12 @@ export default function ExpenseDetailScreen() {
         </Section>
 
         <Section
-          title="Split"
+          title={`Split · ${expenseSplitModeLabels[split.mode]}`}
           footer={`${splits.length} ${splits.length === 1 ? "person" : "people"} included`}
         >
-          <ListRow
-            title="Split method"
-            value={expenseSplitModeLabels[split.mode]}
-          />
-          {splits.map((person) => (
+          {splits.map((person, index) => (
             <View key={person.userId}>
-              <RowDivider />
+              {index > 0 ? <RowDivider /> : null}
               <ListRow
                 title={person.displayName}
                 leading={
@@ -165,9 +164,11 @@ export default function ExpenseDetailScreen() {
                   />
                 }
                 trailing={
-                  <MoneyValue
-                    minor={person.sourceAmountMinor}
-                    currency={sourceCurrency}
+                  <ExpenseParticipantAmount
+                    sourceAmountMinor={person.sourceAmountMinor}
+                    sourceCurrency={sourceCurrency}
+                    homeCurrency={person.homeCurrency as CurrencyCode}
+                    rates={rates}
                   />
                 }
               />
@@ -206,27 +207,8 @@ export default function ExpenseDetailScreen() {
         ) : null}
 
         {expense.notes ? (
-          <View style={{ gap: 8 }}>
-            <Text
-              style={{
-                color: theme.muted,
-                paddingHorizontal: 16,
-                fontSize: 13,
-                fontWeight: "600",
-                textTransform: "uppercase",
-                letterSpacing: 0.4,
-              }}
-            >
-              Notes
-            </Text>
-            <View
-              style={{
-                padding: 16,
-                borderRadius: 16,
-                borderCurve: "continuous",
-                backgroundColor: theme.surface,
-              }}
-            >
+          <Section title="Notes">
+            <View style={{ paddingHorizontal: 16, paddingVertical: 13 }}>
               <Text
                 selectable
                 style={{ color: theme.text, fontSize: 16, lineHeight: 23 }}
@@ -234,13 +216,13 @@ export default function ExpenseDetailScreen() {
                 {expense.notes}
               </Text>
             </View>
-          </View>
+          </Section>
         ) : null}
 
         {rates.some((rate) => rate.base !== rate.quote) ? (
           <Section
-            title="Conversion"
-            footer="Saved exchange rates keep this expense stable over time."
+            title="Exchange rate"
+            footer="The saved rate keeps this expense and its balances stable."
           >
             {rates
               .filter((rate) => rate.base !== rate.quote)

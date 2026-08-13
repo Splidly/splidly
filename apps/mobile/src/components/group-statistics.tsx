@@ -34,6 +34,7 @@ export type GroupStatisticsData = {
     userId: string;
     displayName: string;
     avatarUrl: string | null;
+    homeCurrency: CurrencyCode;
     isViewer: boolean;
     paid: Money;
     share: Money;
@@ -44,8 +45,19 @@ export type GroupStatisticsData = {
     iconKey: ExpenseIconKey;
     occurredAt: Date;
     amount: Money;
-    payments: { userId: string; amount: Money }[];
-    shares: { userId: string; amount: Money }[];
+    sourceAmount: Money;
+    payments: {
+      userId: string;
+      amount: Money;
+      sourceAmount: Money;
+      homeAmount?: Money;
+    }[];
+    shares: {
+      userId: string;
+      amount: Money;
+      sourceAmount: Money;
+      homeAmount?: Money;
+    }[];
   }[];
 };
 

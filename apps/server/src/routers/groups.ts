@@ -293,6 +293,7 @@ export const groupsRouter = router({
             userId: groupMembers.userId,
             displayName: profiles.displayName,
             avatarUrl: profiles.avatarUrl,
+            homeCurrency: profiles.homeCurrency,
           })
           .from(groupMembers)
           .innerJoin(profiles, eq(profiles.userId, groupMembers.userId))
@@ -340,15 +341,17 @@ export const groupsRouter = router({
       );
       let unconvertedExpenseCount = 0;
       const canonicalCurrency = group.currency as CurrencyCode;
+      const membersById = new Map(
+        members.map((member) => [member.userId, member]),
+      );
       const statisticsExpenses = expenseRecords.flatMap((expense) => {
         const sourceCurrency = expense.sourceCurrency as CurrencyCode;
-        const rate = ratesByExpense
-          .get(expense.id)
-          ?.find(
-            (candidate) =>
-              candidate.base === sourceCurrency &&
-              candidate.quote === canonicalCurrency,
-          );
+        const rates = ratesByExpense.get(expense.id) ?? [];
+        const rate = rates.find(
+          (candidate) =>
+            candidate.base === sourceCurrency &&
+            candidate.quote === canonicalCurrency,
+        );
         if (sourceCurrency !== canonicalCurrency && !rate) {
           unconvertedExpenseCount += 1;
           return [];
@@ -387,6 +390,11 @@ export const groupsRouter = router({
             description: expense.description,
             iconKey: resolveGroupStatisticsIconKey(expense),
             occurredAt: expense.occurredAt,
+            sourceCurrency,
+            sourceAmountMinor: expense.sourceAmountMinor,
+            sourcePayments,
+            sourceShares,
+            rates,
             canonicalAmountMinor,
             canonicalPayments: allocateByUser(
               canonicalAmountMinor,
@@ -407,6 +415,33 @@ export const groupsRouter = router({
       });
       const asMoney = (amountMinor: bigint) =>
         money(canonicalCurrency, amountMinor);
+      const homeMoney = (
+        expense: (typeof statisticsExpenses)[number],
+        userId: string,
+        sourceAmountMinor: bigint,
+      ) => {
+        const homeCurrency = membersById.get(userId)
+          ?.homeCurrency as CurrencyCode | undefined;
+        if (!homeCurrency) return undefined;
+        if (homeCurrency === expense.sourceCurrency) {
+          return money(homeCurrency, sourceAmountMinor);
+        }
+        const rate = expense.rates.find(
+          (candidate) =>
+            candidate.base === expense.sourceCurrency &&
+            candidate.quote === homeCurrency,
+        );
+        if (!rate) return undefined;
+        return money(
+          homeCurrency,
+          convertMinor(
+            sourceAmountMinor,
+            expense.sourceCurrency,
+            homeCurrency,
+            rate.rate,
+          ),
+        );
+      };
 
       return {
         group: {
@@ -433,6 +468,8 @@ export const groupsRouter = router({
           userId: member.userId,
           displayName: member.displayName,
           avatarUrl: member.avatarUrl,
+          homeCurrency: membersById.get(member.userId)!
+            .homeCurrency as CurrencyCode,
           isViewer: member.isViewer,
           paid: asMoney(member.paidMinor),
           share: asMoney(member.shareMinor),
@@ -443,17 +480,38 @@ export const groupsRouter = router({
           iconKey: expense.iconKey,
           occurredAt: expense.occurredAt,
           amount: asMoney(expense.canonicalAmountMinor),
+          sourceAmount: money(
+            expense.sourceCurrency,
+            expense.sourceAmountMinor,
+          ),
           payments: [...expense.canonicalPayments].map(
-            ([userId, amountMinor]) => ({
-              userId,
-              amount: asMoney(amountMinor),
-            }),
+            ([userId, amountMinor]) => {
+              const sourceAmountMinor =
+                expense.sourcePayments.get(userId) ?? 0n;
+              return {
+                userId,
+                amount: asMoney(amountMinor),
+                sourceAmount: money(
+                  expense.sourceCurrency,
+                  sourceAmountMinor,
+                ),
+                homeAmount: homeMoney(expense, userId, sourceAmountMinor),
+              };
+            },
           ),
           shares: [...expense.canonicalShares].map(
-            ([userId, amountMinor]) => ({
-              userId,
-              amount: asMoney(amountMinor),
-            }),
+            ([userId, amountMinor]) => {
+              const sourceAmountMinor = expense.sourceShares.get(userId) ?? 0n;
+              return {
+                userId,
+                amount: asMoney(amountMinor),
+                sourceAmount: money(
+                  expense.sourceCurrency,
+                  sourceAmountMinor,
+                ),
+                homeAmount: homeMoney(expense, userId, sourceAmountMinor),
+              };
+            },
           ),
         })),
       };

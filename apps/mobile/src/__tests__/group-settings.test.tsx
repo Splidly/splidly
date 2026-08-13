@@ -1,5 +1,5 @@
 import { fireEvent, render } from "@testing-library/react-native";
-import { Alert } from "react-native";
+import { Alert, StyleSheet } from "react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import GroupSettingsScreen from "../app/(tabs)/groups/[id]/settings";
 
@@ -249,7 +249,9 @@ describe("GroupSettingsScreen", () => {
     expect(usesGroupColor).toBe(true);
     expect(view.queryByText(/All settled up/)).toBeNull();
     expect(view.queryByLabelText("Name")).toBeNull();
-    expect(view.queryByText("›")).toBeNull();
+    expect(
+      view.getAllByText("›", { includeHiddenElements: true }),
+    ).toHaveLength(1);
 
     await fireEvent.press(view.getByTestId("edit-group"));
 
@@ -268,6 +270,11 @@ describe("GroupSettingsScreen", () => {
     expect(
       view.queryByText("Use fewer payments to settle the group"),
     ).toBeNull();
+    const switchStyle = StyleSheet.flatten(
+      view.getByLabelText("Simplify debts").props.style,
+    );
+    expect(switchStyle.alignSelf).toBe("center");
+    expect(switchStyle.transform).toBeUndefined();
 
     await fireEvent(
       view.getByLabelText("Simplify debts"),

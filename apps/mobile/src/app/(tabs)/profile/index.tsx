@@ -225,6 +225,7 @@ export default function ProfileScreen() {
         <ListRow
           title="Privacy policy"
           subtitle="How Splidly collects, uses, and retains your data"
+          showsDisclosureIndicator
           onPress={() => void Linking.openURL(`${APP_URL}/privacy`)}
         />
       </Section>

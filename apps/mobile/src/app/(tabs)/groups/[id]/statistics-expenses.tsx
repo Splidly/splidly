@@ -1,6 +1,6 @@
 import { expenseIconKeys, type ExpenseIconKey, type Money } from "@splidly/shared";
 import { Stack, router, useLocalSearchParams, type Href } from "expo-router";
-import { View } from "react-native";
+import { Text, View } from "react-native";
 import { ActivityTimeline } from "../../../../components/activity-timeline";
 import {
   statisticsCategoryLabel,
@@ -14,12 +14,14 @@ import {
   Intro,
   ListRow,
   LoadingState,
+  MoneyValue,
   Screen,
   Section,
 } from "../../../../components/ui";
 import { groupActivityByDate } from "../../../../lib/activity-dates";
 import { formatConvertedMoney } from "../../../../lib/money-display";
 import { api } from "../../../../lib/trpc";
+import { useTheme } from "../../../../theme";
 
 function isStatisticsRange(value: unknown): value is StatisticsRange {
   return value === "all" || value === "12-months" || value === "30-days";
@@ -34,6 +36,44 @@ function isExpenseIconKey(value: unknown): value is ExpenseIconKey {
 
 function formatted(money: Money) {
   return formatConvertedMoney(BigInt(money.minor), money.currency);
+}
+
+function memberExpenseContext(
+  expense: GroupStatisticsData["expenses"][number],
+) {
+  const participantCount = expense.shares.length;
+  return `${formatted(expense.sourceAmount)} total · ${participantCount} ${participantCount === 1 ? "person" : "people"}`;
+}
+
+function MemberAmount({
+  sourceAmount,
+  homeAmount,
+}: {
+  sourceAmount: Money;
+  homeAmount?: Money;
+}) {
+  const theme = useTheme();
+  const showHomeAmount =
+    homeAmount && homeAmount.currency !== sourceAmount.currency;
+  return (
+    <View style={{ alignItems: "flex-end", gap: 1 }}>
+      <MoneyValue minor={sourceAmount.minor} currency={sourceAmount.currency} />
+      {showHomeAmount ? (
+        <Text
+          selectable
+          style={{
+            color: theme.muted,
+            fontSize: 13,
+            lineHeight: 17,
+            fontWeight: "500",
+            fontVariant: ["tabular-nums"],
+          }}
+        >
+          {formatted(homeAmount)}
+        </Text>
+      ) : null}
+    </View>
+  );
 }
 
 export default function StatisticsExpensesScreen() {
@@ -83,7 +123,14 @@ export default function StatisticsExpensesScreen() {
   const filteredExpenses = data.expenses.flatMap((expense) => {
     if (!isMemberFilter) {
       return !category || expense.iconKey === category
-        ? [{ ...expense, displayedAmount: expense.amount }]
+        ? [
+            {
+              ...expense,
+              displayedAmount: expense.amount,
+              displayedSourceAmount: expense.sourceAmount,
+              displayedHomeAmount: undefined,
+            },
+          ]
         : [];
     }
     const allocations = metric === "paid" ? expense.payments : expense.shares;
@@ -91,7 +138,14 @@ export default function StatisticsExpensesScreen() {
       (candidate) => candidate.userId === member!.userId,
     );
     return allocation && BigInt(allocation.amount.minor) > 0n
-      ? [{ ...expense, displayedAmount: allocation.amount }]
+      ? [
+          {
+            ...expense,
+            displayedAmount: allocation.amount,
+            displayedSourceAmount: allocation.sourceAmount,
+            displayedHomeAmount: allocation.homeAmount,
+          },
+        ]
       : [];
   });
   const totalMinor = filteredExpenses.reduce(
@@ -100,11 +154,6 @@ export default function StatisticsExpensesScreen() {
   );
   const total = formatConvertedMoney(totalMinor, data.group.currency);
   const activityGroups = groupActivityByDate(filteredExpenses);
-  const memberAmountExplanation = isMemberFilter
-    ? metric === "share"
-      ? `Amounts on the right show ${member!.isViewer ? "your" : `${member!.displayName}’s`} share, not the full expense total.`
-      : `Amounts on the right show ${member!.isViewer ? "what you paid" : `what ${member!.displayName} paid`}, not the full expense total.`
-    : undefined;
 
   return (
     <>
@@ -126,9 +175,6 @@ export default function StatisticsExpensesScreen() {
                 {filteredExpenses.length}{" "}
                 {filteredExpenses.length === 1 ? "expense" : "expenses"} · {total}
               </Intro>
-              {memberAmountExplanation ? (
-                <Intro>{memberAmountExplanation}</Intro>
-              ) : null}
             </View>
             <ActivityTimeline
               groups={activityGroups}
@@ -138,12 +184,21 @@ export default function StatisticsExpensesScreen() {
                   title={expense.description}
                   subtitle={
                     isMemberFilter
-                      ? metric === "paid"
-                        ? "Paid"
-                        : "Share"
+                      ? memberExpenseContext(expense)
                       : statisticsCategoryLabel(expense.iconKey)
                   }
-                  value={formatted(expense.displayedAmount)}
+                  {...(isMemberFilter
+                    ? {
+                        trailing: (
+                          <MemberAmount
+                            sourceAmount={expense.displayedSourceAmount}
+                            {...(expense.displayedHomeAmount
+                              ? { homeAmount: expense.displayedHomeAmount }
+                              : {})}
+                          />
+                        ),
+                      }
+                    : { value: formatted(expense.displayedAmount) })}
                   leading={
                     <ExpenseIcon
                       iconKey={expense.iconKey}

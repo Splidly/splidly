@@ -1,4 +1,5 @@
 import { render } from "@testing-library/react-native";
+import { StyleSheet } from "react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import ExpenseDetailScreen from "../app/expense/[id]";
 
@@ -139,11 +140,17 @@ describe("expense details", () => {
 
     expect(view.getByText("Dinner")).toBeTruthy();
     expect(view.getAllByText("$100.00")).toHaveLength(2);
+    expect(
+      StyleSheet.flatten(view.getByTestId("expense-summary-line").props.style)
+        .flexDirection,
+    ).toBe("row");
     expect(view.getByLabelText("92.00 € in your home currency")).toBeTruthy();
+    expect(view.getByText("55.20 €")).toBeTruthy();
+    expect(view.getByText("36.80 €")).toBeTruthy();
     expect(view.getByText("Paid by")).toBeTruthy();
-    expect(view.getByText("Split method")).toBeTruthy();
+    expect(view.getByText("Split · Custom amount")).toBeTruthy();
     expect(view.getByText("Great evening")).toBeTruthy();
-    expect(view.getByText("Conversion")).toBeTruthy();
+    expect(view.getByText("Exchange rate")).toBeTruthy();
     expect(
       view.queryByText("›", { includeHiddenElements: true }),
     ).toBeNull();

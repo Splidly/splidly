@@ -9,6 +9,7 @@ import { StatusBar } from "expo-status-bar";
 import { useColorScheme } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
+  expenseDetailSheetOptions,
   formSheetOptions,
   nativeHeaderOptions,
 } from "../lib/navigation";
@@ -63,10 +64,7 @@ function Navigation() {
           name="expense/[id]/index"
           options={{
             title: "Expense",
-            ...formSheetOptions(theme.sheet),
-            sheetAllowedDetents: [0.72, 1],
-            sheetInitialDetentIndex: 0,
-            sheetGrabberVisible: true,
+            ...expenseDetailSheetOptions(theme.sheet),
           }}
         />
         <Stack.Screen

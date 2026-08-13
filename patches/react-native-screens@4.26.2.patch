@@ -1,8 +1,26 @@
+diff --git a/ios/RNSBarButtonItem.mm b/ios/RNSBarButtonItem.mm
+index 0eb1f09dee82edd99e3e614938233db5cdeaebfe..57fb3e27191798ddacd906376ba33c9100fee8c1 100644
+--- a/ios/RNSBarButtonItem.mm
++++ b/ios/RNSBarButtonItem.mm
+@@ -315,6 +315,5 @@ - (void)setTitleStyleFromConfig:(NSDictionary *)titleStyle
+   [self setTitleTextAttributes:attrs forState:UIControlStateNormal];
+   [self setTitleTextAttributes:attrs forState:UIControlStateHighlighted];
+   [self setTitleTextAttributes:attrs forState:UIControlStateDisabled];
+-  [self setTitleTextAttributes:attrs forState:UIControlStateSelected];
+   [self setTitleTextAttributes:attrs forState:UIControlStateFocused];
+ }
 diff --git a/ios/RNSScreenStackHeaderConfig.mm b/ios/RNSScreenStackHeaderConfig.mm
-index 1c844846a5c66e31cfa530ca462774d2fb6bbea1..88770e678ebdfe0a4c20c86a8d433f61ebf81e45 100644
+index 1c844846a5c66e31cfa530ca462774d2fb6bbea1..964243f9daa6ae739003744d93a793eda81d7ec2 100644
 --- a/ios/RNSScreenStackHeaderConfig.mm
 +++ b/ios/RNSScreenStackHeaderConfig.mm
-@@ -518,11 +518,22 @@ + (void)updateViewController:(UIViewController *)vc
+@@ -273,6 +273,5 @@ + (void)setTitleAttibutes:(NSDictionary *)attrs forButton:(UIBarButtonItem *)but
+   [button setTitleTextAttributes:attrs forState:UIControlStateNormal];
+   [button setTitleTextAttributes:attrs forState:UIControlStateHighlighted];
+   [button setTitleTextAttributes:attrs forState:UIControlStateDisabled];
+-  [button setTitleTextAttributes:attrs forState:UIControlStateSelected];
+   [button setTitleTextAttributes:attrs forState:UIControlStateFocused];
+ }
+@@ -518,11 +517,22 @@ + (void)updateViewController:(UIViewController *)vc
  #if !TARGET_OS_TV
    [config configureBackItem:prevItem withPrevVC:prevVC];
  

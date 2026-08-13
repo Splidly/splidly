@@ -31,6 +31,17 @@ export function formSheetOptions(backgroundColor: ColorValue) {
   } as const;
 }
 
+export function expenseDetailSheetOptions(backgroundColor: ColorValue) {
+  return {
+    ...formSheetOptions(backgroundColor),
+    sheetAllowedDetents: [0.65, 1] as number[],
+    sheetInitialDetentIndex: 0,
+    // Keep content scrolling independent from dragging the compact sheet.
+    sheetExpandsWhenScrolledToEdge: false,
+    sheetGrabberVisible: true,
+  } as const;
+}
+
 export function inlineLargeTitleOptions(color: ColorValue) {
   if (process.env.EXPO_OS !== "ios") return {};
 

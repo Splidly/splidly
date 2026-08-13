@@ -104,6 +104,7 @@ const mockUseQuery = jest.fn((_input: unknown, _options?: unknown) => ({
         userId: "viewer",
         displayName: "Lasse",
         avatarUrl: null,
+        homeCurrency: "EUR" as const,
         isViewer: true,
         paid: { currency: "EUR" as const, minor: "11000" },
         share: { currency: "EUR" as const, minor: "7000" },
@@ -112,6 +113,7 @@ const mockUseQuery = jest.fn((_input: unknown, _options?: unknown) => ({
         userId: "alex",
         displayName: "Alex",
         avatarUrl: null,
+        homeCurrency: "USD" as const,
         isViewer: false,
         paid: { currency: "EUR" as const, minor: "8000" },
         share: { currency: "EUR" as const, minor: "12000" },
@@ -124,16 +126,21 @@ const mockUseQuery = jest.fn((_input: unknown, _options?: unknown) => ({
         iconKey: "other" as const,
         occurredAt: new Date("2026-07-22T18:00:00.000Z"),
         amount: { currency: "EUR" as const, minor: "1000" },
+        sourceAmount: { currency: "EUR" as const, minor: "1000" },
         payments: [
           {
             userId: "alex",
             amount: { currency: "EUR" as const, minor: "1000" },
+            sourceAmount: { currency: "EUR" as const, minor: "1000" },
+            homeAmount: { currency: "USD" as const, minor: "1100" },
           },
         ],
         shares: [
           {
             userId: "alex",
             amount: { currency: "EUR" as const, minor: "1000" },
+            sourceAmount: { currency: "EUR" as const, minor: "1000" },
+            homeAmount: { currency: "USD" as const, minor: "1100" },
           },
         ],
       },
@@ -143,20 +150,27 @@ const mockUseQuery = jest.fn((_input: unknown, _options?: unknown) => ({
         iconKey: "transport" as const,
         occurredAt: new Date("2026-08-01T09:00:00.000Z"),
         amount: { currency: "EUR" as const, minor: "6000" },
+        sourceAmount: { currency: "EUR" as const, minor: "6000" },
         payments: [
           {
             userId: "alex",
             amount: { currency: "EUR" as const, minor: "6000" },
+            sourceAmount: { currency: "EUR" as const, minor: "6000" },
+            homeAmount: { currency: "USD" as const, minor: "6600" },
           },
         ],
         shares: [
           {
             userId: "viewer",
             amount: { currency: "EUR" as const, minor: "3000" },
+            sourceAmount: { currency: "EUR" as const, minor: "3000" },
+            homeAmount: { currency: "EUR" as const, minor: "3000" },
           },
           {
             userId: "alex",
             amount: { currency: "EUR" as const, minor: "3000" },
+            sourceAmount: { currency: "EUR" as const, minor: "3000" },
+            homeAmount: { currency: "USD" as const, minor: "3300" },
           },
         ],
       },
@@ -166,24 +180,33 @@ const mockUseQuery = jest.fn((_input: unknown, _options?: unknown) => ({
         iconKey: "dining" as const,
         occurredAt: new Date("2026-07-20T18:00:00.000Z"),
         amount: { currency: "EUR" as const, minor: "12000" },
+        sourceAmount: { currency: "USD" as const, minor: "13000" },
         payments: [
           {
             userId: "viewer",
             amount: { currency: "EUR" as const, minor: "11000" },
+            sourceAmount: { currency: "USD" as const, minor: "11917" },
+            homeAmount: { currency: "EUR" as const, minor: "11000" },
           },
           {
             userId: "alex",
             amount: { currency: "EUR" as const, minor: "1000" },
+            sourceAmount: { currency: "USD" as const, minor: "1083" },
+            homeAmount: { currency: "USD" as const, minor: "1083" },
           },
         ],
         shares: [
           {
             userId: "viewer",
             amount: { currency: "EUR" as const, minor: "4000" },
+            sourceAmount: { currency: "USD" as const, minor: "4333" },
+            homeAmount: { currency: "EUR" as const, minor: "4000" },
           },
           {
             userId: "alex",
             amount: { currency: "EUR" as const, minor: "8000" },
+            sourceAmount: { currency: "USD" as const, minor: "8667" },
+            homeAmount: { currency: "USD" as const, minor: "8667" },
           },
         ],
       },
@@ -374,16 +397,16 @@ describe("group statistics", () => {
 
     expect(view.getByText("Dinner")).toBeTruthy();
     expect(view.getByText("1 expense · 110.00 €")).toBeTruthy();
-    expect(
-      view.getByText(
-        "Amounts on the right show what you paid, not the full expense total.",
-      ),
-    ).toBeTruthy();
+    expect(view.queryByText(/Amounts on the right show/)).toBeNull();
+    expect(view.getByText("$130.00 total · 2 people")).toBeTruthy();
+    expect(view.getByText("$119.17")).toBeTruthy();
+    expect(view.getByText("110.00 €")).toBeTruthy();
+    expect(view.queryByText("Paid")).toBeNull();
     expect(view.queryByText("Train")).toBeNull();
     expect(view.queryByText("Mystery purchase")).toBeNull();
   });
 
-  it("clarifies that member share amounts are not expense totals", async () => {
+  it("shows member shares in source and home currencies", async () => {
     mockUseLocalSearchParams.mockReturnValue({
       id: "group-1",
       range: "all",
@@ -400,11 +423,12 @@ describe("group statistics", () => {
     );
 
     expect(view.getByText("2 expenses · 70.00 €")).toBeTruthy();
-    expect(
-      view.getByText(
-        "Amounts on the right show your share, not the full expense total.",
-      ),
-    ).toBeTruthy();
+    expect(view.queryByText(/Amounts on the right show/)).toBeNull();
+    expect(view.getByText("$130.00 total · 2 people")).toBeTruthy();
+    expect(view.getByText("60.00 € total · 2 people")).toBeTruthy();
+    expect(view.getByText("$43.33")).toBeTruthy();
+    expect(view.getByText("40.00 €")).toBeTruthy();
+    expect(view.queryByText("Share")).toBeNull();
   });
 
   it("keeps your share visible when the selected period changes", async () => {

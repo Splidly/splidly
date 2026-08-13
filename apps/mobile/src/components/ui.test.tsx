@@ -162,6 +162,46 @@ describe("Screen", () => {
     expect(scrollView?.props.alwaysBounceVertical).toBe(true);
   });
 
+  it("clears native form-sheet chrome only when content overflows", async () => {
+    const view = await render(
+      <SafeAreaInsetsContext.Provider
+        value={{ top: 0, right: 0, bottom: 34, left: 0 }}
+      >
+        <Screen background="sheet" formSheetBottomClearance>
+          <Text>Sheet content</Text>
+        </Screen>
+      </SafeAreaInsetsContext.Provider>,
+    );
+    const findScrollView = () =>
+      view.container.queryAll(
+        (instance) =>
+          instance.props.contentInsetAdjustmentBehavior === "automatic",
+      )[0];
+    const scrollView = findScrollView();
+    if (!scrollView) throw new Error("ScrollView was not rendered");
+
+    await fireEvent(scrollView, "layout", {
+      nativeEvent: { layout: { height: 800 } },
+    });
+    expect(
+      StyleSheet.flatten(findScrollView()?.props.contentContainerStyle)
+        .paddingBottom,
+    ).toBeUndefined();
+
+    const resizedScrollView = findScrollView();
+    if (!resizedScrollView) throw new Error("ScrollView was not resized");
+    await fireEvent(resizedScrollView, "contentSizeChange", 400, 1000);
+    const overflowingScrollView = findScrollView();
+    const overflowingStyle = StyleSheet.flatten(
+      overflowingScrollView?.props.contentContainerStyle,
+    );
+
+    expect(overflowingStyle.paddingBottom).toBe(50);
+    expect(
+      overflowingScrollView?.props.contentInsetAdjustmentBehavior,
+    ).toBe("automatic");
+  });
+
   it("removes the native top inset from headerless viewport fill", async () => {
     const view = await render(
       <SafeAreaInsetsContext.Provider

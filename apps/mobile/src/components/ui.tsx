@@ -44,11 +44,13 @@ function useScrollViewportFill({
   underlapsHeader = false,
   reservedBottomHeight = 0,
   transientBottomClearance = 0,
+  includeBottomInsetWhenOverflowing = false,
 }: {
   accountForTopInset?: boolean;
   underlapsHeader?: boolean;
   reservedBottomHeight?: number;
   transientBottomClearance?: number;
+  includeBottomInsetWhenOverflowing?: boolean;
 } = {}) {
   const insets = useSafeAreaInsets();
   const headerHeight = use(HeaderHeightContext) ?? 0;
@@ -72,7 +74,9 @@ function useScrollViewportFill({
   const bottomPadding =
     reservedBottomHeight +
     transientBottomClearance +
-    (hasBottomSpacing ? spacing.md : 0);
+    (hasBottomSpacing
+      ? spacing.md + (includeBottomInsetWhenOverflowing ? insets.bottom : 0)
+      : 0);
 
   useEffect(() => {
     if (viewportHeight === 0 || contentMeasurement.height === 0) return;
@@ -195,6 +199,7 @@ export function Screen({
   transientBottomClearance = 0,
   bottomOverlay,
   bottomOverlayHeight = 62,
+  formSheetBottomClearance = false,
   refreshing,
   onRefresh,
   onScroll,
@@ -209,6 +214,7 @@ export function Screen({
   transientBottomClearance?: number;
   bottomOverlay?: ReactNode;
   bottomOverlayHeight?: number;
+  formSheetBottomClearance?: boolean;
   refreshing?: boolean;
   onRefresh?: () => void;
   onScroll?: ScrollViewProps["onScroll"];
@@ -223,6 +229,7 @@ export function Screen({
       underlapsHeader ?? (background === "default" && !accountForTopInset),
     reservedBottomHeight: bottomOverlay ? bottomOverlayHeight : 0,
     transientBottomClearance,
+    includeBottomInsetWhenOverflowing: formSheetBottomClearance,
   });
   if (!scroll) {
     return (
@@ -430,6 +437,7 @@ export function ListRow({
   accessibilityHint,
   accessibilityState,
   title,
+  titleColor,
   subtitle,
   subtitleNumberOfLines = 2,
   value,
@@ -445,6 +453,7 @@ export function ListRow({
   accessibilityHint?: string;
   accessibilityState?: AccessibilityState;
   title: string;
+  titleColor?: ColorValue;
   subtitle?: string;
   subtitleNumberOfLines?: number;
   value?: string;
@@ -479,7 +488,10 @@ export function ListRow({
           numberOfLines={1}
           style={[
             styles.rowTitle,
-            { color: destructive ? theme.negative : theme.text },
+            {
+              color:
+                titleColor ?? (destructive ? theme.negative : theme.text),
+            },
           ]}
         >
           {title}

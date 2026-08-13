@@ -1,8 +1,23 @@
 import {
+  expenseDetailSheetOptions,
   formSheetOptions,
   inlineLargeTitleOptions,
   nativeHeaderOptions,
 } from "./navigation";
+
+describe("expenseDetailSheetOptions", () => {
+  it("lets the compact sheet content scroll without first expanding", () => {
+    expect(expenseDetailSheetOptions("#1c1c1e")).toEqual(
+      expect.objectContaining({
+        presentation: "formSheet",
+        sheetAllowedDetents: [0.65, 1],
+        sheetInitialDetentIndex: 0,
+        sheetExpandsWhenScrolledToEdge: false,
+        sheetGrabberVisible: true,
+      }),
+    );
+  });
+});
 
 describe("formSheetOptions", () => {
   it("keeps elevated sheet chrome opaque and out of the content flow", () => {

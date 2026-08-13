@@ -1,7 +1,7 @@
 import type { CurrencyCode } from "@splidly/shared";
 import { router, useLocalSearchParams, type Href } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, Switch, View } from "react-native";
+import { Alert, PlatformColor, Switch, View } from "react-native";
 import type { GroupBalanceMember } from "../../../../components/group-balances";
 import { normalizeGroupIconKey } from "../../../../components/group-icon";
 import { GroupSummaryHeader } from "../../../../components/group-summary-header";
@@ -157,6 +157,7 @@ export default function GroupSettingsScreen() {
             trailing={
               <Switch
                 accessibilityLabel="Simplify debts"
+                style={{ alignSelf: "center" }}
                 disabled={updateSimplification.isPending}
                 value={simplifyDebts}
                 onValueChange={(nextValue) => {
@@ -185,8 +186,13 @@ export default function GroupSettingsScreen() {
                 ? "Creating invitation…"
                 : "Invite people"
             }
+            titleColor={
+              process.env.EXPO_OS === "ios"
+                ? PlatformColor("systemBlue")
+                : "#007AFF"
+            }
             subtitle="Share a link to join this group"
-            showsDisclosureIndicator={false}
+            showsDisclosureIndicator
             onPress={() =>
               createInvite.mutate({ kind: "group", groupId: id })
             }
