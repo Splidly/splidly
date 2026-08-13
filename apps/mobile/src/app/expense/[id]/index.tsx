@@ -1,7 +1,9 @@
 import type { CurrencyCode } from "@splidly/shared";
 import { router, Stack, useLocalSearchParams, type Href } from "expo-router";
 import { Alert, Text, View } from "react-native";
+import { ExpenseDetailHero } from "../../../components/expense-detail-hero";
 import {
+  Avatar,
   ErrorState,
   HeaderButton,
   ListRow,
@@ -11,16 +13,12 @@ import {
   Screen,
   Section,
 } from "../../../components/ui";
-import { ExpenseIcon } from "../../../components/expense-icon";
 import {
   expenseItemAllocationModeLabels,
   expenseSplitModeLabels,
 } from "../../../lib/expense-split";
-import {
-  currencySymbol,
-  formatExchangeRate,
-  formatMoney,
-} from "../../../lib/money-display";
+import { expenseTotalInCurrency } from "../../../lib/expense-detail";
+import { formatExchangeRate } from "../../../lib/money-display";
 import { api } from "../../../lib/trpc";
 import { useTheme } from "../../../theme";
 
@@ -28,6 +26,7 @@ export default function ExpenseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const theme = useTheme();
   const detail = api.expenses.detail.useQuery({ expenseId: id });
+  const profile = api.profile.me.useQuery();
   const utils = api.useUtils();
   const remove = api.expenses.remove.useMutation({
     async onSuccess() {
@@ -53,21 +52,30 @@ export default function ExpenseDetailScreen() {
 
   if (detail.isPending) {
     return (
-      <Screen>
+      <Screen background="sheet">
         <LoadingState />
       </Screen>
     );
   }
   if (detail.error || !detail.data) {
     return (
-      <Screen>
+      <Screen background="sheet">
         <ErrorState message={detail.error?.message} />
       </Screen>
     );
   }
 
   const { expense, payers, rates, split, splits } = detail.data;
-  const currency = expense.sourceCurrency as CurrencyCode;
+  const sourceCurrency = expense.sourceCurrency as CurrencyCode;
+  const homeCurrency = profile.data?.homeCurrency as CurrencyCode | undefined;
+  const homeAmountMinor = homeCurrency
+    ? expenseTotalInCurrency(
+        expense.sourceAmountMinor,
+        sourceCurrency,
+        homeCurrency,
+        rates,
+      )
+    : undefined;
   const editExpense = () => router.push(`/expense/${expense.id}/edit` as Href);
 
   function confirmDelete() {
@@ -91,67 +99,44 @@ export default function ExpenseDetailScreen() {
 
   return (
     <>
-      <Screen>
-        <View style={{ alignItems: "center", gap: 7, paddingVertical: 12 }}>
-          <ExpenseIcon
-            iconKey={expense.iconKey}
-            name={expense.description}
-            size={64}
-            useNameFallback={!expense.iconManuallySet}
-          />
-          <Text
-            style={{
-              color: theme.text,
-              fontSize: 34,
-              fontWeight: "700",
-              letterSpacing: -1,
-            }}
-          >
-            {formatMoney(expense.sourceAmountMinor, currency)}
-          </Text>
-          <Text
-            style={{
-              color: theme.text,
-              fontSize: 20,
-              fontWeight: "600",
-              textAlign: "center",
-            }}
-          >
-            {expense.description}
-          </Text>
-        </View>
-
-        <Section title="Details">
-          <ListRow
-            title="Date"
-            value={expense.occurredAt.toLocaleDateString(undefined, {
-              dateStyle: "long",
-            })}
-          />
-          <RowDivider inset={16} />
-          <ListRow
-            title="Ledger"
-            value={
-              expense.contextType === "group"
-                ? "Group expense"
-                : "Direct expense"
-            }
-          />
-        </Section>
+      <Screen
+        background="sheet"
+        contentContainerStyle={{ paddingTop: 12, gap: 20 }}
+      >
+        <ExpenseDetailHero
+          description={expense.description}
+          iconKey={expense.iconKey}
+          iconManuallySet={expense.iconManuallySet}
+          sourceAmountMinor={expense.sourceAmountMinor}
+          sourceCurrency={sourceCurrency}
+          homeAmountMinor={homeAmountMinor}
+          homeCurrency={homeCurrency}
+          dateLabel={expense.occurredAt.toLocaleDateString(undefined, {
+            dateStyle: "medium",
+          })}
+          ledgerLabel={
+            expense.contextType === "group" ? "Group expense" : "Direct expense"
+          }
+        />
 
         <Section title="Paid by">
           {payers.map((payer, index) => (
             <View key={payer.userId}>
-              {index > 0 ? <RowDivider inset={16} /> : null}
+              {index > 0 ? <RowDivider /> : null}
               <ListRow
                 title={payer.displayName}
-                subtitle={`Home currency · ${currencySymbol(
-                  payer.homeCurrency as CurrencyCode,
-                )}`}
+                subtitle="Paid toward this expense"
+                leading={
+                  <Avatar
+                    name={payer.displayName}
+                    colorKey={payer.userId}
+                    imageUrl={payer.avatarUrl}
+                  />
+                }
                 trailing={
                   <MoneyValue
                     minor={payer.sourceAmountMinor}
-                    currency={currency}
+                    currency={sourceCurrency}
                   />
                 }
               />
@@ -159,36 +144,30 @@ export default function ExpenseDetailScreen() {
           ))}
         </Section>
 
-        {expense.notes ? (
-          <Section title="Notes">
-            <Text
-              style={{
-                color: theme.text,
-                fontSize: 16,
-                lineHeight: 22,
-                padding: 16,
-              }}
-            >
-              {expense.notes}
-            </Text>
-          </Section>
-        ) : null}
-
-        <Section title="Split">
-          <ListRow title="Method" value={expenseSplitModeLabels[split.mode]} />
-          <RowDivider inset={16} />
-          {splits.map((split, index) => (
-            <View key={split.userId}>
-              {index > 0 ? <RowDivider inset={16} /> : null}
+        <Section
+          title="Split"
+          footer={`${splits.length} ${splits.length === 1 ? "person" : "people"} included`}
+        >
+          <ListRow
+            title="Split method"
+            value={expenseSplitModeLabels[split.mode]}
+          />
+          {splits.map((person) => (
+            <View key={person.userId}>
+              <RowDivider />
               <ListRow
-                title={split.displayName}
-                subtitle={`Home currency · ${currencySymbol(
-                  split.homeCurrency as CurrencyCode,
-                )}`}
+                title={person.displayName}
+                leading={
+                  <Avatar
+                    name={person.displayName}
+                    colorKey={person.userId}
+                    imageUrl={person.avatarUrl}
+                  />
+                }
                 trailing={
                   <MoneyValue
-                    minor={split.sourceAmountMinor}
-                    currency={currency}
+                    minor={person.sourceAmountMinor}
+                    currency={sourceCurrency}
                   />
                 }
               />
@@ -217,7 +196,7 @@ export default function ExpenseDetailScreen() {
                   trailing={
                     <MoneyValue
                       minor={BigInt(item.amountMinor)}
-                      currency={currency}
+                      currency={sourceCurrency}
                     />
                   }
                 />
@@ -226,8 +205,43 @@ export default function ExpenseDetailScreen() {
           </Section>
         ) : null}
 
+        {expense.notes ? (
+          <View style={{ gap: 8 }}>
+            <Text
+              style={{
+                color: theme.muted,
+                paddingHorizontal: 16,
+                fontSize: 13,
+                fontWeight: "600",
+                textTransform: "uppercase",
+                letterSpacing: 0.4,
+              }}
+            >
+              Notes
+            </Text>
+            <View
+              style={{
+                padding: 16,
+                borderRadius: 16,
+                borderCurve: "continuous",
+                backgroundColor: theme.surface,
+              }}
+            >
+              <Text
+                selectable
+                style={{ color: theme.text, fontSize: 16, lineHeight: 23 }}
+              >
+                {expense.notes}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
         {rates.some((rate) => rate.base !== rate.quote) ? (
-          <Section title="Frozen exchange rates">
+          <Section
+            title="Conversion"
+            footer="Saved exchange rates keep this expense stable over time."
+          >
             {rates
               .filter((rate) => rate.base !== rate.quote)
               .map((rate, index) => (
@@ -247,15 +261,24 @@ export default function ExpenseDetailScreen() {
           <ListRow
             title={remove.isPending ? "Deleting…" : "Delete expense"}
             destructive
+            showsDisclosureIndicator={false}
             {...(remove.isPending ? {} : { onPress: confirmDelete })}
           />
         </Section>
+        {profile.error ? <ErrorState message={profile.error.message} /> : null}
         {remove.error ? <ErrorState message={remove.error.message} /> : null}
       </Screen>
       <Stack.Screen
         options={{
           title: "Expense",
           ...(process.env.EXPO_OS !== "ios" && {
+            headerLeft: () => (
+              <HeaderButton
+                label="Close expense details"
+                glyph="×"
+                onPress={() => router.back()}
+              />
+            ),
             headerRight: () => (
               <HeaderButton
                 label="Edit expense"
@@ -266,6 +289,13 @@ export default function ExpenseDetailScreen() {
           }),
         }}
       />
+      <Stack.Toolbar placement="left">
+        <Stack.Toolbar.Button
+          icon="xmark"
+          accessibilityLabel="Close expense details"
+          onPress={() => router.back()}
+        />
+      </Stack.Toolbar>
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
           icon="pencil"

@@ -251,6 +251,12 @@ describe("GroupDetailScreen actions", () => {
       },
     });
     mockPush.mockClear();
+    expect(
+      StyleSheet.flatten(view.getByText("Add expense").props.style).textAlign,
+    ).toBe("center");
+    expect(
+      StyleSheet.flatten(view.getByText("Settle up").props.style).textAlign,
+    ).toBe("center");
     await fireEvent.press(view.getByText("Settle up"));
 
     expect(mockPush).toHaveBeenCalledWith({

@@ -59,7 +59,16 @@ function Navigation() {
             ...formSheetOptions(theme.background),
           }}
         />
-        <Stack.Screen name="expense/[id]/index" options={{ title: "Expense" }} />
+        <Stack.Screen
+          name="expense/[id]/index"
+          options={{
+            title: "Expense",
+            ...formSheetOptions(theme.sheet),
+            sheetAllowedDetents: [0.72, 1],
+            sheetInitialDetentIndex: 0,
+            sheetGrabberVisible: true,
+          }}
+        />
         <Stack.Screen
           name="expense/[id]/edit"
           options={{

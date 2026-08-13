@@ -4,7 +4,6 @@ import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import ProfileScreen from "../app/(tabs)/profile";
 
 const mockDeleteAccount = jest.fn();
-const mockUpdateNotificationPreferences = jest.fn();
 let mockDeleteMutationOptions:
   | {
       onError?: (
@@ -23,6 +22,7 @@ jest.mock("@tanstack/react-query", () => ({
 
 jest.mock("expo-router", () => ({
   router: {
+    push: jest.fn(),
     replace: jest.fn(),
   },
 }));
@@ -69,13 +69,6 @@ jest.mock("../lib/trpc", () => ({
           error: null,
           isPending: false,
           mutate: jest.fn(),
-        }),
-      },
-      updateNotificationPreferences: {
-        useMutation: () => ({
-          error: null,
-          isPending: false,
-          mutate: mockUpdateNotificationPreferences,
         }),
       },
       deleteAccount: {
@@ -137,7 +130,6 @@ describe("ProfileScreen account deletion", () => {
   beforeEach(() => {
     mockGroups = [];
     mockDeleteAccount.mockClear();
-    mockUpdateNotificationPreferences.mockClear();
     mockDeleteMutationOptions = undefined;
     alert = jest.spyOn(Alert, "alert").mockImplementation();
   });
@@ -210,27 +202,17 @@ describe("ProfileScreen account deletion", () => {
     );
   });
 
-  it("saves notification filtering and summary preferences", async () => {
+  it("opens notification preferences without action chevrons on account rows", async () => {
     const view = await renderProfile();
+    const { router } = jest.requireMock("expo-router") as {
+      router: { push: jest.Mock };
+    };
 
-    await fireEvent(
-      view.getByLabelText("Only when involved"),
-      "valueChange",
-      true,
-    );
-    expect(mockUpdateNotificationPreferences).toHaveBeenLastCalledWith({
-      onlyWhenInvolved: true,
-      summarizeBursts: false,
-    });
-
-    await fireEvent(
-      view.getByLabelText("Smart summaries"),
-      "valueChange",
-      true,
-    );
-    expect(mockUpdateNotificationPreferences).toHaveBeenLastCalledWith({
-      onlyWhenInvolved: true,
-      summarizeBursts: true,
-    });
+    await fireEvent.press(view.getByText("Notifications"));
+    expect(router.push).toHaveBeenCalledWith("/profile/notifications");
+    expect(view.queryByText("Changes save automatically")).toBeNull();
+    expect(
+      view.getAllByText("›", { includeHiddenElements: true }),
+    ).toHaveLength(2);
   });
 });

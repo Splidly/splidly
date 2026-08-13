@@ -5,7 +5,7 @@ import type {
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Alert, Linking, Switch, Text } from "react-native";
+import { Alert, Linking } from "react-native";
 import {
   Avatar,
   ErrorState,
@@ -25,7 +25,6 @@ import {
   unregisterNativePushNotifications,
 } from "../../../lib/push-installation";
 import { api } from "../../../lib/trpc";
-import { useTheme } from "../../../theme";
 
 type SavedProfile = {
   displayName: string;
@@ -33,15 +32,9 @@ type SavedProfile = {
   avatarUrl: string | null;
 };
 
-type NotificationPreferences = {
-  onlyWhenInvolved: boolean;
-  summarizeBursts: boolean;
-};
-
 const ACTIVE_GROUPS_ERROR = "Leave all groups before deleting your account";
 
 export default function ProfileScreen() {
-  const theme = useTheme();
   const profile = api.profile.me.useQuery();
   const groups = api.groups.list.useQuery();
   const utils = api.useUtils();
@@ -49,22 +42,9 @@ export default function ProfileScreen() {
   const [name, setName] = useState("");
   const [currency, setCurrency] = useState<CurrencyCode>("EUR");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [notificationPreferences, setNotificationPreferences] =
-    useState<NotificationPreferences>({
-      onlyWhenInvolved: false,
-      summarizeBursts: false,
-    });
   const initializedUser = useRef<string | undefined>(undefined);
   const saved = useRef<SavedProfile | undefined>(undefined);
   const lastAttempted = useRef<string | undefined>(undefined);
-  const savedNotificationPreferences = useRef<NotificationPreferences>({
-    onlyWhenInvolved: false,
-    summarizeBursts: false,
-  });
-  const draftNotificationPreferences = useRef<NotificationPreferences>({
-    onlyWhenInvolved: false,
-    summarizeBursts: false,
-  });
 
   useEffect(() => {
     if (!profile.data || initializedUser.current === profile.data.userId) return;
@@ -78,15 +58,6 @@ export default function ProfileScreen() {
     setName(initial.displayName);
     setCurrency(initial.homeCurrency);
     setAvatarUrl(initial.avatarUrl);
-    const initialNotificationPreferences = {
-      onlyWhenInvolved:
-        profile.data.notificationOnlyWhenInvolved ?? false,
-      summarizeBursts:
-        profile.data.summarizeNotificationBursts ?? false,
-    };
-    savedNotificationPreferences.current = initialNotificationPreferences;
-    draftNotificationPreferences.current = initialNotificationPreferences;
-    setNotificationPreferences(initialNotificationPreferences);
   }, [profile.data]);
 
   const update = api.profile.update.useMutation({
@@ -146,38 +117,7 @@ export default function ProfileScreen() {
       }
     },
   });
-  const updateNotificationPreferences =
-    api.profile.updateNotificationPreferences.useMutation({
-      onSuccess(updated) {
-        const savedPreferences = {
-          onlyWhenInvolved: updated.notificationOnlyWhenInvolved,
-          summarizeBursts: updated.summarizeNotificationBursts,
-        };
-        savedNotificationPreferences.current = savedPreferences;
-        draftNotificationPreferences.current = savedPreferences;
-        setNotificationPreferences(savedPreferences);
-        utils.profile.me.setData(undefined, updated);
-      },
-      onError() {
-        draftNotificationPreferences.current =
-          savedNotificationPreferences.current;
-        setNotificationPreferences(savedNotificationPreferences.current);
-      },
-    });
   const unregisterPush = api.push.unregister.useMutation();
-
-  function saveNotificationPreference(
-    key: keyof NotificationPreferences,
-    value: boolean,
-  ) {
-    const next = {
-      ...draftNotificationPreferences.current,
-      [key]: value,
-    };
-    draftNotificationPreferences.current = next;
-    setNotificationPreferences(next);
-    updateNotificationPreferences.mutate(next);
-  }
 
   async function signOut() {
     const installationId = await getExistingPushInstallationId();
@@ -274,48 +214,13 @@ export default function ProfileScreen() {
           onValueChange={setCurrency}
         />
       </FormSection>
-      <Text
-        accessibilityLiveRegion="polite"
-        style={{ color: theme.muted, fontSize: 13, textAlign: "center" }}
-      >
-        {update.isPending ? "Saving…" : "Changes save automatically"}
-      </Text>
-      <FormSection
-        title="Notifications"
-        footer="Smart summaries wait up to 5 minutes. One or two updates still arrive separately; three or more from the same group are combined."
-      >
+      <Section title="Preferences">
         <ListRow
-          title="Only when involved"
-          subtitle="Skip expenses you didn't pay for or share"
-          trailing={
-            <Switch
-              accessibilityLabel="Only when involved"
-              disabled={updateNotificationPreferences.isPending}
-              value={notificationPreferences.onlyWhenInvolved}
-              onValueChange={(onlyWhenInvolved) =>
-                saveNotificationPreference(
-                  "onlyWhenInvolved",
-                  onlyWhenInvolved,
-                )
-              }
-            />
-          }
+          title="Notifications"
+          subtitle="Choose which expense updates reach you"
+          onPress={() => router.push("/profile/notifications")}
         />
-        <ListRow
-          title="Smart summaries"
-          subtitle="Reduce notification bursts without missing activity"
-          trailing={
-            <Switch
-              accessibilityLabel="Smart summaries"
-              disabled={updateNotificationPreferences.isPending}
-              value={notificationPreferences.summarizeBursts}
-              onValueChange={(summarizeBursts) =>
-                saveNotificationPreference("summarizeBursts", summarizeBursts)
-              }
-            />
-          }
-        />
-      </FormSection>
+      </Section>
       <Section title="Privacy">
         <ListRow
           title="Privacy policy"
@@ -326,19 +231,18 @@ export default function ProfileScreen() {
       <Section title="Account">
         <ListRow
           title="Sign out"
+          showsDisclosureIndicator={false}
           onPress={() => void signOut()}
         />
         <RowDivider inset={16} />
         <ListRow
           title="Delete account"
           destructive
+          showsDisclosureIndicator={false}
           onPress={confirmDelete}
         />
       </Section>
       {update.error ? <ErrorState message={update.error.message} /> : null}
-      {updateNotificationPreferences.error ? (
-        <ErrorState message={updateNotificationPreferences.error.message} />
-      ) : null}
       {remove.error ? <ErrorState message={remove.error.message} /> : null}
     </Screen>
   );

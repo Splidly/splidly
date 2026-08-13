@@ -1,5 +1,6 @@
 import { Stack } from "expo-router";
 import {
+  formSheetOptions,
   inlineLargeTitleOptions,
   nativeHeaderOptions,
 } from "../../../lib/navigation";
@@ -21,6 +22,16 @@ export default function ProfileStackLayout() {
         options={{
           title: "Profile",
           ...inlineLargeTitleOptions(theme.text),
+        }}
+      />
+      <Stack.Screen
+        name="notifications"
+        options={{
+          title: "Notifications",
+          ...formSheetOptions(theme.sheet),
+          sheetAllowedDetents: "fitToContents",
+          sheetInitialDetentIndex: 0,
+          sheetGrabberVisible: true,
         }}
       />
     </Stack>

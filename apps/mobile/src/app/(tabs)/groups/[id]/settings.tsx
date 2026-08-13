@@ -154,7 +154,6 @@ export default function GroupSettingsScreen() {
         >
           <ListRow
             title="Simplify debts"
-            subtitle="Use fewer payments to settle the group"
             trailing={
               <Switch
                 accessibilityLabel="Simplify debts"

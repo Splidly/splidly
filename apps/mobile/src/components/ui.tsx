@@ -992,7 +992,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 14,
   },
-  buttonText: { fontSize: 16, fontWeight: "700" },
+  buttonText: {
+    width: "100%",
+    flexShrink: 1,
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: "700",
+    textAlign: "center",
+  },
   sheetCloseButton: {
     position: "absolute",
     top: spacing.md,

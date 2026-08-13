@@ -265,6 +265,10 @@ describe("GroupSettingsScreen", () => {
       </SafeAreaInsetsContext.Provider>,
     );
 
+    expect(
+      view.queryByText("Use fewer payments to settle the group"),
+    ).toBeNull();
+
     await fireEvent(
       view.getByLabelText("Simplify debts"),
       "valueChange",
