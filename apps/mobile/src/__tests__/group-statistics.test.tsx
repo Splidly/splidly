@@ -1,6 +1,7 @@
 import { fireEvent, render, within } from "@testing-library/react-native";
 import { StyleSheet } from "react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
+import { semanticChartColorFor } from "../lib/avatar-colors";
 
 const mockUseLocalSearchParams = jest.fn(
   (): {
@@ -245,9 +246,14 @@ describe("group statistics", () => {
     expect(StyleSheet.flatten(heroAmount?.props.style).fontSize).toBe(38);
     expect(within(hero).getAllByText("Your share").length).toBeGreaterThan(0);
     expect(within(hero).getByText("37% of 190.00 € total")).toBeTruthy();
+    const paymentSummary = within(hero).getByTestId("viewer-payment-summary");
+    expect(within(paymentSummary).getByText("You paid")).toBeTruthy();
+    expect(within(paymentSummary).getByText("110.00 €")).toBeTruthy();
     expect(
-      within(hero).getByText("You paid 40.00 € more than your share"),
+      within(paymentSummary).getByText("40.00 € more than your share"),
     ).toBeTruthy();
+    expect(view.queryByTestId("viewer-paid-bar")).toBeNull();
+    expect(view.queryByTestId("viewer-share-bar")).toBeNull();
     expect(
       StyleSheet.flatten(view.getByTestId("viewer-share-segment").props.style)
         .width,
@@ -266,14 +272,21 @@ describe("group statistics", () => {
     expect(view.getByText("Selected total")).toBeTruthy();
     expect(view.getByText("Aug 2026 · 60.00 €")).toBeTruthy();
     expect(view.getByText("Where the money went")).toBeTruthy();
-    expect(view.getByText("Who paid & who used it")).toBeTruthy();
-    expect(view.getByText("Paid and share use the same scale")).toBeTruthy();
+    expect(view.getByText("Spending by member")).toBeTruthy();
+    expect(
+      view.getByText("Ranked by share · initial payments shown for context"),
+    ).toBeTruthy();
     expect(view.getByText("Uncategorized")).toBeTruthy();
     expect(
       StyleSheet.flatten(
         view.getByTestId("category-segment-dining").props.style,
       ).width,
     ).toBe("63%");
+    expect(
+      StyleSheet.flatten(
+        view.getByTestId("category-segment-dining").props.style,
+      ).backgroundColor,
+    ).toBe(semanticChartColorFor("expense:dining", "light"));
     expect(
       StyleSheet.flatten(
         view.getByTestId("category-segment-transport").props.style,
@@ -288,14 +301,30 @@ describe("group statistics", () => {
         .getAllByLabelText(/Show expenses where/)
         .map((row) => row.props.accessibilityLabel),
     ).toEqual([
-      "Show expenses where Alex paid",
       "Show expenses where Alex had a share",
-      "Show expenses where you paid",
+      "Show expenses where Alex paid",
       "Show expenses where you had a share",
+      "Show expenses where you paid",
     ]);
 
-    expect(view.getByText("Share 40.00 € more")).toBeTruthy();
+    expect(view.getByText("Paid 40.00 € less")).toBeTruthy();
     expect(view.getByText("Paid 40.00 € more")).toBeTruthy();
+    expect(
+      StyleSheet.flatten(view.getByTestId("member-share-amount-alex").props.style)
+        .fontSize,
+    ).toBe(18);
+    expect(
+      StyleSheet.flatten(view.getByTestId("member-paid-amount-alex").props.style)
+        .fontSize,
+    ).toBe(12);
+    expect(
+      StyleSheet.flatten(view.getByTestId("member-share-track-alex").props.style)
+        .height,
+    ).toBe(8);
+    expect(
+      StyleSheet.flatten(view.getByTestId("member-paid-track-alex").props.style)
+        .height,
+    ).toBe(3);
     await fireEvent.press(
       view.getByLabelText("Show expenses where Alex had a share"),
     );
@@ -549,11 +578,27 @@ describe("group statistics", () => {
     );
 
     expect(view.getByText("2 expenses · 70.00 €")).toBeTruthy();
+    expect(view.getByText("Where your share went")).toBeTruthy();
+    expect(view.getByText("Only your portion of each expense")).toBeTruthy();
+    expect(view.getByText("Dining")).toBeTruthy();
+    expect(view.getByText("Transport")).toBeTruthy();
+    expect(view.getByText("57%")).toBeTruthy();
+    expect(view.getByText("43%")).toBeTruthy();
+    expect(
+      StyleSheet.flatten(
+        view.getByTestId("category-segment-dining").props.style,
+      ).backgroundColor,
+    ).toBe(semanticChartColorFor("expense:dining", "light"));
+    expect(
+      StyleSheet.flatten(
+        view.getByTestId("category-segment-transport").props.style,
+      ).backgroundColor,
+    ).toBe(semanticChartColorFor("expense:transport", "light"));
     expect(view.queryByText(/Amounts on the right show/)).toBeNull();
     expect(view.getByText("$130.00 total · 2 people")).toBeTruthy();
     expect(view.getByText("60.00 € total · 2 people")).toBeTruthy();
     expect(view.getByText("$43.33")).toBeTruthy();
-    expect(view.getByText("40.00 €")).toBeTruthy();
+    expect(view.getAllByText("40.00 €").length).toBeGreaterThan(0);
     expect(view.queryByText("Share")).toBeNull();
   });
 

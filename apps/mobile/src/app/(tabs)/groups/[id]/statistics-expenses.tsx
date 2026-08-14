@@ -3,6 +3,7 @@ import { Stack, router, useLocalSearchParams, type Href } from "expo-router";
 import { Text, View } from "react-native";
 import { ActivityTimeline } from "../../../../components/activity-timeline";
 import {
+  MemberShareCategoryOverview,
   statisticsCategoryLabel,
   type GroupStatisticsData,
   type StatisticsRange,
@@ -178,6 +179,9 @@ export default function StatisticsExpensesScreen() {
         refreshing={statistics.isRefetching}
         onRefresh={() => void statistics.refetch()}
       >
+        {isMemberFilter && metric === "share" ? (
+          <MemberShareCategoryOverview data={data} member={member!} />
+        ) : null}
         {filteredExpenses.length === 0 ? (
           <Section>
             <EmptyState

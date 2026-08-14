@@ -6,9 +6,11 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useColorScheme,
   useWindowDimensions,
   View,
 } from "react-native";
+import { semanticChartColorFor } from "../lib/avatar-colors";
 import { formatConvertedMoney } from "../lib/money-display";
 import { normalizeGroupColor } from "../lib/group-colors";
 import { useTheme } from "../theme";
@@ -92,17 +94,6 @@ const quickRangeDetails: Record<Exclude<StatisticsRange, "custom">, string> = {
   "12-months": "Trends",
   all: "Everything",
 };
-
-const categoryColors = [
-  "#5E5CE6",
-  "#FF9F0A",
-  "#30B0C7",
-  "#AF52DE",
-  "#34C759",
-  "#FF375F",
-  "#A2845E",
-  "#64D2FF",
-] as const;
 
 function startOfDay(date: Date) {
   return new Date(
@@ -642,42 +633,6 @@ function SectionCard({
   );
 }
 
-function MetricBar({
-  label,
-  value,
-  width,
-  color,
-  testID,
-}: {
-  label: string;
-  value: string;
-  width: number;
-  color: string;
-  testID?: string;
-}) {
-  const theme = useTheme();
-  return (
-    <View style={styles.metric} testID={testID}>
-      <View style={styles.metricHeading}>
-        <Text selectable={false} style={[styles.metricLabel, { color: theme.muted }]}>
-          {label}
-        </Text>
-        <Text selectable={false} style={[styles.metricValue, { color: theme.text }]}>
-          {value}
-        </Text>
-      </View>
-      <View style={[styles.metricTrack, { backgroundColor: theme.elevated }]}>
-        <View
-          style={[
-            styles.metricFill,
-            { backgroundColor: color, width: `${width}%` },
-          ]}
-        />
-      </View>
-    </View>
-  );
-}
-
 function PersonalOverview({
   data,
   accent,
@@ -691,16 +646,12 @@ function PersonalOverview({
   const paidMinor = BigInt(data.viewerPaid.minor);
   const restMinor = totalMinor > shareMinor ? totalMinor - shareMinor : 0n;
   const differenceMinor = paidMinor - shareMinor;
-  const maximumMinor = [totalMinor, paidMinor, shareMinor].reduce(
-    (current, amount) => (amount > current ? amount : current),
-    0n,
-  );
   const differenceCopy =
     differenceMinor > 0n
-      ? `You paid ${formattedMinor(differenceMinor, data.group.currency)} more than your share`
+      ? `${formattedMinor(differenceMinor, data.group.currency)} more than your share`
       : differenceMinor < 0n
-        ? `Your share was ${formattedMinor(-differenceMinor, data.group.currency)} more than you paid`
-        : "Your payments exactly match your share";
+        ? `${formattedMinor(-differenceMinor, data.group.currency)} less than your share`
+        : "Exactly matches your share";
 
   return (
     <View
@@ -761,14 +712,25 @@ function PersonalOverview({
 
       <View style={[styles.heroDivider, { backgroundColor: theme.border }]} />
 
-      <View style={styles.comparisonHeading}>
-        <Text selectable={false} style={[styles.comparisonTitle, { color: theme.text }]}>
-          Paid compared with share
-        </Text>
+      <View testID="viewer-payment-summary" style={styles.paymentSummary}>
+        <View style={styles.paymentAmount}>
+          <Text
+            selectable={false}
+            style={[styles.paymentLabel, { color: theme.muted }]}
+          >
+            You paid
+          </Text>
+          <Text
+            selectable={false}
+            style={[styles.paymentValue, { color: theme.text }]}
+          >
+            {formatted(data.viewerPaid)}
+          </Text>
+        </View>
         <Text
           selectable={false}
           style={[
-            styles.differencePill,
+            styles.paymentDifference,
             {
               color:
                 differenceMinor > 0n
@@ -776,41 +738,12 @@ function PersonalOverview({
                   : differenceMinor < 0n
                     ? theme.negative
                     : theme.muted,
-              backgroundColor:
-                differenceMinor > 0n
-                  ? theme.positiveSurface
-                  : differenceMinor < 0n
-                    ? theme.negativeSurface
-                    : theme.elevated,
             },
           ]}
         >
-          {differenceMinor > 0n ? "+" : differenceMinor < 0n ? "−" : ""}
-          {formattedMinor(
-            differenceMinor < 0n ? -differenceMinor : differenceMinor,
-            data.group.currency,
-          )}
+          {differenceCopy}
         </Text>
       </View>
-      <View style={styles.comparisonBars}>
-        <MetricBar
-          label="You paid"
-          value={formatted(data.viewerPaid)}
-          width={proportionalWidth(paidMinor, maximumMinor)}
-          color={accent}
-          testID="viewer-paid-bar"
-        />
-        <MetricBar
-          label="Your share"
-          value={formatted(data.viewerShare)}
-          width={proportionalWidth(shareMinor, maximumMinor)}
-          color={theme.muted as string}
-          testID="viewer-share-bar"
-        />
-      </View>
-      <Text selectable={false} style={[styles.comparisonNote, { color: theme.muted }]}>
-        {differenceCopy}
-      </Text>
     </View>
   );
 }
@@ -937,17 +870,16 @@ function TimelineChart({
 function CategoryBreakdown({
   categories,
   totalMinor,
-  accent,
   onOpenCategory,
 }: {
   categories: GroupStatisticsData["categories"];
   totalMinor: bigint;
-  accent: string;
-  onOpenCategory: (iconKey: ExpenseIconKey) => void;
+  onOpenCategory?: (iconKey: ExpenseIconKey) => void;
 }) {
   const theme = useTheme();
-  const colors = categories.map((_, index) =>
-    index === 0 ? accent : categoryColors[index % categoryColors.length],
+  const colorScheme = useColorScheme() === "dark" ? "dark" : "light";
+  const colors = categories.map((category) =>
+    semanticChartColorFor(`expense:${category.iconKey}`, colorScheme),
   );
 
   return (
@@ -980,17 +912,8 @@ function CategoryBreakdown({
           const amountMinor = BigInt(category.amount.minor);
           const share = percent(amountMinor, totalMinor);
           const label = statisticsCategoryLabel(category.iconKey);
-          return (
-            <Pressable
-              key={category.iconKey}
-              accessibilityRole="button"
-              accessibilityLabel={`Show ${label} expenses`}
-              onPress={() => onOpenCategory(category.iconKey)}
-              style={({ pressed }) => [
-                styles.categoryRow,
-                { opacity: pressed ? 0.62 : 1 },
-              ]}
-            >
+          const content = (
+            <>
               <View style={styles.categoryIconWrap}>
                 <View
                   style={[
@@ -1017,23 +940,98 @@ function CategoryBreakdown({
                   <Text selectable={false} style={[styles.percent, { color: theme.muted }]}>
                     {share}%
                   </Text>
-                  <Text
-                    accessibilityElementsHidden
-                    selectable={false}
-                    style={[styles.disclosure, { color: theme.subtle }]}
-                  >
-                    ›
-                  </Text>
+                  {onOpenCategory ? (
+                    <Text
+                      accessibilityElementsHidden
+                      selectable={false}
+                      style={[styles.disclosure, { color: theme.subtle }]}
+                    >
+                      ›
+                    </Text>
+                  ) : null}
                 </View>
                 <Text selectable={false} style={[styles.rankAmount, { color: theme.text }]}>
                   {formatted(category.amount)}
                 </Text>
               </View>
+            </>
+          );
+          return onOpenCategory ? (
+            <Pressable
+              key={category.iconKey}
+              accessibilityRole="button"
+              accessibilityLabel={`Show ${label} expenses`}
+              onPress={() => onOpenCategory(category.iconKey)}
+              style={({ pressed }) => [
+                styles.categoryRow,
+                { opacity: pressed ? 0.62 : 1 },
+              ]}
+            >
+              {content}
             </Pressable>
+          ) : (
+            <View key={category.iconKey} style={styles.categoryRow}>
+              {content}
+            </View>
           );
         })}
       </View>
     </View>
+  );
+}
+
+export function MemberShareCategoryOverview({
+  data,
+  member,
+}: {
+  data: GroupStatisticsData;
+  member: GroupStatisticsData["members"][number];
+}) {
+  const categories = useMemo(() => {
+    const totals = new Map<ExpenseIconKey, bigint>();
+    for (const expense of data.expenses) {
+      const share = expense.shares.find(
+        (candidate) => candidate.userId === member.userId,
+      );
+      const amountMinor = share ? BigInt(share.amount.minor) : 0n;
+      if (amountMinor <= 0n) continue;
+      totals.set(
+        expense.iconKey,
+        (totals.get(expense.iconKey) ?? 0n) + amountMinor,
+      );
+    }
+    return [...totals]
+      .map(([iconKey, amountMinor]) => ({
+        iconKey,
+        amount: {
+          currency: data.group.currency,
+          minor: amountMinor.toString(),
+        },
+      }))
+      .sort((left, right) => {
+        const leftAmount = BigInt(left.amount.minor);
+        const rightAmount = BigInt(right.amount.minor);
+        return leftAmount === rightAmount ? 0 : leftAmount > rightAmount ? -1 : 1;
+      });
+  }, [data.expenses, data.group.currency, member.userId]);
+  const totalMinor = categories.reduce(
+    (sum, category) => sum + BigInt(category.amount.minor),
+    0n,
+  );
+
+  if (categories.length === 0) return null;
+
+  const possessiveName = member.isViewer ? "your" : `${member.displayName}'s`;
+  return (
+    <SectionCard
+      title={`Where ${possessiveName} share went`}
+      subtitle={`Only ${possessiveName} portion of each expense`}
+    >
+      <CategoryBreakdown
+        categories={categories}
+        totalMinor={totalMinor}
+      />
+    </SectionCard>
   );
 }
 
@@ -1053,6 +1051,7 @@ function MemberMetric({
   const theme = useTheme();
   const amountMinor = BigInt(member[metric].minor);
   const memberName = member.isViewer ? "you" : member.displayName;
+  const isShare = metric === "share";
 
   return (
     <Pressable
@@ -1061,14 +1060,26 @@ function MemberMetric({
       onPress={onOpen}
       hitSlop={4}
       style={({ pressed }) => [
-        styles.memberMetric,
+        isShare ? styles.memberShareMetric : styles.memberPaidMetric,
         { opacity: pressed ? 0.62 : 1 },
       ]}
     >
-      <Text selectable={false} style={[styles.memberMetricLabel, { color: theme.muted }]}>
-        {metric === "paid" ? "Paid" : "Share"}
+      <Text
+        selectable={false}
+        style={[
+          isShare ? styles.memberShareLabel : styles.memberPaidLabel,
+          { color: theme.muted },
+        ]}
+      >
+        {isShare ? "Share" : "Paid"}
       </Text>
-      <View style={[styles.memberTrack, { backgroundColor: theme.elevated }]}>
+      <View
+        testID={`member-${metric}-track-${member.userId}`}
+        style={[
+          isShare ? styles.memberShareTrack : styles.memberPaidTrack,
+          { backgroundColor: theme.elevated },
+        ]}
+      >
         <View
           style={[
             styles.progressFill,
@@ -1079,13 +1090,24 @@ function MemberMetric({
           ]}
         />
       </View>
-      <Text selectable={false} style={[styles.memberAmount, { color: theme.text }]}>
+      <Text
+        testID={`member-${metric}-amount-${member.userId}`}
+        selectable={false}
+        numberOfLines={1}
+        style={[
+          isShare ? styles.memberShareAmount : styles.memberPaidAmount,
+          { color: isShare ? theme.text : theme.muted },
+        ]}
+      >
         {formatted(member[metric])}
       </Text>
       <Text
         accessibilityElementsHidden
         selectable={false}
-        style={[styles.smallDisclosure, { color: theme.subtle }]}
+        style={[
+          isShare ? styles.memberShareDisclosure : styles.smallDisclosure,
+          { color: theme.subtle },
+        ]}
       >
         ›
       </Text>
@@ -1127,21 +1149,6 @@ function MemberBreakdown({
 
   return (
     <View style={styles.memberContent}>
-      <View style={styles.memberLegend}>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDash, { backgroundColor: accent }]} />
-          <Text selectable={false} style={[styles.legendText, { color: theme.muted }]}>
-            Paid
-          </Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDash, { backgroundColor: shareColor }]} />
-          <Text selectable={false} style={[styles.legendText, { color: theme.muted }]}>
-            Share
-          </Text>
-        </View>
-      </View>
-
       <View style={styles.memberList}>
         {sorted.map((member) => {
           const paidMinor = BigInt(member.paid.minor);
@@ -1151,7 +1158,7 @@ function MemberBreakdown({
             differenceMinor > 0n
               ? `Paid ${formattedMinor(differenceMinor, member.paid.currency as CurrencyCode)} more`
               : differenceMinor < 0n
-                ? `Share ${formattedMinor(-differenceMinor, member.share.currency as CurrencyCode)} more`
+                ? `Paid ${formattedMinor(-differenceMinor, member.share.currency as CurrencyCode)} less`
                 : "Even";
           return (
             <View key={member.userId} style={styles.memberRow}>
@@ -1192,17 +1199,17 @@ function MemberBreakdown({
               <View style={styles.memberMetrics}>
                 <MemberMetric
                   member={member}
-                  metric="paid"
-                  maximumMinor={maximumMinor}
-                  color={accent}
-                  onOpen={() => onOpenMember(member, "paid")}
-                />
-                <MemberMetric
-                  member={member}
                   metric="share"
                   maximumMinor={maximumMinor}
                   color={shareColor}
                   onOpen={() => onOpenMember(member, "share")}
+                />
+                <MemberMetric
+                  member={member}
+                  metric="paid"
+                  maximumMinor={maximumMinor}
+                  color={accent}
+                  onOpen={() => onOpenMember(member, "paid")}
                 />
               </View>
             </View>
@@ -1267,14 +1274,13 @@ export function GroupStatistics({
             <CategoryBreakdown
               categories={data.categories}
               totalMinor={totalMinor}
-              accent={accent}
               onOpenCategory={onOpenCategory}
             />
           </SectionCard>
 
           <SectionCard
-            title="Who paid & who used it"
-            subtitle="Paid and share use the same scale"
+            title="Spending by member"
+            subtitle="Ranked by share · initial payments shown for context"
           >
             <MemberBreakdown
               members={data.members}
@@ -1499,44 +1505,30 @@ const styles = StyleSheet.create({
   },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   legendDot: { width: 7, height: 7, borderRadius: 4 },
-  legendDash: { width: 18, height: 6, borderRadius: 3 },
   legendText: { fontSize: 12, lineHeight: 16, fontVariant: ["tabular-nums"] },
   heroDivider: { height: StyleSheet.hairlineWidth, marginVertical: 18 },
-  comparisonHeading: {
+  paymentSummary: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 12,
+    gap: 16,
   },
-  comparisonTitle: { fontSize: 16, lineHeight: 21, fontWeight: "700" },
-  differencePill: {
-    overflow: "hidden",
-    borderRadius: 9,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
+  paymentAmount: { gap: 1 },
+  paymentLabel: { fontSize: 11, lineHeight: 15, fontWeight: "600" },
+  paymentValue: {
+    fontSize: 18,
+    lineHeight: 23,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
+  },
+  paymentDifference: {
+    flex: 1,
     fontSize: 12,
-    lineHeight: 16,
-    fontWeight: "700",
-    fontVariant: ["tabular-nums"],
-  },
-  comparisonBars: { gap: 12, paddingTop: 15 },
-  comparisonNote: { fontSize: 12, lineHeight: 17, paddingTop: 11 },
-  metric: { gap: 6 },
-  metricHeading: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  metricLabel: { fontSize: 13, lineHeight: 17, fontWeight: "600" },
-  metricValue: {
-    fontSize: 13,
     lineHeight: 17,
-    fontWeight: "700",
+    fontWeight: "600",
+    textAlign: "right",
     fontVariant: ["tabular-nums"],
   },
-  metricTrack: { height: 8, borderRadius: 4, overflow: "hidden" },
-  metricFill: { height: "100%", borderRadius: 4 },
   sectionBlock: { gap: 9 },
   sectionHeading: { paddingHorizontal: 4, gap: 2 },
   sectionTitle: {
@@ -1633,10 +1625,9 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
   },
   disclosure: { fontSize: 23, lineHeight: 23, fontWeight: "300" },
-  memberContent: { padding: 16, gap: 16 },
-  memberLegend: { flexDirection: "row", alignItems: "center", gap: 18 },
-  memberList: { gap: 20 },
-  memberRow: { gap: 11 },
+  memberContent: { paddingHorizontal: 16, paddingVertical: 14 },
+  memberList: { gap: 16 },
+  memberRow: { gap: 8 },
   memberHeading: { flexDirection: "row", alignItems: "center", gap: 10 },
   memberName: {
     flex: 1,
@@ -1652,24 +1643,62 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "right",
   },
-  memberMetrics: { gap: 8, paddingLeft: 46 },
-  memberMetric: {
-    minHeight: 32,
+  memberMetrics: { gap: 4, paddingLeft: 46 },
+  memberShareMetric: {
+    minHeight: 34,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
-  memberMetricLabel: { width: 35, fontSize: 11, lineHeight: 15 },
-  memberTrack: { flex: 1, height: 7, borderRadius: 4, overflow: "hidden" },
-  progressFill: { height: "100%", borderRadius: 4 },
-  memberAmount: {
-    width: 74,
+  memberShareLabel: {
+    width: 38,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+  },
+  memberShareAmount: {
+    width: 78,
+    textAlign: "right",
+    fontSize: 18,
+    lineHeight: 23,
+    fontWeight: "700",
+    letterSpacing: -0.3,
+    fontVariant: ["tabular-nums"],
+  },
+  memberShareDisclosure: { fontSize: 20, lineHeight: 20, fontWeight: "300" },
+  memberShareTrack: {
+    flex: 1,
+    height: 8,
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+  memberPaidMetric: {
+    minHeight: 26,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  memberPaidLabel: {
+    width: 38,
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  memberPaidAmount: {
+    width: 78,
     textAlign: "right",
     fontSize: 12,
     lineHeight: 16,
     fontWeight: "600",
     fontVariant: ["tabular-nums"],
   },
+  memberPaidTrack: {
+    flex: 1,
+    height: 3,
+    borderRadius: 2,
+    overflow: "hidden",
+  },
+  progressFill: { height: "100%", borderRadius: 4 },
   smallDisclosure: { fontSize: 18, lineHeight: 18, fontWeight: "300" },
   emptyCard: {
     borderRadius: 20,

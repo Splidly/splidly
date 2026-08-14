@@ -14,7 +14,7 @@
     "submit:android": "eas submit --platform android"
   },
   "dependencies": {
-    "@better-auth/expo": "1.6.25",
+    "@better-auth/expo": "1.6.27",
     "@expo/material-symbols": "^0.1.1",
     "@expo/ui": "57.0.10",
     "@react-native-google-signin/google-signin": "16.1.4",
@@ -23,7 +23,7 @@
     "@tanstack/react-query": "5.101.4",
     "@trpc/client": "11.18.0",
     "@trpc/react-query": "11.18.0",
-    "better-auth": "1.6.25",
+    "better-auth": "1.6.27",
     "expo": "~57.0.12",
     "expo-apple-authentication": "~57.0.1",
     "expo-application": "~57.0.2",
@@ -56,7 +56,7 @@
   "devDependencies": {
     "@testing-library/react-native": "14.0.1",
     "@types/jest": "29.5.14",
-    "@types/react": "19.2.17",
+    "@types/react": "19.2.18",
     "jest-expo": "57.0.4",
     "typescript": "~6.0.3"
   },
