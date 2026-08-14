@@ -86,6 +86,7 @@ export default function GroupSettingsScreen() {
       <Screen>
         <ErrorState
           message={detail.error?.message ?? "Unable to load this group."}
+          onRetry={() => void detail.refetch()}
         />
       </Screen>
     );

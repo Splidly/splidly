@@ -12,6 +12,7 @@ import {
   ledgerEntries,
   ledgerValuations,
   profiles,
+  pushInstallations,
   rateSnapshots,
 } from "@splidly/db";
 import {
@@ -41,7 +42,10 @@ import {
   requireActiveGroupMember,
   requireFriendshipParticipant,
 } from "../domain/helpers";
-import { enqueueExpenseNotifications } from "../domain/expense-notifications";
+import {
+  enqueueExpenseNotifications,
+  type ExpenseNotificationInstallation,
+} from "../domain/expense-notifications";
 import { protectedProcedure, router, type TrpcContext } from "../trpc";
 
 interface PreparedExpense {
@@ -52,6 +56,7 @@ interface PreparedExpense {
   canonicalCurrency: CurrencyCode;
   groupName?: string;
   actorName?: string;
+  notificationInstallations?: ExpenseNotificationInstallation[];
   payments: Map<string, bigint>;
   sourceShares: Map<string, bigint>;
   transfers: {
@@ -113,44 +118,46 @@ async function prepareExpense(
   let canonicalCurrency: CurrencyCode;
   let groupName: string | undefined;
   let actorName: string | undefined;
+  let notificationInstallations: ExpenseNotificationInstallation[] | undefined;
   let homeCurrencies: Map<string, CurrencyCode>;
   if (input.context.type === "group") {
-    const [membership] = await ctx.db
-      .select({ group: groups })
+    const memberRows = await ctx.db
+      .select({
+        group: groups,
+        displayName: profiles.displayName,
+        homeCurrency: profiles.homeCurrency,
+        userId: groupMembers.userId,
+        notificationOnlyWhenInvolved: profiles.notificationOnlyWhenInvolved,
+        summarizeNotificationBursts: profiles.summarizeNotificationBursts,
+        installationId: pushInstallations.id,
+      })
       .from(groupMembers)
       .innerJoin(groups, eq(groups.id, groupMembers.groupId))
+      .innerJoin(profiles, eq(profiles.userId, groupMembers.userId))
+      .leftJoin(
+        pushInstallations,
+        and(
+          eq(pushInstallations.userId, groupMembers.userId),
+          eq(pushInstallations.platform, "ios"),
+          isNull(pushInstallations.disabledAt),
+        ),
+      )
       .where(
         and(
           eq(groupMembers.groupId, input.context.groupId),
-          eq(groupMembers.userId, userId),
           isNull(groupMembers.removedAt),
         ),
-      )
-      .limit(1);
-    const group = membership?.group;
-    if (!group) {
+      );
+    const actorMembership = memberRows.find((row) => row.userId === userId);
+    const group = actorMembership?.group;
+    if (!group || !actorMembership) {
       throw new TRPCError({ code: "FORBIDDEN", message: "Not a group member" });
     }
     if (group.archivedAt) {
       throw new TRPCError({ code: "NOT_FOUND", message: "Group not found" });
     }
-    const memberProfiles = await ctx.db
-      .select({
-        displayName: profiles.displayName,
-        homeCurrency: profiles.homeCurrency,
-        userId: groupMembers.userId,
-      })
-      .from(groupMembers)
-      .innerJoin(profiles, eq(profiles.userId, groupMembers.userId))
-      .where(
-        and(
-          eq(groupMembers.groupId, group.id),
-          inArray(groupMembers.userId, [...new Set([...involvedIds, userId])]),
-          isNull(groupMembers.removedAt),
-        ),
-      );
     const profilesById = new Map(
-      memberProfiles.map((profile) => [profile.userId, profile]),
+      memberRows.map((profile) => [profile.userId, profile]),
     );
     if (involvedIds.some((id) => !profilesById.has(id))) {
       throw new TRPCError({
@@ -168,6 +175,19 @@ async function prepareExpense(
     canonicalCurrency = group.currency as CurrencyCode;
     groupName = group.name;
     actorName = profilesById.get(userId)?.displayName;
+    notificationInstallations = memberRows.flatMap((row) =>
+      row.installationId && row.userId !== userId
+        ? [
+            {
+              id: row.installationId,
+              userId: row.userId,
+              notificationOnlyWhenInvolved:
+                row.notificationOnlyWhenInvolved,
+              summarizeNotificationBursts: row.summarizeNotificationBursts,
+            },
+          ]
+        : [],
+    );
   } else {
     const friendship = await requireFriendshipParticipant(
       ctx.db,
@@ -262,6 +282,7 @@ async function prepareExpense(
     canonicalCurrency,
     ...(groupName ? { groupName } : {}),
     ...(actorName ? { actorName } : {}),
+    ...(notificationInstallations ? { notificationInstallations } : {}),
     payments,
     sourceShares,
     transfers,
@@ -491,18 +512,26 @@ export const expensesRouter = router({
   create: protectedProcedure
     .input(expenseMutationSchema)
     .mutation(async ({ ctx, input }) => {
-      const [duplicate] = await ctx.db
-        .select()
-        .from(expenses)
-        .where(
-          and(
-            eq(expenses.createdBy, ctx.session.user.id),
-            eq(expenses.clientMutationId, input.clientMutationId),
-          ),
-        )
-        .limit(1);
-      if (duplicate) return duplicate;
-      const prepared = await prepareExpense(ctx, input);
+      let prepared: PreparedExpense;
+      try {
+        prepared = await prepareExpense(ctx, input);
+      } catch (cause) {
+        // Retried mutations must stay idempotent even after a quote expires or
+        // the ledger changes. Keep the successful path free of an extra read
+        // and only recover the prior result when preparation fails.
+        const [duplicate] = await ctx.db
+          .select()
+          .from(expenses)
+          .where(
+            and(
+              eq(expenses.createdBy, ctx.session.user.id),
+              eq(expenses.clientMutationId, input.clientMutationId),
+            ),
+          )
+          .limit(1);
+        if (duplicate) return duplicate;
+        throw cause;
+      }
       const primaryPayerId = prepared.payments.keys().next().value;
       if (!primaryPayerId) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Payer required" });
@@ -529,8 +558,24 @@ export const expensesRouter = router({
             sourceAmountMinor: BigInt(input.amount.minor),
             clientMutationId: input.clientMutationId,
           })
+          .onConflictDoNothing({
+            target: [expenses.createdBy, expenses.clientMutationId],
+          })
           .returning();
-        if (!expense) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        if (!expense) {
+          const [duplicate] = await tx
+            .select()
+            .from(expenses)
+            .where(
+              and(
+                eq(expenses.createdBy, ctx.session.user.id),
+                eq(expenses.clientMutationId, input.clientMutationId),
+              ),
+            )
+            .limit(1);
+          if (duplicate) return duplicate;
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        }
         await writeExpenseFinancials(tx, expense.id, prepared);
         await tx.insert(financialRevisions).values({
           recordType: "expense",
@@ -554,6 +599,9 @@ export const expensesRouter = router({
             splits: prepared.sourceShares,
             sourceAmountMinor: expense.sourceAmountMinor,
             sourceCurrency: expense.sourceCurrency as CurrencyCode,
+            ...(prepared.notificationInstallations
+              ? { installations: prepared.notificationInstallations }
+              : {}),
           });
         }
         return expense;
@@ -678,6 +726,9 @@ export const expensesRouter = router({
             splits: prepared.sourceShares,
             sourceAmountMinor: updated.sourceAmountMinor,
             sourceCurrency: updated.sourceCurrency as CurrencyCode,
+            ...(prepared.notificationInstallations
+              ? { installations: prepared.notificationInstallations }
+              : {}),
           });
         }
         return updated;

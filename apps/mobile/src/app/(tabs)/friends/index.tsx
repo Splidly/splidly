@@ -33,7 +33,12 @@ export default function FriendsScreen() {
         onRefresh={() => void friends.refetch()}
       >
         {friends.isPending ? <LoadingState /> : null}
-        {friends.error ? <ErrorState message={friends.error.message} /> : null}
+        {friends.error ? (
+          <ErrorState
+            message={friends.error.message}
+            onRetry={() => void friends.refetch()}
+          />
+        ) : null}
         {friends.data?.length === 0 ? (
           <EmptyState
             title="Your people will appear here"

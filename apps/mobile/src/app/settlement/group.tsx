@@ -75,6 +75,10 @@ export default function SettleGroupScreen() {
             profile.error?.message ??
             "Could not load this group"
           }
+          onRetry={() => {
+            void detail.refetch();
+            void profile.refetch();
+          }}
         />
       </Screen>
     );

@@ -21,6 +21,7 @@ import {
   type RepaymentTransfer,
 } from "../domain/debt-simplification";
 import { groupBy, requireFriendshipParticipant } from "../domain/helpers";
+import { loadGroupedLedgerAmounts } from "../domain/ledger-summary";
 import { protectedProcedure, router } from "../trpc";
 
 export const friendsRouter = router({
@@ -68,21 +69,19 @@ export const friendsRouter = router({
         .from(ledgerEntries)
         .where(
           or(
-            eq(ledgerEntries.debtorId, userId),
-            eq(ledgerEntries.creditorId, userId),
+            and(
+              eq(ledgerEntries.debtorId, userId),
+              inArray(ledgerEntries.creditorId, friendIds),
+            ),
+            and(
+              eq(ledgerEntries.creditorId, userId),
+              inArray(ledgerEntries.debtorId, friendIds),
+            ),
           ),
         ),
       simplifiedGroupIds.length === 0
         ? Promise.resolve([])
-        : ctx.db
-            .select()
-            .from(ledgerEntries)
-            .where(
-              and(
-                eq(ledgerEntries.contextType, "group"),
-                inArray(ledgerEntries.contextId, simplifiedGroupIds),
-              ),
-            ),
+        : loadGroupedLedgerAmounts(ctx.db, "group", simplifiedGroupIds),
     ]);
     const simplifiedGroups = new Map<
       string,

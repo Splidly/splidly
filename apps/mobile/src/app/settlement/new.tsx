@@ -36,6 +36,7 @@ function rateBasis(base: CurrencyCode, targets: CurrencyCode[]) {
 }
 
 export default function NewSettlementScreen() {
+  const clientMutationId = useRef(Crypto.randomUUID());
   const params = useLocalSearchParams<{
     type: "group" | "friend";
     id: string;
@@ -421,7 +422,7 @@ export default function NewSettlementScreen() {
           };
     const mutation = {
       context,
-      clientMutationId: Crypto.randomUUID(),
+      clientMutationId: clientMutationId.current,
       fromUserId: fromMember.userId,
       toUserId: toMember.userId,
       amount: {
@@ -499,6 +500,12 @@ export default function NewSettlementScreen() {
             ? "This group needs at least two members"
             : "Friend not found")
         }
+        onRetry={() => {
+          void profile.refetch();
+          if (params.type === "group") void group.refetch();
+          if (params.type === "friend") void friend.refetch();
+          if (editing) void settlementDetail.refetch();
+        }}
       />
     );
   } else {

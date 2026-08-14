@@ -27,7 +27,12 @@ export default function GroupsScreen() {
         onRefresh={() => void groups.refetch()}
       >
         {groups.isPending ? <LoadingState /> : null}
-        {groups.error ? <ErrorState message={groups.error.message} /> : null}
+        {groups.error ? (
+          <ErrorState
+            message={groups.error.message}
+            onRetry={() => void groups.refetch()}
+          />
+        ) : null}
         {groups.data?.length === 0 ? (
           <EmptyState
             title="Make space for a shared plan"

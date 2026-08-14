@@ -61,7 +61,10 @@ export default function ExpenseDetailScreen() {
   if (detail.error || !detail.data) {
     return (
       <Screen background="sheet">
-        <ErrorState message={detail.error?.message} />
+        <ErrorState
+          message={detail.error?.message}
+          onRetry={() => void detail.refetch()}
+        />
       </Screen>
     );
   }

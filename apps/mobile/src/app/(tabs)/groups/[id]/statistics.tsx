@@ -50,6 +50,7 @@ export default function GroupStatisticsScreen() {
       <Screen>
         <ErrorState
           message={statistics.error?.message ?? "Unable to load statistics."}
+          onRetry={() => void statistics.refetch()}
         />
       </Screen>
     );

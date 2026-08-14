@@ -1,5 +1,5 @@
 import { serve } from "@hono/node-server";
-import { createDatabase } from "@splidly/db";
+import { createDatabase, sql } from "@splidly/db";
 import { createApp } from "./app";
 import { createAuth } from "./auth";
 import { readEnv } from "./env";
@@ -33,6 +33,12 @@ async function main() {
   });
   pool.on("connect", () => logger.debug("database.pool.connected"));
   pool.on("remove", () => logger.debug("database.pool.connection-removed"));
+  const databaseWarmupStartedAt = performance.now();
+  await db.execute(sql`select 1`);
+  logger.info("database.pool.warmed", {
+    durationMs: Math.round((performance.now() - databaseWarmupStartedAt) * 100) /
+      100,
+  });
 
   const auth = await createAuth(db, env, logger.child({ component: "auth" }));
   const app = createApp({ auth, db, env, logger });

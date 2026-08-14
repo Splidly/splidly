@@ -18,6 +18,13 @@ import type { DbTransaction } from "./finance";
 
 export type ExpenseNotificationAction = "create" | "update" | "delete";
 
+export type ExpenseNotificationInstallation = {
+  id: string;
+  userId: string;
+  notificationOnlyWhenInvolved: boolean;
+  summarizeNotificationBursts: boolean;
+};
+
 export const smartNotificationWindowMs = 5 * 60 * 1_000;
 export const smartNotificationThreshold = 3;
 
@@ -147,6 +154,7 @@ export async function enqueueExpenseNotifications(
     splits?: ReadonlyMap<string, bigint>;
     sourceAmountMinor: bigint;
     sourceCurrency: CurrencyCode;
+    installations?: readonly ExpenseNotificationInstallation[];
   },
 ) {
   const [group] = input.groupName
@@ -163,30 +171,32 @@ export async function enqueueExpenseNotifications(
         .from(profiles)
         .where(eq(profiles.userId, input.actorId))
         .limit(1);
-  const installations = await tx
-    .select({
-      id: pushInstallations.id,
-      userId: pushInstallations.userId,
-      notificationOnlyWhenInvolved: profiles.notificationOnlyWhenInvolved,
-      summarizeNotificationBursts: profiles.summarizeNotificationBursts,
-    })
-    .from(pushInstallations)
-    .innerJoin(
-      groupMembers,
-      and(
-        eq(groupMembers.userId, pushInstallations.userId),
-        eq(groupMembers.groupId, input.groupId),
-      ),
-    )
-    .innerJoin(profiles, eq(profiles.userId, pushInstallations.userId))
-    .where(
-      and(
-        ne(pushInstallations.userId, input.actorId),
-        eq(pushInstallations.platform, "ios"),
-        isNull(pushInstallations.disabledAt),
-        isNull(groupMembers.removedAt),
-      ),
-    );
+  const installations =
+    input.installations ??
+    (await tx
+      .select({
+        id: pushInstallations.id,
+        userId: pushInstallations.userId,
+        notificationOnlyWhenInvolved: profiles.notificationOnlyWhenInvolved,
+        summarizeNotificationBursts: profiles.summarizeNotificationBursts,
+      })
+      .from(pushInstallations)
+      .innerJoin(
+        groupMembers,
+        and(
+          eq(groupMembers.userId, pushInstallations.userId),
+          eq(groupMembers.groupId, input.groupId),
+        ),
+      )
+      .innerJoin(profiles, eq(profiles.userId, pushInstallations.userId))
+      .where(
+        and(
+          ne(pushInstallations.userId, input.actorId),
+          eq(pushInstallations.platform, "ios"),
+          isNull(pushInstallations.disabledAt),
+          isNull(groupMembers.removedAt),
+        ),
+      ));
   if (!group || installations.length === 0) return;
 
   const payments =

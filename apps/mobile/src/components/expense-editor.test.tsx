@@ -450,6 +450,12 @@ describe("ExpenseEditor", () => {
         iconManuallySet: true,
       }),
     );
+
+    await fireEvent.press(view.getByText("Save expense"));
+    expect(mockCreateExpense).toHaveBeenCalledTimes(2);
+    expect(mockCreateExpense.mock.calls[1]?.[0].clientMutationId).toBe(
+      mockCreateExpense.mock.calls[0]?.[0].clientMutationId,
+    );
   });
 
   it("requires multiple payer contributions to cover the full expense", async () => {

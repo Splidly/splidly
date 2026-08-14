@@ -40,6 +40,10 @@ export default function FriendDetailScreen() {
             profile.error?.message ??
             "Could not load this friend"
           }
+          onRetry={() => {
+            void detail.refetch();
+            void profile.refetch();
+          }}
         />
       </Screen>
     );

@@ -34,6 +34,7 @@ export default function GroupBalancesScreen() {
       <Screen>
         <ErrorState
           message={balances.error?.message ?? "Unable to load group balances."}
+          onRetry={() => void balances.refetch()}
         />
       </Screen>
     );

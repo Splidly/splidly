@@ -48,7 +48,10 @@ export default function GroupDetailScreen() {
   if (detail.error || !detail.data) {
     return (
       <Screen>
-        <ErrorState message={detail.error?.message} />
+        <ErrorState
+          message={detail.error?.message}
+          onRetry={() => void detail.refetch()}
+        />
       </Screen>
     );
   }

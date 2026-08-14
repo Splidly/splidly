@@ -1,5 +1,6 @@
 import {
   and,
+  type Database,
   eq,
   financialRevisions,
   groupMembers,
@@ -41,6 +42,48 @@ export function assertSettlementParticipant(
     code: "FORBIDDEN",
     message: "Only the people involved can record this settlement",
   });
+}
+
+async function requireSettlementGroup(input: {
+  db: Database;
+  groupId: string;
+  actorId: string;
+  fromUserId: string;
+  toUserId: string;
+  canonicalCurrency: string;
+}) {
+  const rows = await input.db
+    .select({ group: groups, userId: groupMembers.userId })
+    .from(groupMembers)
+    .innerJoin(groups, eq(groups.id, groupMembers.groupId))
+    .where(
+      and(
+        eq(groupMembers.groupId, input.groupId),
+        isNull(groupMembers.removedAt),
+      ),
+    );
+  const group = rows[0]?.group;
+  if (!group) throw new TRPCError({ code: "NOT_FOUND" });
+  if (!rows.some((row) => row.userId === input.actorId)) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Not a group member" });
+  }
+  if (group.currency !== input.canonicalCurrency) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Settlement must clear the group currency",
+    });
+  }
+  const participantIds = new Set(rows.map((row) => row.userId));
+  if (
+    !participantIds.has(input.fromUserId) ||
+    !participantIds.has(input.toUserId)
+  ) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Settlement users must be active members",
+    });
+  }
+  return group;
 }
 
 export const settlementsRouter = router({
@@ -133,41 +176,14 @@ export const settlementsRouter = router({
 
       let contextId: string;
       if (input.context.type === "group") {
-        await requireActiveGroupMember(
-          ctx.db,
-          input.context.groupId,
-          ctx.session.user.id,
-        );
-        const [group] = await ctx.db
-          .select()
-          .from(groups)
-          .where(eq(groups.id, input.context.groupId))
-          .limit(1);
-        if (!group) throw new TRPCError({ code: "NOT_FOUND" });
-        if (group.currency !== input.canonicalCurrency) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Settlement must clear the group currency",
-          });
-        }
-        const participants = await ctx.db
-          .select({ userId: groupMembers.userId })
-          .from(groupMembers)
-          .where(
-            and(
-              eq(groupMembers.groupId, group.id),
-              isNull(groupMembers.removedAt),
-            ),
-          );
-        if (
-          !participants.some((x) => x.userId === input.fromUserId) ||
-          !participants.some((x) => x.userId === input.toUserId)
-        ) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Settlement users must be active members",
-          });
-        }
+        const group = await requireSettlementGroup({
+          db: ctx.db,
+          groupId: input.context.groupId,
+          actorId: ctx.session.user.id,
+          fromUserId: input.fromUserId,
+          toUserId: input.toUserId,
+          canonicalCurrency: input.canonicalCurrency,
+        });
         contextId = group.id;
       } else {
         assertSettlementParticipant(
@@ -236,8 +252,24 @@ export const settlementsRouter = router({
             canonicalAmountMinor: canonicalAmount,
             clientMutationId: input.clientMutationId,
           })
+          .onConflictDoNothing({
+            target: [settlements.createdBy, settlements.clientMutationId],
+          })
           .returning();
-        if (!settlement) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        if (!settlement) {
+          const [duplicate] = await tx
+            .select()
+            .from(settlements)
+            .where(
+              and(
+                eq(settlements.createdBy, ctx.session.user.id),
+                eq(settlements.clientMutationId, input.clientMutationId),
+              ),
+            )
+            .limit(1);
+          if (duplicate) return duplicate;
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        }
         await tx.insert(rateSnapshots).values(
           rates.map((rate) => ({
             settlementId: settlement.id,
@@ -356,41 +388,14 @@ export const settlementsRouter = router({
 
       let contextId: string;
       if (input.context.type === "group") {
-        await requireActiveGroupMember(
-          ctx.db,
-          input.context.groupId,
-          ctx.session.user.id,
-        );
-        const [group] = await ctx.db
-          .select()
-          .from(groups)
-          .where(eq(groups.id, input.context.groupId))
-          .limit(1);
-        if (!group) throw new TRPCError({ code: "NOT_FOUND" });
-        if (group.currency !== input.canonicalCurrency) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Settlement must clear the group currency",
-          });
-        }
-        const participants = await ctx.db
-          .select({ userId: groupMembers.userId })
-          .from(groupMembers)
-          .where(
-            and(
-              eq(groupMembers.groupId, group.id),
-              isNull(groupMembers.removedAt),
-            ),
-          );
-        if (
-          !participants.some((x) => x.userId === input.fromUserId) ||
-          !participants.some((x) => x.userId === input.toUserId)
-        ) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Settlement users must be active members",
-          });
-        }
+        const group = await requireSettlementGroup({
+          db: ctx.db,
+          groupId: input.context.groupId,
+          actorId: ctx.session.user.id,
+          fromUserId: input.fromUserId,
+          toUserId: input.toUserId,
+          canonicalCurrency: input.canonicalCurrency,
+        });
         contextId = group.id;
       } else {
         assertSettlementParticipant(

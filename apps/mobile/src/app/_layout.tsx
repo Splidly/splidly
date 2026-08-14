@@ -14,6 +14,7 @@ import {
   nativeHeaderOptions,
 } from "../lib/navigation";
 import { ApiProvider } from "../lib/trpc";
+import { OfflineNotice } from "../components/offline-notice";
 import { useTheme } from "../theme";
 import { ExpensePaymentSessionProvider } from "../components/expense-payment-session";
 import { ExpenseItemSplitSessionProvider } from "../components/expense-item-split-session";
@@ -147,6 +148,7 @@ export default function RootLayout() {
           <ExpenseSplitSessionProvider>
             <ExpenseItemSplitSessionProvider>
               <Navigation />
+              <OfflineNotice />
             </ExpenseItemSplitSessionProvider>
           </ExpenseSplitSessionProvider>
         </ExpensePaymentSessionProvider>

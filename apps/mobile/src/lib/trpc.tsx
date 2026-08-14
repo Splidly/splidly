@@ -5,8 +5,9 @@ import { createTRPCReact } from "@trpc/react-query";
 import { useState, type PropsWithChildren } from "react";
 import superjson from "superjson";
 import { authClient } from "./auth-client";
+import { ConnectivityProvider } from "./connectivity";
 import { API_URL } from "./env";
-import { friendlyFetch } from "./network";
+import { friendlyFetch, isNetworkError } from "./network";
 
 export const api = createTRPCReact<AppRouter>();
 
@@ -15,8 +16,17 @@ export function ApiProvider({ children }: PropsWithChildren) {
     () =>
       new QueryClient({
         defaultOptions: {
-          queries: { staleTime: 20_000, retry: 1 },
-          mutations: { retry: 0 },
+          queries: {
+            staleTime: 60_000,
+            gcTime: 24 * 60 * 60 * 1_000,
+            networkMode: "online",
+            retry: (failureCount, error) =>
+              isNetworkError(error) && failureCount < 1,
+          },
+          // A save made while offline must fail visibly and leave its sheet
+          // open. It must not sit in React Query's paused mutation queue and
+          // look as if it may already have been committed.
+          mutations: { retry: 0, networkMode: "always" },
         },
       }),
   );
@@ -39,7 +49,9 @@ export function ApiProvider({ children }: PropsWithChildren) {
   return (
     <api.Provider client={client} queryClient={queryClient}>
       <QueryClientProvider client={queryClient}>
-        {children}
+        <ConnectivityProvider queryClient={queryClient}>
+          {children}
+        </ConnectivityProvider>
       </QueryClientProvider>
     </api.Provider>
   );

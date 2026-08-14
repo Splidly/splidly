@@ -32,10 +32,16 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { avatarColorsFor } from "../lib/avatar-colors";
+import { useConnectivity } from "../lib/connectivity";
 import {
   formatConvertedMoney,
   formatMoney,
 } from "../lib/money-display";
+import {
+  friendlyErrorMessage,
+  isNetworkError,
+  NETWORK_ERROR_MESSAGE,
+} from "../lib/network";
 import { spacing, useTheme } from "../theme";
 import { AppIcon } from "./app-icon";
 
@@ -882,6 +888,25 @@ export function EmptyState({
 
 export function LoadingState() {
   const theme = useTheme();
+  const { isOnline, isResolved } = useConnectivity();
+  if (isResolved && !isOnline) {
+    return (
+      <View accessibilityRole="alert" style={[styles.state, { gap: 8 }]}>
+        <Text
+          selectable
+          style={{ color: theme.text, fontSize: 17, fontWeight: "700" }}
+        >
+          Waiting for a connection
+        </Text>
+        <Text
+          selectable
+          style={{ color: theme.muted, textAlign: "center", lineHeight: 20 }}
+        >
+          This screen will load automatically when you’re back online.
+        </Text>
+      </View>
+    );
+  }
   return (
     <View style={styles.state}>
       <ActivityIndicator color={theme.primary} />
@@ -889,16 +914,52 @@ export function LoadingState() {
   );
 }
 
-export function ErrorState({ message }: { message?: string }) {
+export function ErrorState({
+  message,
+  onRetry,
+}: {
+  message?: string;
+  onRetry?: () => void;
+}) {
   const theme = useTheme();
+  const { isOnline } = useConnectivity();
+  const networkError = isNetworkError(message);
+  const resolvedMessage = networkError
+    ? NETWORK_ERROR_MESSAGE
+    : friendlyErrorMessage(message);
   return (
     <View
       accessibilityRole="alert"
-      style={[styles.error, { backgroundColor: theme.negativeSurface }]}
+      style={[
+        styles.error,
+        {
+          backgroundColor: networkError
+            ? theme.elevated
+            : theme.negativeSurface,
+          borderCurve: "continuous",
+        },
+      ]}
     >
-      <Text style={{ color: theme.negative, lineHeight: 20 }}>
-        {message ?? "Something went wrong. Please try again."}
+      {networkError ? (
+        <Text
+          selectable
+          style={{ color: theme.text, fontWeight: "700", fontSize: 16 }}
+        >
+          You’re offline
+        </Text>
+      ) : null}
+      <Text
+        selectable
+        style={{
+          color: networkError ? theme.muted : theme.negative,
+          lineHeight: 20,
+        }}
+      >
+        {resolvedMessage}
       </Text>
+      {networkError && onRetry && isOnline ? (
+        <PrimaryButton label="Try Again" compact onPress={onRetry} />
+      ) : null}
     </View>
   );
 }
@@ -1096,6 +1157,7 @@ const styles = StyleSheet.create({
     borderRadius: 13,
     borderCurve: "continuous",
     padding: 14,
+    gap: 8,
   },
   pill: {
     minHeight: 38,

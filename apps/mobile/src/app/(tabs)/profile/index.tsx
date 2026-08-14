@@ -19,7 +19,9 @@ import {
 import { CurrencyField } from "../../../components/currency-field";
 import { PictureEditor } from "../../../components/picture-editor";
 import { authClient } from "../../../lib/auth-client";
+import { useConnectivity } from "../../../lib/connectivity";
 import { APP_URL } from "../../../lib/env";
+import { friendlyErrorMessage } from "../../../lib/network";
 import {
   getExistingPushInstallationId,
   unregisterNativePushNotifications,
@@ -36,15 +38,21 @@ const ACTIVE_GROUPS_ERROR = "Leave all groups before deleting your account";
 
 export default function ProfileScreen() {
   const profile = api.profile.me.useQuery();
+  const { isOnline } = useConnectivity();
   const groups = api.groups.list.useQuery();
   const utils = api.useUtils();
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [currency, setCurrency] = useState<CurrencyCode>("EUR");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [accountError, setAccountError] = useState<string>();
   const initializedUser = useRef<string | undefined>(undefined);
   const saved = useRef<SavedProfile | undefined>(undefined);
   const lastAttempted = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (isOnline) lastAttempted.current = undefined;
+  }, [isOnline]);
 
   useEffect(() => {
     if (!profile.data || initializedUser.current === profile.data.userId) return;
@@ -78,7 +86,7 @@ export default function ProfileScreen() {
   });
 
   useEffect(() => {
-    if (!initializedUser.current || update.isPending) return;
+    if (!initializedUser.current || update.isPending || !isOnline) return;
     const displayName = name.trim();
     const current = saved.current;
     const draftKey = `${displayName}\u0000${currency}\u0000${avatarUrl ?? ""}`;
@@ -102,13 +110,16 @@ export default function ProfileScreen() {
       });
     }, 500);
     return () => clearTimeout(timer);
-  }, [avatarUrl, currency, name, update.isPending]);
+  }, [avatarUrl, currency, isOnline, name, update.isPending]);
 
   const remove = api.profile.deleteAccount.useMutation({
     async onSuccess() {
       await unregisterNativePushNotifications().catch(() => {});
       queryClient.clear();
-      await authClient.signOut();
+      await authClient.signOut().catch(() => {
+        // The account is already deleted server-side. Local navigation must
+        // not be stranded if clearing the remote session loses connectivity.
+      });
       router.replace("/sign-in");
     },
     onError(error, input) {
@@ -120,19 +131,24 @@ export default function ProfileScreen() {
   const unregisterPush = api.push.unregister.useMutation();
 
   async function signOut() {
-    const installationId = await getExistingPushInstallationId();
-    if (installationId) {
-      await unregisterPush.mutateAsync({ installationId }).catch(() => {
-        // Signing out must still succeed while offline.
+    setAccountError(undefined);
+    try {
+      const installationId = await getExistingPushInstallationId();
+      if (installationId) {
+        await unregisterPush.mutateAsync({ installationId }).catch(() => {
+          // The server will disable a stale installation after APNs rejects it.
+        });
+      }
+      await unregisterNativePushNotifications().catch(() => {
+        // Native token cleanup is best effort and must not strand the account.
       });
+      const result = await authClient.signOut();
+      if (result.error) throw new Error(result.error.message);
+      queryClient.clear();
+      router.replace("/sign-in");
+    } catch (cause) {
+      setAccountError(friendlyErrorMessage(cause, "Could not sign out"));
     }
-    await unregisterNativePushNotifications().catch(() => {
-      // APNs invalidates the token when possible. The server also disables it
-      // after APNs rejects a delivery to a signed-out installation.
-    });
-    queryClient.clear();
-    await authClient.signOut();
-    router.replace("/sign-in");
   }
 
   function deleteAccount(leaveGroups = false) {
@@ -245,6 +261,13 @@ export default function ProfileScreen() {
       </Section>
       {update.error ? <ErrorState message={update.error.message} /> : null}
       {remove.error ? <ErrorState message={remove.error.message} /> : null}
+      {accountError ? <ErrorState message={accountError} /> : null}
+      {profile.error ? (
+        <ErrorState
+          message={profile.error.message}
+          onRetry={() => void profile.refetch()}
+        />
+      ) : null}
     </Screen>
   );
 }

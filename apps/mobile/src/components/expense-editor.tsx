@@ -82,6 +82,7 @@ export function ExpenseEditor({
   expenseId?: string;
   newContext?: ExpenseContext;
 }) {
+  const clientMutationId = useRef(Crypto.randomUUID());
   const theme = useTheme();
   const paymentSession = useExpensePaymentSession();
   const splitSession = useExpenseSplitSession();
@@ -520,7 +521,7 @@ export function ExpenseEditor({
     try {
       const mutation = {
         context,
-        clientMutationId: Crypto.randomUUID(),
+        clientMutationId: clientMutationId.current,
         description: description.trim(),
         iconKey,
         iconManuallySet: manualIconKey !== undefined,
@@ -570,7 +571,15 @@ export function ExpenseEditor({
   if (!context || loadingError) {
     return (
       <Screen underlapsHeader={false}>
-        <ErrorState message={loadingError?.message ?? "Expense not found"} />
+        <ErrorState
+          message={loadingError?.message ?? "Expense not found"}
+          onRetry={() => {
+            void profile.refetch();
+            if (editing) void detail.refetch();
+            if (context?.type === "group") void group.refetch();
+            if (context?.type === "friend") void friend.refetch();
+          }}
+        />
       </Screen>
     );
   }

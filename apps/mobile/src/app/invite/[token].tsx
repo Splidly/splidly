@@ -47,7 +47,14 @@ export default function InviteScreen() {
 
   if (preview.isPending) return <Screen><LoadingState /></Screen>;
   if (preview.error || !preview.data) {
-    return <Screen><ErrorState message={preview.error?.message} /></Screen>;
+    return (
+      <Screen>
+        <ErrorState
+          message={preview.error?.message}
+          onRetry={() => void preview.refetch()}
+        />
+      </Screen>
+    );
   }
   const isGroup = preview.data.kind === "group";
   const subject = isGroup

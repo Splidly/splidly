@@ -1,4 +1,9 @@
-import { friendlyFetch, NETWORK_ERROR_MESSAGE } from "./network";
+import {
+  friendlyErrorMessage,
+  friendlyFetch,
+  isNetworkError,
+  NETWORK_ERROR_MESSAGE,
+} from "./network";
 
 describe("friendlyFetch", () => {
   const originalFetch = global.fetch;
@@ -28,5 +33,30 @@ describe("friendlyFetch", () => {
     await expect(
       friendlyFetch("https://splidly.site/health/ready"),
     ).resolves.toBe(response);
+  });
+
+  it("recognizes platform and wrapped transport messages", () => {
+    expect(isNetworkError("Network request failed")).toBe(true);
+    expect(isNetworkError(new Error("Failed to fetch"))).toBe(true);
+    expect(friendlyErrorMessage("The Internet connection appears to be offline"))
+      .toBe(NETWORK_ERROR_MESSAGE);
+  });
+
+  it("hides backend implementation details", () => {
+    expect(friendlyErrorMessage("DrizzleQueryError: Failed query: select *"))
+      .toBe("Splidly couldn’t complete that request. Please try again.");
+  });
+
+  it("does not turn an intentional query cancellation into an offline error", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const cause = new Error("Aborted");
+    global.fetch = jest.fn().mockRejectedValue(cause);
+
+    await expect(
+      friendlyFetch("https://splidly.site/trpc", {
+        signal: controller.signal,
+      }),
+    ).rejects.toBe(cause);
   });
 });

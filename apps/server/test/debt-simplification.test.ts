@@ -88,6 +88,41 @@ describe("repaymentPlan", () => {
       { userId: "sam", displayName: "Sam", amountMinor: 1_200n },
     ]);
   });
+
+  it("settles large groups without entering the exponential search", () => {
+    const entries = Array.from({ length: 20 }, (_, index) =>
+      amount(`debtor-${index}`, `creditor-${index}`, BigInt(index + 1) * 100n),
+    );
+
+    const plan = repaymentPlan(entries, true);
+
+    expect(plan.length).toBeLessThanOrEqual(39);
+    expect(
+      plan.reduce((total, transfer) => total + transfer.amountMinor, 0n),
+    ).toBe(21_000n);
+    const remaining = new Map<string, bigint>();
+    for (const entry of entries) {
+      remaining.set(
+        entry.debtorId,
+        (remaining.get(entry.debtorId) ?? 0n) - entry.canonicalAmountMinor,
+      );
+      remaining.set(
+        entry.creditorId,
+        (remaining.get(entry.creditorId) ?? 0n) + entry.canonicalAmountMinor,
+      );
+    }
+    for (const transfer of plan) {
+      remaining.set(
+        transfer.fromUserId,
+        (remaining.get(transfer.fromUserId) ?? 0n) + transfer.amountMinor,
+      );
+      remaining.set(
+        transfer.toUserId,
+        (remaining.get(transfer.toUserId) ?? 0n) - transfer.amountMinor,
+      );
+    }
+    expect([...remaining.values()].every((amount) => amount === 0n)).toBe(true);
+  });
 });
 
 describe("memberRepaymentSummaries", () => {

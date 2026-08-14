@@ -119,6 +119,7 @@ export default function StatisticsExpensesScreen() {
       <Screen>
         <ErrorState
           message={statistics.error?.message ?? "Unable to load expenses."}
+          onRetry={() => void statistics.refetch()}
         />
       </Screen>
     );

@@ -56,22 +56,24 @@ export default function OnboardingScreen() {
   const cancel = api.profile.deleteAccount.useMutation();
 
   const cancelSetup = useCallback(async () => {
-    if (completed.current || cancelling.current) return;
+    if (completed.current || cancelling.current) return false;
     cancelling.current = true;
     try {
       await cancel.mutateAsync({ confirmation: "DELETE" });
-      await authClient.signOut();
+      const result = await authClient.signOut();
+      if (result.error) throw new Error(result.error.message);
       await utils.invalidate();
+      return true;
     } catch {
       cancelling.current = false;
+      return false;
     }
   }, [cancel, utils]);
 
   const displayName = name ?? providerDisplayName(profile.data?.displayName);
 
-  function cancelAndClose() {
-    router.dismiss();
-    void cancelSetup();
+  async function cancelAndClose() {
+    if (await cancelSetup()) router.dismiss();
   }
 
   function submit() {
@@ -90,7 +92,7 @@ export default function OnboardingScreen() {
       <SheetCloseButton
         label="Cancel account setup"
         disabled={cancel.isPending || update.isPending}
-        onPress={cancelAndClose}
+        onPress={() => void cancelAndClose()}
       />
 
       <View style={styles.hero}>
@@ -152,6 +154,12 @@ export default function OnboardingScreen() {
         </Text>
         {update.error ? <ErrorState message={update.error.message} /> : null}
         {cancel.error ? <ErrorState message={cancel.error.message} /> : null}
+        {profile.error ? (
+          <ErrorState
+            message={profile.error.message}
+            onRetry={() => void profile.refetch()}
+          />
+        ) : null}
       </View>
     </Screen>
   );

@@ -53,6 +53,7 @@ const t = initTRPC.context<TrpcContext>().create({
 });
 
 export const router = t.router;
+const slowProcedureThresholdMs = 500;
 const observedProcedure = t.procedure.use(async ({ ctx, next, path, type }) => {
   const startedAt = performance.now();
   const logger = ctx.logger.child({ procedure: path, procedureType: type });
@@ -60,7 +61,14 @@ const observedProcedure = t.procedure.use(async ({ ctx, next, path, type }) => {
   const result = await next({ ctx: { ...ctx, logger } });
   const fields = { durationMs: durationMs(startedAt) };
   if (result.ok) {
-    logger.info("trpc.procedure.completed", fields);
+    if (fields.durationMs >= slowProcedureThresholdMs) {
+      logger.warn("trpc.procedure.slow", {
+        ...fields,
+        thresholdMs: slowProcedureThresholdMs,
+      });
+    } else {
+      logger.info("trpc.procedure.completed", fields);
+    }
   } else {
     const errorFields = {
       ...fields,

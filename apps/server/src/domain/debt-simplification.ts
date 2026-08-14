@@ -54,6 +54,11 @@ function netBalances(entries: LedgerAmount[]) {
 
 function simplifiedTransfers(entries: LedgerAmount[]): RepaymentTransfer[] {
   const balances = netBalances(entries);
+  // The exact minimum-transfer search is exponential. It is useful for normal
+  // household-sized groups, but a large group must never be able to stall an
+  // API request. Above this bound, use the deterministic O(n log n) fallback,
+  // which still settles every balance in at most n - 1 transfers.
+  if (balances.length > 8) return greedyTransfers(balances);
   const amounts = balances.map((balance) => balance.amountMinor);
   const memo = new Map<string, RepaymentTransfer[]>();
 
@@ -99,6 +104,44 @@ function simplifiedTransfers(entries: LedgerAmount[]): RepaymentTransfer[] {
   }
 
   return settle();
+}
+
+function greedyTransfers(
+  balances: { userId: string; amountMinor: bigint }[],
+): RepaymentTransfer[] {
+  const debtors = balances
+    .filter((balance) => balance.amountMinor < 0n)
+    .map((balance) => ({
+      userId: balance.userId,
+      remainingMinor: -balance.amountMinor,
+    }));
+  const creditors = balances
+    .filter((balance) => balance.amountMinor > 0n)
+    .map((balance) => ({
+      userId: balance.userId,
+      remainingMinor: balance.amountMinor,
+    }));
+  const transfers: RepaymentTransfer[] = [];
+  let debtorIndex = 0;
+  let creditorIndex = 0;
+  while (debtorIndex < debtors.length && creditorIndex < creditors.length) {
+    const debtor = debtors[debtorIndex]!;
+    const creditor = creditors[creditorIndex]!;
+    const amountMinor =
+      debtor.remainingMinor < creditor.remainingMinor
+        ? debtor.remainingMinor
+        : creditor.remainingMinor;
+    transfers.push({
+      fromUserId: debtor.userId,
+      toUserId: creditor.userId,
+      amountMinor,
+    });
+    debtor.remainingMinor -= amountMinor;
+    creditor.remainingMinor -= amountMinor;
+    if (debtor.remainingMinor === 0n) debtorIndex += 1;
+    if (creditor.remainingMinor === 0n) creditorIndex += 1;
+  }
+  return transfers;
 }
 
 function pairwiseTransfers(entries: LedgerAmount[]): RepaymentTransfer[] {

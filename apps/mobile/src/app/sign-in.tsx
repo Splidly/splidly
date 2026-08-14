@@ -15,6 +15,7 @@ import {
 } from "../components/ui";
 import { authClient, signInAsDemo } from "../lib/auth-client";
 import { isAppleSignInCancellation } from "../lib/auth-errors";
+import { friendlyErrorMessage } from "../lib/network";
 import { pendingInvite } from "../lib/pending-invite";
 import { api } from "../lib/trpc";
 import { useTheme } from "../theme";
@@ -83,7 +84,7 @@ export default function SignInScreen() {
       if (result.error) throw new Error(result.error.message);
       await finishSignIn();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Google sign-in failed");
+      setError(friendlyErrorMessage(cause, "Google sign-in failed"));
     } finally {
       setBusy(false);
     }
@@ -127,7 +128,7 @@ export default function SignInScreen() {
       await finishSignIn();
     } catch (cause) {
       if (isAppleSignInCancellation(cause)) return;
-      setError(cause instanceof Error ? cause.message : "Apple sign-in failed");
+      setError(friendlyErrorMessage(cause, "Apple sign-in failed"));
     } finally {
       setBusy(false);
     }
@@ -140,7 +141,7 @@ export default function SignInScreen() {
       await signInAsDemo();
       await finishSignIn();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Demo sign-in failed");
+      setError(friendlyErrorMessage(cause, "Demo sign-in failed"));
     } finally {
       setBusy(false);
     }

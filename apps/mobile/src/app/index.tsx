@@ -3,10 +3,12 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useRef } from "react";
 import { LoadingState, Screen } from "../components/ui";
 import { authClient } from "../lib/auth-client";
+import { useConnectivity } from "../lib/connectivity";
 import { api } from "../lib/trpc";
 
 export default function IndexScreen() {
   const session = authClient.useSession();
+  const { isOnline } = useConnectivity();
   const queryClient = useQueryClient();
   const profile = api.profile.me.useQuery(undefined, {
     enabled: Boolean(session.data?.user),
@@ -16,7 +18,7 @@ export default function IndexScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (session.isPending) return;
+      if (session.isPending || session.error || !isOnline) return;
       if (!session.data?.user) {
         router.replace("/sign-in");
         return;
@@ -45,7 +47,9 @@ export default function IndexScreen() {
       cancel,
       queryClient,
       session.data?.user,
+      session.error,
       session.isPending,
+      isOnline,
     ]),
   );
 

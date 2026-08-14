@@ -141,6 +141,12 @@ export default function NewGroupScreen() {
           }
         />
         {create.error ? <ErrorState message={create.error.message} /> : null}
+        {profile.error ? (
+          <ErrorState
+            message={profile.error.message}
+            onRetry={() => void profile.refetch()}
+          />
+        ) : null}
       </View>
     </Screen>
   );

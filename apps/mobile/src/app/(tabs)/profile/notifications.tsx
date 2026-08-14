@@ -114,7 +114,12 @@ export default function NotificationSettingsScreen() {
             }
           />
         </Section>
-        {profile.error ? <ErrorState message={profile.error.message} /> : null}
+        {profile.error ? (
+          <ErrorState
+            message={profile.error.message}
+            onRetry={() => void profile.refetch()}
+          />
+        ) : null}
         {update.error ? <ErrorState message={update.error.message} /> : null}
       </Screen>
       {process.env.EXPO_OS !== "ios" ? (
