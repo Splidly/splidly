@@ -3,7 +3,7 @@ import { useState } from "react";
 import {
   GroupStatistics,
   type GroupStatisticsData,
-  type StatisticsRange,
+  type StatisticsRangeSelection,
 } from "../../../../components/group-statistics";
 import {
   ErrorState,
@@ -14,11 +14,29 @@ import { api } from "../../../../lib/trpc";
 
 export default function GroupStatisticsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [range, setRange] = useState<StatisticsRange>("all");
+  const [selection, setSelection] = useState<StatisticsRangeSelection>({
+    range: "all",
+  });
+  const queryInput =
+    selection.range === "custom" && selection.from && selection.to
+      ? {
+          groupId: id,
+          range: selection.range,
+          from: selection.from,
+          to: selection.to,
+        }
+      : { groupId: id, range: selection.range };
   const statistics = api.groups.statistics.useQuery(
-    { groupId: id, range },
+    queryInput,
     { placeholderData: (previousData) => previousData },
   );
+  const rangeParams =
+    selection.range === "custom" && selection.from && selection.to
+      ? {
+          from: selection.from.toISOString(),
+          to: selection.to.toISOString(),
+        }
+      : {};
 
   if (statistics.isPending) {
     return (
@@ -45,14 +63,15 @@ export default function GroupStatisticsScreen() {
       >
         <GroupStatistics
           data={statistics.data as GroupStatisticsData}
-          range={range}
-          onRangeChange={setRange}
+          selection={selection}
+          onSelectionChange={setSelection}
           onOpenCategory={(category) =>
             router.push({
               pathname: "/groups/[id]/statistics-expenses",
               params: {
                 id,
-                range,
+                range: selection.range,
+                ...rangeParams,
                 filter: "category",
                 category,
               },
@@ -63,7 +82,8 @@ export default function GroupStatisticsScreen() {
               pathname: "/groups/[id]/statistics-expenses",
               params: {
                 id,
-                range,
+                range: selection.range,
+                ...rangeParams,
                 filter: "member",
                 userId: member.userId,
                 metric,

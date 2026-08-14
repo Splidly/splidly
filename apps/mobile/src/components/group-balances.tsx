@@ -1,5 +1,11 @@
 import type { CurrencyCode, Money } from "@splidly/shared";
-import { StyleSheet, Text, View } from "react-native";
+import { useRef } from "react";
+import {
+  StyleSheet,
+  Text,
+  View,
+  type GestureResponderEvent,
+} from "react-native";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { formatConvertedMoney } from "../lib/money-display";
 import { useTheme } from "../theme";
@@ -73,6 +79,8 @@ export function GroupBalanceMemberRow({
   onPress: () => void;
 }) {
   const theme = useTheme();
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const touchMoved = useRef(false);
   const owes = BigInt(member.owes.minor);
   const lent = BigInt(member.lent.minor);
   const title = member.isViewer
@@ -80,86 +88,107 @@ export function GroupBalanceMemberRow({
     : member.displayName;
 
   return (
-    <ListRow
-      accessibilityLabel={`${title}. ${memberBalanceStatusText(member)}`}
-      accessibilityHint={
-        expanded ? "Collapses balance details" : "Expands balance details"
-      }
-      accessibilityState={{ expanded }}
-      title={title}
-      leading={
-        <Avatar
-          name={member.displayName}
-          colorKey={member.userId}
-          imageUrl={member.avatarUrl}
-        />
-      }
-      trailing={
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <View style={{ alignItems: "flex-end", gap: 2 }}>
-            {owes > 0n ? (
-              <Text
-                selectable
-                style={{
-                  color: theme.negative,
-                  fontSize: 14,
-                  lineHeight: 18,
-                  fontWeight: "600",
-                  fontVariant: ["tabular-nums"],
-                }}
-              >
-                Owes {formattedAmount(member.owes)}
-              </Text>
-            ) : null}
-            {lent > 0n ? (
-              <Text
-                selectable
-                style={{
-                  color: theme.positive,
-                  fontSize: 14,
-                  lineHeight: 18,
-                  fontWeight: "600",
-                  fontVariant: ["tabular-nums"],
-                }}
-              >
-                Lent {formattedAmount(member.lent)}
-              </Text>
-            ) : null}
-            {owes === 0n && lent === 0n ? (
-              <Text
-                selectable
-                style={{
-                  color: theme.muted,
-                  fontSize: 14,
-                  lineHeight: 18,
-                  fontWeight: "600",
-                }}
-              >
-                Settled up
-              </Text>
-            ) : null}
+    <View
+      onTouchStart={(event: GestureResponderEvent) => {
+        touchStart.current = {
+          x: event.nativeEvent.pageX,
+          y: event.nativeEvent.pageY,
+        };
+        touchMoved.current = false;
+      }}
+      onTouchMove={(event: GestureResponderEvent) => {
+        if (!touchStart.current) return;
+        if (
+          Math.abs(event.nativeEvent.pageX - touchStart.current.x) > 8 ||
+          Math.abs(event.nativeEvent.pageY - touchStart.current.y) > 8
+        ) {
+          touchMoved.current = true;
+        }
+      }}
+    >
+      <ListRow
+        accessibilityLabel={`${title}. ${memberBalanceStatusText(member)}`}
+        accessibilityHint={
+          expanded ? "Collapses balance details" : "Expands balance details"
+        }
+        accessibilityState={{ expanded }}
+        title={title}
+        leading={
+          <Avatar
+            name={member.displayName}
+            colorKey={member.userId}
+            imageUrl={member.avatarUrl}
+          />
+        }
+        trailing={
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <View style={{ alignItems: "flex-end", gap: 2 }}>
+              {owes > 0n ? (
+                <Text
+                  selectable={false}
+                  style={{
+                    color: theme.negative,
+                    fontSize: 14,
+                    lineHeight: 18,
+                    fontWeight: "600",
+                    fontVariant: ["tabular-nums"],
+                  }}
+                >
+                  Owes {formattedAmount(member.owes)}
+                </Text>
+              ) : null}
+              {lent > 0n ? (
+                <Text
+                  selectable={false}
+                  style={{
+                    color: theme.positive,
+                    fontSize: 14,
+                    lineHeight: 18,
+                    fontWeight: "600",
+                    fontVariant: ["tabular-nums"],
+                  }}
+                >
+                  Lent {formattedAmount(member.lent)}
+                </Text>
+              ) : null}
+              {owes === 0n && lent === 0n ? (
+                <Text
+                  selectable={false}
+                  style={{
+                    color: theme.muted,
+                    fontSize: 14,
+                    lineHeight: 18,
+                    fontWeight: "600",
+                  }}
+                >
+                  Settled up
+                </Text>
+              ) : null}
+            </View>
+            <View
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              style={{
+                width: 20,
+                height: 44,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <DropdownChevron
+                color={theme.subtle}
+                direction={expanded ? "up" : "down"}
+                size={14}
+                testID={`balance-disclosure-${member.userId}-${expanded ? "expanded" : "collapsed"}`}
+              />
+            </View>
           </View>
-          <View
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants"
-            style={{
-              width: 20,
-              height: 44,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <DropdownChevron
-              color={theme.subtle}
-              direction={expanded ? "up" : "down"}
-              size={14}
-              testID={`balance-disclosure-${member.userId}-${expanded ? "expanded" : "collapsed"}`}
-            />
-          </View>
-        </View>
-      }
-      onPress={onPress}
-    />
+        }
+        onPress={() => {
+          if (!touchMoved.current) onPress();
+        }}
+      />
+    </View>
   );
 }
 

@@ -13,6 +13,7 @@ import {
   isNull,
   ledgerEntries,
   ledgerValuations,
+  lte,
   or,
   profiles,
   rateSnapshots,
@@ -40,6 +41,7 @@ import { allocateByUser } from "../domain/expense-allocation";
 import {
   buildGroupStatistics,
   resolveGroupStatisticsIconKey,
+  statisticsBucketForPeriod,
 } from "../domain/group-statistics";
 import { groupBy, requireActiveGroupMember } from "../domain/helpers";
 import { protectedProcedure, router } from "../trpc";
@@ -254,10 +256,39 @@ export const groupsRouter = router({
 
   statistics: protectedProcedure
     .input(
-      z.object({
-        groupId: z.uuid(),
-        range: z.enum(["all", "12-months", "30-days"]).default("all"),
-      }),
+      z
+        .object({
+          groupId: z.uuid(),
+          range: z
+            .enum(["all", "12-months", "30-days", "custom"])
+            .default("all"),
+          from: z.date().optional(),
+          to: z.date().optional(),
+        })
+        .superRefine((value, context) => {
+          if (value.range !== "custom") return;
+          if (!value.from) {
+            context.addIssue({
+              code: "custom",
+              path: ["from"],
+              message: "A custom range needs a start date",
+            });
+          }
+          if (!value.to) {
+            context.addIssue({
+              code: "custom",
+              path: ["to"],
+              message: "A custom range needs an end date",
+            });
+          }
+          if (value.from && value.to && value.from > value.to) {
+            context.addIssue({
+              code: "custom",
+              path: ["to"],
+              message: "The end date must be on or after the start date",
+            });
+          }
+        }),
     )
     .query(async ({ ctx, input }) => {
       await requireActiveGroupMember(
@@ -274,17 +305,38 @@ export const groupsRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Group not found" });
       }
 
-      const from = new Date();
-      if (input.range === "30-days") from.setUTCDate(from.getUTCDate() - 30);
+      const now = new Date();
+      let requestedFrom: Date | undefined;
+      let requestedTo: Date | undefined;
+      if (input.range === "30-days") {
+        requestedFrom = new Date(
+          Date.UTC(
+            now.getUTCFullYear(),
+            now.getUTCMonth(),
+            now.getUTCDate() - 29,
+          ),
+        );
+        requestedTo = now;
+      }
       if (input.range === "12-months") {
-        from.setUTCFullYear(from.getUTCFullYear() - 1);
+        requestedFrom = new Date(
+          Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 11, 1),
+        );
+        requestedTo = now;
+      }
+      if (input.range === "custom") {
+        requestedFrom = input.from!;
+        requestedTo = input.to!;
       }
       const expenseConditions = [
         eq(expenses.groupId, input.groupId),
         isNull(expenses.deletedAt),
       ];
-      if (input.range !== "all") {
-        expenseConditions.push(gte(expenses.occurredAt, from));
+      if (requestedFrom) {
+        expenseConditions.push(gte(expenses.occurredAt, requestedFrom));
+      }
+      if (requestedTo) {
+        expenseConditions.push(lte(expenses.occurredAt, requestedTo));
       }
 
       const [members, expenseRecords] = await Promise.all([
@@ -305,6 +357,11 @@ export const groupsRouter = router({
           .orderBy(expenses.occurredAt),
       ]);
       const expenseIds = expenseRecords.map((expense) => expense.id);
+      const rangeStart =
+        requestedFrom ?? expenseRecords[0]?.occurredAt ?? requestedTo ?? now;
+      const rangeEnd =
+        requestedTo ?? expenseRecords.at(-1)?.occurredAt ?? requestedFrom ?? now;
+      const timelineBucket = statisticsBucketForPeriod(rangeStart, rangeEnd);
       const [paymentRecords, splitRecords, rateRecords] =
         expenseIds.length === 0
           ? [[], [], []]
@@ -411,7 +468,7 @@ export const groupsRouter = router({
         expenses: statisticsExpenses,
         members,
         viewerUserId: ctx.session.user.id,
-        bucket: input.range === "30-days" ? "day" : "month",
+        bucket: timelineBucket,
       });
       const asMoney = (amountMinor: bigint) =>
         money(canonicalCurrency, amountMinor);
@@ -451,6 +508,9 @@ export const groupsRouter = router({
           currency: canonicalCurrency,
         },
         range: input.range,
+        rangeStart,
+        rangeEnd,
+        timelineBucket,
         unconvertedExpenseCount,
         totalSpent: asMoney(statistics.totalSpentMinor),
         viewerPaid: asMoney(statistics.viewerPaidMinor),

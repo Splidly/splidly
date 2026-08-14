@@ -24,7 +24,18 @@ import { api } from "../../../../lib/trpc";
 import { useTheme } from "../../../../theme";
 
 function isStatisticsRange(value: unknown): value is StatisticsRange {
-  return value === "all" || value === "12-months" || value === "30-days";
+  return (
+    value === "all" ||
+    value === "12-months" ||
+    value === "30-days" ||
+    value === "custom"
+  );
+}
+
+function parsedDate(value: unknown) {
+  if (typeof value !== "string") return undefined;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
 function isExpenseIconKey(value: unknown): value is ExpenseIconKey {
@@ -60,7 +71,7 @@ function MemberAmount({
       <MoneyValue minor={sourceAmount.minor} currency={sourceAmount.currency} />
       {showHomeAmount ? (
         <Text
-          selectable
+          selectable={false}
           style={{
             color: theme.muted,
             fontSize: 13,
@@ -84,12 +95,17 @@ export default function StatisticsExpensesScreen() {
     category?: string;
     userId?: string;
     metric?: string;
+    from?: string;
+    to?: string;
   }>();
   const range = isStatisticsRange(params.range) ? params.range : "all";
-  const statistics = api.groups.statistics.useQuery({
-    groupId: params.id,
-    range,
-  });
+  const from = parsedDate(params.from);
+  const to = parsedDate(params.to);
+  const statistics = api.groups.statistics.useQuery(
+    range === "custom" && from && to
+      ? { groupId: params.id, range, from, to }
+      : { groupId: params.id, range: range === "custom" ? "all" : range },
+  );
 
   if (statistics.isPending) {
     return (

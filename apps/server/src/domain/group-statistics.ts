@@ -20,6 +20,21 @@ export type GroupStatisticsMember = {
   avatarUrl: string | null;
 };
 
+export type StatisticsTimelineBucket = "day" | "week" | "month" | "year";
+
+const dayMilliseconds = 24 * 60 * 60 * 1000;
+
+export function statisticsBucketForPeriod(from: Date, to: Date) {
+  const spanDays = Math.max(
+    1,
+    Math.ceil((to.getTime() - from.getTime()) / dayMilliseconds) + 1,
+  );
+  if (spanDays <= 45) return "day" as const;
+  if (spanDays <= 180) return "week" as const;
+  if (spanDays <= 1_095) return "month" as const;
+  return "year" as const;
+}
+
 export function resolveGroupStatisticsIconKey(expense: {
   iconKey: unknown;
   iconManuallySet: boolean;
@@ -51,11 +66,35 @@ function utcMonthKey(date: Date) {
   return date.toISOString().slice(0, 7);
 }
 
+function utcWeekKey(date: Date) {
+  const start = new Date(date);
+  const daysSinceMonday = (start.getUTCDay() + 6) % 7;
+  start.setUTCDate(start.getUTCDate() - daysSinceMonday);
+  return utcDayKey(start);
+}
+
+function utcYearKey(date: Date) {
+  return date.toISOString().slice(0, 4);
+}
+
+function timelineKey(date: Date, bucket: StatisticsTimelineBucket) {
+  switch (bucket) {
+    case "day":
+      return utcDayKey(date);
+    case "week":
+      return utcWeekKey(date);
+    case "month":
+      return utcMonthKey(date);
+    case "year":
+      return utcYearKey(date);
+  }
+}
+
 export function buildGroupStatistics(input: {
   expenses: readonly GroupStatisticsExpense[];
   members: readonly GroupStatisticsMember[];
   viewerUserId: string;
-  bucket: "day" | "month";
+  bucket: StatisticsTimelineBucket;
 }) {
   let totalSpentMinor = 0n;
   const categoryTotals = new Map<ExpenseIconKey, bigint>();
@@ -68,9 +107,7 @@ export function buildGroupStatistics(input: {
     increment(categoryTotals, expense.iconKey, expense.canonicalAmountMinor);
     increment(
       timelineTotals,
-      input.bucket === "day"
-        ? utcDayKey(expense.occurredAt)
-        : utcMonthKey(expense.occurredAt),
+      timelineKey(expense.occurredAt, input.bucket),
       expense.canonicalAmountMinor,
     );
     for (const [userId, amountMinor] of expense.canonicalPayments) {

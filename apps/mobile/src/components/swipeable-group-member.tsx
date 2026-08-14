@@ -1,7 +1,8 @@
 import ReanimatedSwipeable, {
   type SwipeableMethods,
 } from "react-native-gesture-handler/ReanimatedSwipeable";
-import { Pressable, Text, View } from "react-native";
+import { Image } from "expo-image";
+import { PlatformColor, Pressable, Text, View } from "react-native";
 import { useTheme } from "../theme";
 import {
   GroupBalanceMemberRow,
@@ -32,15 +33,30 @@ function RemoveMemberAction({
         onRemove();
       }}
       style={({ pressed }) => ({
-        width: 88,
+        width: 82,
         alignSelf: "stretch",
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: theme.negative,
+        gap: 3,
+        backgroundColor:
+          process.env.EXPO_OS === "ios"
+            ? PlatformColor("systemRed")
+            : theme.negative,
         opacity: disabled ? 0.55 : pressed ? 0.72 : 1,
       })}
     >
-      <Text style={{ color: "#FFFFFF", fontSize: 15, fontWeight: "700" }}>
+      {process.env.EXPO_OS === "ios" ? (
+        <Image
+          source="sf:person.badge.minus"
+          contentFit="contain"
+          tintColor="#FFFFFF"
+          style={{ width: 21, height: 21 }}
+        />
+      ) : null}
+      <Text
+        selectable={false}
+        style={{ color: "#FFFFFF", fontSize: 13, fontWeight: "600" }}
+      >
         Remove
       </Text>
     </Pressable>
@@ -79,11 +95,17 @@ export function SwipeableGroupMember({
         <ReanimatedSwipeable
           testID={`member-swipe-${member.userId}`}
           enabled={!removalPending}
-          friction={1.4}
-          rightThreshold={44}
-          overshootRight={false}
+          friction={1}
+          rightThreshold={41}
+          overshootRight
+          overshootFriction={8}
           enableTrackpadTwoFingerGesture
-          containerStyle={{ backgroundColor: theme.negative }}
+          containerStyle={{
+            backgroundColor:
+              process.env.EXPO_OS === "ios"
+                ? PlatformColor("systemRed")
+                : theme.negative,
+          }}
           childrenContainerStyle={{ backgroundColor: theme.surface }}
           renderRightActions={(_, __, swipeable) => (
             <RemoveMemberAction

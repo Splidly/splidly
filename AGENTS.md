@@ -1,5 +1,19 @@
 # Agent Instructions
 
+## Never allow text selection
+
+Text displayed by the app must never be selectable. This is a project-wide UI
+requirement for every platform and every screen.
+
+- Keep `selectable={false}` on React Native `Text` components and shared text
+  primitives. Never set `selectable` to `true`.
+- Do not add selectable labels, values, headings, descriptions, list content,
+  error messages, empty states, or other display text.
+- Do not enable text-selection context menus as a way to provide copy actions.
+  If copying is required, expose an explicit button or menu action instead.
+- When adding or changing shared typography components, add or preserve tests
+  that prevent text selection from being enabled accidentally.
+
 ## Mobile scrolling contract
 
 Scrolling in `apps/mobile` is deliberately centralized. Treat the behavior in

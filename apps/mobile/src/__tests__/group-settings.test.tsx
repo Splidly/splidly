@@ -293,7 +293,7 @@ describe("GroupSettingsScreen", () => {
     });
   });
 
-  it("combines sorted members with balances, disclosures, and swipe removal", async () => {
+  it("combines sorted members with balances, tap disclosures, and swipe removal", async () => {
     const view = await render(
       <SafeAreaInsetsContext.Provider
         value={{ top: 0, right: 0, bottom: 0, left: 0 }}
@@ -315,7 +315,20 @@ describe("GroupSettingsScreen", () => {
     expect(view.getByLabelText("Remove Alex")).toBeTruthy();
     expect(view.getByLabelText("Remove Zoe")).toBeTruthy();
 
-    await fireEvent.press(view.getByLabelText("Alex. Owes 5.00 €"));
+    const alexRow = view.getByLabelText("Alex. Owes 5.00 €");
+    await fireEvent(alexRow, "touchStart", {
+      nativeEvent: { pageX: 220, pageY: 50 },
+    });
+    await fireEvent(alexRow, "touchMove", {
+      nativeEvent: { pageX: 160, pageY: 50 },
+    });
+    await fireEvent.press(alexRow);
+    expect(view.queryByLabelText("Alex owes 5.00 € to you")).toBeNull();
+
+    await fireEvent(alexRow, "touchStart", {
+      nativeEvent: { pageX: 220, pageY: 50 },
+    });
+    await fireEvent.press(alexRow);
     expect(view.getByLabelText("Alex owes 5.00 € to you")).toBeTruthy();
 
     await fireEvent.press(view.getByLabelText("Lasse (You). Lent 5.00 €"));

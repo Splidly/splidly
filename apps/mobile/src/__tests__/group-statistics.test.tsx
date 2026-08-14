@@ -10,6 +10,8 @@ const mockUseLocalSearchParams = jest.fn(
     category?: string;
     userId?: string;
     metric?: string;
+    from?: string;
+    to?: string;
   } => ({ id: "group-1" }),
 );
 
@@ -19,46 +21,19 @@ jest.mock("expo-router", () => ({
   Stack: { Screen: () => null },
 }));
 
-jest.mock("@expo/ui/community/segmented-control", () => {
+jest.mock("@expo/ui/community/datetime-picker", () => {
   const React = require("react") as typeof import("react");
-  const { Pressable, Text, View } =
-    require("react-native") as typeof import("react-native");
+  const { View } = require("react-native") as typeof import("react-native");
 
-  function SegmentedControl({
-    values = [],
-    selectedIndex = 0,
-    onChange,
-    testID,
-  }: {
-    values?: string[];
-    selectedIndex?: number;
-    onChange?: (event: {
-      nativeEvent: { selectedSegmentIndex: number; value: string };
-    }) => void;
+  function DateTimePicker(props: {
     testID?: string;
+    value: Date;
+    onValueChange?: (event: unknown, date: Date) => void;
   }) {
-    return (
-      <View accessibilityRole="tablist" testID={testID}>
-        {values.map((value, index) => (
-          <Pressable
-            key={value}
-            testID={`${testID}-${index}`}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: index === selectedIndex }}
-            onPress={() =>
-              onChange?.({
-                nativeEvent: { selectedSegmentIndex: index, value },
-              })
-            }
-          >
-            <Text>{value}</Text>
-          </Pressable>
-        ))}
-      </View>
-    );
+    return <View {...props} />;
   }
 
-  return { __esModule: true, default: SegmentedControl, SegmentedControl };
+  return { __esModule: true, default: DateTimePicker, DateTimePicker };
 });
 
 const mockUseQuery = jest.fn((_input: unknown, _options?: unknown) => ({
@@ -75,6 +50,9 @@ const mockUseQuery = jest.fn((_input: unknown, _options?: unknown) => ({
     viewerPaid: { currency: "EUR" as const, minor: "11000" },
     viewerShare: { currency: "EUR" as const, minor: "7000" },
     expenseCount: 3,
+    rangeStart: new Date("2026-07-01T00:00:00.000Z"),
+    rangeEnd: new Date("2026-08-31T23:59:59.999Z"),
+    timelineBucket: "month" as "day" | "week" | "month" | "year",
     categories: [
       {
         iconKey: "dining" as const,
@@ -248,7 +226,7 @@ describe("group statistics", () => {
     mockUseLocalSearchParams.mockReturnValue({ id: "group-1" });
   });
 
-  it("shows paid and share separately and supports comparison controls", async () => {
+  it("visualizes how personal, category, and member amounts relate", async () => {
     const view = await render(
       <SafeAreaInsetsContext.Provider
         value={{ top: 0, right: 0, bottom: 0, left: 0 }}
@@ -261,25 +239,48 @@ describe("group statistics", () => {
     const heroStyle = StyleSheet.flatten(hero.props.style);
     expect(heroStyle.backgroundColor).not.toBe("#1764B0");
     expect(heroStyle.minHeight).toBe(108);
-    expect(within(hero).getByText("70.00 €")).toBeTruthy();
-    expect(within(hero).getByText("Your share")).toBeTruthy();
+    expect(within(hero).getAllByText("70.00 €").length).toBeGreaterThan(0);
+    const heroAmount = within(hero).getAllByText("70.00 €")[0];
+    expect(heroAmount?.props.adjustsFontSizeToFit).toBeUndefined();
+    expect(StyleSheet.flatten(heroAmount?.props.style).fontSize).toBe(38);
+    expect(within(hero).getAllByText("Your share").length).toBeGreaterThan(0);
+    expect(within(hero).getByText("37% of 190.00 € total")).toBeTruthy();
+    expect(
+      within(hero).getByText("You paid 40.00 € more than your share"),
+    ).toBeTruthy();
+    expect(
+      StyleSheet.flatten(view.getByTestId("viewer-share-segment").props.style)
+        .width,
+    ).toBe("37%");
     expect(view.queryByText("All recorded expenses")).toBeNull();
     expect(within(hero).queryByText("Total group spending")).toBeNull();
-    expect(view.getByText("190.00 €")).toBeTruthy();
-    expect(view.getByText("Total group spending")).toBeTruthy();
+    expect(view.getAllByText(/190.00 €/).length).toBeGreaterThan(0);
     expect(view.getByText("You paid")).toBeTruthy();
-    expect(view.getByText("Your share")).toBeTruthy();
-    expect(view.queryByText(/fronted|covered|you owe/i)).toBeNull();
+    expect(view.getAllByText("Your share").length).toBeGreaterThan(0);
     expect(view.getByText("Spending over time")).toBeTruthy();
+    expect(view.getByText("Highest total")).toBeTruthy();
+    expect(view.getByText("Jul 2026 · 130.00 €")).toBeTruthy();
+    expect(view.getByText("Monthly totals · adapts to your timeframe")).toBeTruthy();
+    expect(view.getByText("Tap a bar to see its exact total")).toBeTruthy();
+    await fireEvent.press(view.getByTestId("timeline-bar-2026-08"));
+    expect(view.getByText("Selected total")).toBeTruthy();
+    expect(view.getByText("Aug 2026 · 60.00 €")).toBeTruthy();
     expect(view.getByText("Where the money went")).toBeTruthy();
-    expect(view.getByText("Group members")).toBeTruthy();
-    expect(view.queryByText("Highlights")).toBeNull();
+    expect(view.getByText("Who paid & who used it")).toBeTruthy();
+    expect(view.getByText("Paid and share use the same scale")).toBeTruthy();
     expect(view.getByText("Uncategorized")).toBeTruthy();
     expect(
-      view.getByTestId("statistics-range-0").props.accessibilityState,
-    ).toEqual({ selected: true });
+      StyleSheet.flatten(
+        view.getByTestId("category-segment-dining").props.style,
+      ).width,
+    ).toBe("63%");
     expect(
-      view.getByTestId("member-metric-0").props.accessibilityState,
+      StyleSheet.flatten(
+        view.getByTestId("category-segment-transport").props.style,
+      ).width,
+    ).toBe("32%");
+    expect(
+      view.getByTestId("statistics-range-all").props.accessibilityState,
     ).toEqual({ selected: true });
 
     expect(
@@ -287,11 +288,14 @@ describe("group statistics", () => {
         .getAllByLabelText(/Show expenses where/)
         .map((row) => row.props.accessibilityLabel),
     ).toEqual([
+      "Show expenses where Alex paid",
       "Show expenses where Alex had a share",
+      "Show expenses where you paid",
       "Show expenses where you had a share",
     ]);
 
-    expect(view.getAllByText("120.00 €").length).toBeGreaterThan(0);
+    expect(view.getByText("Share 40.00 € more")).toBeTruthy();
+    expect(view.getByText("Paid 40.00 € more")).toBeTruthy();
     await fireEvent.press(
       view.getByLabelText("Show expenses where Alex had a share"),
     );
@@ -307,18 +311,6 @@ describe("group statistics", () => {
     });
     mockPush.mockClear();
 
-    await fireEvent.press(view.getByText("Paid"));
-    expect(
-      view.getByTestId("member-metric-1").props.accessibilityState,
-    ).toEqual({ selected: true });
-    expect(
-      view
-        .getAllByLabelText(/Show expenses where/)
-        .map((row) => row.props.accessibilityLabel),
-    ).toEqual([
-      "Show expenses where Alex paid",
-      "Show expenses where you paid",
-    ]);
     await fireEvent.press(view.getByLabelText("Show expenses where Alex paid"));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: "/groups/[id]/statistics-expenses",
@@ -352,8 +344,112 @@ describe("group statistics", () => {
       { placeholderData: expect.any(Function) },
     );
     expect(
-      view.getByTestId("statistics-range-2").props.accessibilityState,
+      view.getByTestId("statistics-range-30-days").props.accessibilityState,
     ).toEqual({ selected: true });
+  });
+
+  it("fills short-range charts with tappable daily totals", async () => {
+    mockUseQuery.mockImplementation((input, options) => {
+      const result = defaultUseQueryImplementation(input, options);
+      return {
+        ...result,
+        data: {
+          ...result.data,
+          rangeStart: new Date("2026-08-01T00:00:00.000Z"),
+          rangeEnd: new Date("2026-08-03T23:59:59.999Z"),
+          timelineBucket: "day" as const,
+          timeline: [
+            {
+              period: "2026-08-01",
+              amount: { currency: "EUR" as const, minor: "13000" },
+            },
+            {
+              period: "2026-08-03",
+              amount: { currency: "EUR" as const, minor: "6000" },
+            },
+          ],
+        },
+      };
+    });
+    const view = await render(
+      <SafeAreaInsetsContext.Provider
+        value={{ top: 0, right: 0, bottom: 0, left: 0 }}
+      >
+        <GroupStatisticsScreen />
+      </SafeAreaInsetsContext.Provider>,
+    );
+
+    expect(view.getByText("Daily totals · adapts to your timeframe")).toBeTruthy();
+    const emptyDay = view.getByTestId("timeline-bar-2026-08-02");
+    expect(emptyDay.props.accessibilityLabel).toMatch(/total, 0.00 €/);
+    await fireEvent.press(emptyDay);
+    expect(view.getByText("Selected total")).toBeTruthy();
+    expect(view.getByText(/Aug 2, 2026 · 0.00 €/)).toBeTruthy();
+  });
+
+  it("applies exact custom dates and keeps them in drill-down links", async () => {
+    const view = await render(
+      <SafeAreaInsetsContext.Provider
+        value={{ top: 0, right: 0, bottom: 0, left: 0 }}
+      >
+        <GroupStatisticsScreen />
+      </SafeAreaInsetsContext.Provider>,
+    );
+
+    await fireEvent.press(view.getByTestId("statistics-range-custom"));
+    expect(view.getByTestId("statistics-custom-range-editor")).toBeTruthy();
+    expect(view.getByText("Choose a date range")).toBeTruthy();
+    expect(view.queryByLabelText("Close custom date range")).toBeNull();
+    expect(view.queryByTestId("statistics-range-all")).toBeNull();
+    expect(view.queryByTestId("statistics-custom-date-picker")).toBeNull();
+    expect(view.queryByTestId("statistics-custom-from-picker")).toBeNull();
+
+    const fromDate = new Date(2026, 5, 2, 12);
+    await fireEvent.press(view.getByTestId("statistics-custom-from"));
+    await fireEvent(
+      view.getByTestId("statistics-custom-from-picker"),
+      "valueChange",
+      { nativeEvent: { timestamp: fromDate.getTime(), utcOffset: 0 } },
+      fromDate,
+    );
+    const toDate = new Date(2026, 6, 18, 12);
+    await fireEvent.press(view.getByTestId("statistics-custom-to"));
+    await fireEvent(
+      view.getByTestId("statistics-custom-to-picker"),
+      "valueChange",
+      { nativeEvent: { timestamp: toDate.getTime(), utcOffset: 0 } },
+      toDate,
+    );
+    await fireEvent.press(view.getByTestId("statistics-custom-apply"));
+
+    const expectedFrom = new Date(2026, 5, 2, 0, 0, 0, 0);
+    const expectedTo = new Date(2026, 6, 18, 23, 59, 59, 999);
+    expect(mockUseQuery).toHaveBeenLastCalledWith(
+      {
+        groupId: "group-1",
+        range: "custom",
+        from: expectedFrom,
+        to: expectedTo,
+      },
+      { placeholderData: expect.any(Function) },
+    );
+    expect(
+      view.getByTestId("statistics-range-custom").props.accessibilityState,
+    ).toEqual({ selected: true });
+    expect(view.getByText("Custom dates")).toBeTruthy();
+
+    await fireEvent.press(view.getByLabelText("Show Uncategorized expenses"));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: "/groups/[id]/statistics-expenses",
+      params: {
+        id: "group-1",
+        range: "custom",
+        from: expectedFrom.toISOString(),
+        to: expectedTo.toISOString(),
+        filter: "category",
+        category: "other",
+      },
+    });
   });
 
   it("lists every expense in a selected category, including uncategorized", async () => {
@@ -377,6 +473,36 @@ describe("group statistics", () => {
     expect(view.queryByText("Train")).toBeNull();
     await fireEvent.press(view.getByText("Mystery purchase"));
     expect(mockPush).toHaveBeenCalledWith("/expense/expense-3");
+  });
+
+  it("reuses custom dates on a statistics expense drill-down", async () => {
+    const from = new Date("2026-06-02T00:00:00.000Z");
+    const to = new Date("2026-07-18T21:59:59.999Z");
+    mockUseLocalSearchParams.mockReturnValue({
+      id: "group-1",
+      range: "custom",
+      from: from.toISOString(),
+      to: to.toISOString(),
+      filter: "category",
+      category: "other",
+    });
+    await render(
+      <SafeAreaInsetsContext.Provider
+        value={{ top: 0, right: 0, bottom: 0, left: 0 }}
+      >
+        <StatisticsExpensesScreen />
+      </SafeAreaInsetsContext.Provider>,
+    );
+
+    expect(mockUseQuery).toHaveBeenLastCalledWith(
+      {
+        groupId: "group-1",
+        range: "custom",
+        from,
+        to,
+      },
+      undefined,
+    );
   });
 
   it("filters member expenses by the selected paid model", async () => {
@@ -455,14 +581,20 @@ describe("group statistics", () => {
       </SafeAreaInsetsContext.Provider>,
     );
 
-    expect(within(view.getByTestId("statistics-hero")).getByText("70.00 €"))
-      .toBeTruthy();
+    expect(
+      within(view.getByTestId("statistics-hero")).getAllByText("70.00 €")
+        .length,
+    ).toBeGreaterThan(0);
 
     await fireEvent.press(view.getByText("30 days"));
 
     const updatedHero = view.getByTestId("statistics-hero");
-    expect(within(updatedHero).getByText("Your share")).toBeTruthy();
-    expect(within(updatedHero).getByText("25.00 €")).toBeTruthy();
+    expect(within(updatedHero).getAllByText("Your share").length).toBeGreaterThan(
+      0,
+    );
+    expect(within(updatedHero).getAllByText("25.00 €").length).toBeGreaterThan(
+      0,
+    );
     expect(view.queryByText("Last 30 days")).toBeNull();
   });
 });

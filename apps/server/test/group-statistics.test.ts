@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildGroupStatistics,
   resolveGroupStatisticsIconKey,
+  statisticsBucketForPeriod,
 } from "../src/domain/group-statistics";
 
 describe("resolveGroupStatisticsIconKey", () => {
@@ -94,6 +95,66 @@ describe("buildGroupStatistics", () => {
         paidMinor: 9_000n,
         shareMinor: 7_000n,
       },
+    ]);
+  });
+
+  it("uses calendar buckets that fit the selected period", () => {
+    const from = new Date("2026-01-01T00:00:00.000Z");
+    expect(
+      statisticsBucketForPeriod(
+        from,
+        new Date("2026-01-30T23:59:59.999Z"),
+      ),
+    ).toBe("day");
+    expect(
+      statisticsBucketForPeriod(
+        from,
+        new Date("2026-04-30T23:59:59.999Z"),
+      ),
+    ).toBe("week");
+    expect(
+      statisticsBucketForPeriod(
+        from,
+        new Date("2026-12-31T23:59:59.999Z"),
+      ),
+    ).toBe("month");
+    expect(
+      statisticsBucketForPeriod(
+        from,
+        new Date("2030-01-01T00:00:00.000Z"),
+      ),
+    ).toBe("year");
+  });
+
+  it("groups multi-month custom ranges into weeks", () => {
+    const statistics = buildGroupStatistics({
+      viewerUserId: "viewer",
+      bucket: "week",
+      members: [{ userId: "viewer", displayName: "Viewer", avatarUrl: null }],
+      expenses: [
+        {
+          id: "monday",
+          description: "Monday",
+          iconKey: "other",
+          occurredAt: new Date("2026-08-03T12:00:00.000Z"),
+          canonicalAmountMinor: 1_000n,
+          canonicalPayments: new Map([["viewer", 1_000n]]),
+          canonicalShares: new Map([["viewer", 1_000n]]),
+        },
+        {
+          id: "sunday",
+          description: "Sunday",
+          iconKey: "other",
+          occurredAt: new Date("2026-08-09T12:00:00.000Z"),
+          canonicalAmountMinor: 2_000n,
+          canonicalPayments: new Map([["viewer", 2_000n]]),
+          canonicalShares: new Map([["viewer", 2_000n]]),
+        },
+      ],
+    });
+
+    expect(statistics.timeline).toEqual([
+      { period: "2026-08-03", amountMinor: 3_000n },
     ]);
   });
 
