@@ -213,7 +213,7 @@ export default function ExpenseDetailScreen() {
           <Section title="Notes">
             <View style={{ paddingHorizontal: 16, paddingVertical: 13 }}>
               <Text
-                selectable
+                selectable={false}
                 style={{ color: theme.text, fontSize: 16, lineHeight: 23 }}
               >
                 {expense.notes}

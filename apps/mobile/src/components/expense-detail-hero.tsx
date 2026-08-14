@@ -69,7 +69,7 @@ export function ExpenseDetailHero({
             }}
           >
             <Text
-              selectable
+              selectable={false}
               numberOfLines={1}
               style={{
                 flex: 1,
@@ -83,7 +83,7 @@ export function ExpenseDetailHero({
               {description}
             </Text>
             <Text
-              selectable
+              selectable={false}
               numberOfLines={1}
               adjustsFontSizeToFit
               style={{
@@ -127,7 +127,7 @@ export function ExpenseDetailHero({
                 Home currency
               </Text>
               <Text
-                selectable
+                selectable={false}
                 numberOfLines={1}
                 style={{
                   color: theme.primary,
@@ -192,7 +192,7 @@ function Metadata({
         {label}
       </Text>
       <Text
-        selectable
+        selectable={false}
         numberOfLines={1}
         style={{
           color: theme.text,

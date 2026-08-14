@@ -3,7 +3,13 @@ import { fireEvent, render } from "@testing-library/react-native";
 import { HeaderHeightContext } from "expo-router/build/react-navigation/elements/Header/HeaderHeightContext";
 import { StyleSheet, Text } from "react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
-import { CollectionScreen, EmptyState, Field, Screen } from "./ui";
+import {
+  CollectionScreen,
+  EmptyState,
+  ErrorState,
+  Field,
+  Screen,
+} from "./ui";
 
 function ControlledField() {
   const [value, setValue] = useState("");
@@ -23,6 +29,19 @@ describe("EmptyState", () => {
     expect(view.getByLabelText("Splidly app icon")).toBeTruthy();
     expect(view.getByText("No friends yet")).toBeTruthy();
     expect(view.getByText("Share an invite to get started.")).toBeTruthy();
+  });
+
+  it("never enables text selection in shared display states", async () => {
+    const view = await render(
+      <>
+        <EmptyState title="Nothing here" message="Try again later." />
+        <ErrorState message="Could not load" />
+      </>,
+    );
+
+    expect(
+      view.container.queryAll((instance) => instance.props.selectable === true),
+    ).toHaveLength(0);
   });
 });
 

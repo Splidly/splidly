@@ -48,12 +48,12 @@ export function OfflineNotice() {
         />
         <View style={{ flexShrink: 1 }}>
           <Text
-            selectable
+            selectable={false}
             style={{ color: theme.text, fontSize: 14, fontWeight: "700" }}
           >
             No Internet Connection
           </Text>
-          <Text selectable style={{ color: theme.muted, fontSize: 12 }}>
+          <Text selectable={false} style={{ color: theme.muted, fontSize: 12 }}>
             Saved information remains available. Changes need a connection.
           </Text>
         </View>

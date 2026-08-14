@@ -9,7 +9,14 @@ import {
 import * as Crypto from "expo-crypto";
 import { router, Stack, useLocalSearchParams, type Href } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { beginCurrencySelection } from "../../lib/currency-selection";
 import { formatConvertedMoney } from "../../lib/money-display";
 import { api } from "../../lib/trpc";
@@ -23,8 +30,10 @@ import { DateField } from "../../components/date-field";
 import {
   ErrorState,
   HeaderButton,
+  ListRow,
   LoadingState,
   Screen,
+  Section,
   useKeyboardFocusScroll,
 } from "../../components/ui";
 import { useTheme } from "../../theme";
@@ -149,6 +158,9 @@ export default function NewSettlementScreen() {
     onSuccess: finishSaving,
   });
   const update = api.settlements.update.useMutation({
+    onSuccess: finishSaving,
+  });
+  const remove = api.settlements.remove.useMutation({
     onSuccess: finishSaving,
   });
 
@@ -451,6 +463,27 @@ export default function NewSettlementScreen() {
     }
   }
 
+  function confirmDelete() {
+    const settlement = settlementDetail.data?.settlement;
+    if (!params.settlementId || !settlement) return;
+    Alert.alert(
+      "Delete payment?",
+      "This payment will be removed and its balances will be reversed.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () =>
+            remove.mutate({
+              settlementId: params.settlementId!,
+              expectedVersion: settlement.version,
+            }),
+        },
+      ],
+    );
+  }
+
   const convertedCanonical = useMemo(() => {
     if (
       sourceMinor === undefined ||
@@ -515,12 +548,15 @@ export default function NewSettlementScreen() {
           Updating conversion…
         </Text>
       ) : rateStatus === "error" ? (
-        <Text selectable style={{ color: theme.negative, fontSize: 13 }}>
+        <Text
+          selectable={false}
+          style={{ color: theme.negative, fontSize: 13 }}
+        >
           {rateError ?? "Could not load exchange rates"}
         </Text>
       ) : convertedCanonical ? (
         <Text
-          selectable
+          selectable={false}
           style={{
             color: theme.primary,
             fontSize: 15,
@@ -654,11 +690,22 @@ export default function NewSettlementScreen() {
           </View>
         </View>
 
+        {editing ? (
+          <Section>
+            <ListRow
+              title={remove.isPending ? "Deleting…" : "Delete payment"}
+              destructive
+              showsDisclosureIndicator={false}
+              {...(remove.isPending ? {} : { onPress: confirmDelete })}
+            />
+          </Section>
+        ) : null}
+
         {formError ? <ErrorState message={formError} /> : null}
-        {create.error || update.error ? (
+        {create.error || update.error || remove.error ? (
           <ErrorState
             message={
-              (create.error ?? update.error)?.message ??
+              (create.error ?? update.error ?? remove.error)?.message ??
               "Could not save payment"
             }
           />
@@ -687,7 +734,10 @@ export default function NewSettlementScreen() {
                   }
                   onPress={submit}
                   disabled={
-                    create.isPending || update.isPending || !conversionReady
+                    create.isPending ||
+                    update.isPending ||
+                    remove.isPending ||
+                    !conversionReady
                   }
                 />
               ),
@@ -706,7 +756,9 @@ export default function NewSettlementScreen() {
               <HeaderButton
                 label="Cancel payment"
                 glyph="×"
-                disabled={create.isPending || update.isPending}
+                disabled={
+                  create.isPending || update.isPending || remove.isPending
+                }
                 onPress={closePayment}
               />
             ),
@@ -717,7 +769,7 @@ export default function NewSettlementScreen() {
         <Stack.Toolbar.Button
           icon="xmark"
           accessibilityLabel="Cancel payment"
-          disabled={create.isPending || update.isPending}
+          disabled={create.isPending || update.isPending || remove.isPending}
           onPress={closePayment}
         />
       </Stack.Toolbar>

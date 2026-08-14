@@ -893,13 +893,13 @@ export function LoadingState() {
     return (
       <View accessibilityRole="alert" style={[styles.state, { gap: 8 }]}>
         <Text
-          selectable
+          selectable={false}
           style={{ color: theme.text, fontSize: 17, fontWeight: "700" }}
         >
           Waiting for a connection
         </Text>
         <Text
-          selectable
+          selectable={false}
           style={{ color: theme.muted, textAlign: "center", lineHeight: 20 }}
         >
           This screen will load automatically when you’re back online.
@@ -942,14 +942,14 @@ export function ErrorState({
     >
       {networkError ? (
         <Text
-          selectable
+          selectable={false}
           style={{ color: theme.text, fontWeight: "700", fontSize: 16 }}
         >
           You’re offline
         </Text>
       ) : null}
       <Text
-        selectable
+        selectable={false}
         style={{
           color: networkError ? theme.muted : theme.negative,
           lineHeight: 20,

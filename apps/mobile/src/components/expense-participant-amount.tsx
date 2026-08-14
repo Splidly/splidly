@@ -32,7 +32,7 @@ export function ExpenseParticipantAmount({
       <MoneyValue minor={sourceAmountMinor} currency={sourceCurrency} />
       {homeAmountMinor !== undefined ? (
         <Text
-          selectable
+          selectable={false}
           style={{
             color: theme.muted,
             fontSize: 13,

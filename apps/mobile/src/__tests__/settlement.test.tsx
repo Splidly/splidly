@@ -1,5 +1,5 @@
 import { act, fireEvent, render } from "@testing-library/react-native";
-import { StyleSheet } from "react-native";
+import { Alert, StyleSheet } from "react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import NewSettlementScreen from "../app/settlement/new";
 
@@ -174,6 +174,14 @@ jest.mock("../lib/trpc", () => ({
           mutate: jest.fn(),
         })),
       },
+      remove: {
+        useMutation: jest.fn(() => ({
+          data: undefined,
+          error: null,
+          isPending: false,
+          mutate: jest.fn(),
+        })),
+      },
     },
     useUtils: () => ({
       friends: {
@@ -219,6 +227,11 @@ describe("NewSettlementScreen group context", () => {
         api: { settlements: { create: { useMutation: jest.Mock } } };
       }
     ).api.settlements.create.useMutation.mockClear();
+    (
+      jest.requireMock("../lib/trpc") as {
+        api: { settlements: { remove: { useMutation: jest.Mock } } };
+      }
+    ).api.settlements.remove.useMutation.mockClear();
   });
 
   afterEach(() => jest.useRealTimers());
@@ -473,5 +486,62 @@ describe("NewSettlementScreen group context", () => {
         notes: "Cash",
       }),
     );
+  });
+
+  it("deletes an existing payment after destructive confirmation", async () => {
+    mockSettlementParams = {
+      type: "group",
+      id: "group-1",
+      canonicalCurrency: "EUR",
+      settlementId: "settlement-1",
+    };
+    mockSettlementDetailData = {
+      settlement: {
+        id: "settlement-1",
+        version: 2,
+        fromUserId: "user-3",
+        toUserId: "user-1",
+        sourceCurrency: "EUR",
+        sourceAmountMinor: 900n,
+        occurredAt: new Date("2026-07-20T12:00:00.000Z"),
+        notes: "Cash",
+      },
+      rates: [],
+    };
+    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => {});
+
+    const view = await render(
+      <SafeAreaInsetsContext.Provider
+        value={{ top: 0, right: 0, bottom: 0, left: 0 }}
+      >
+        <NewSettlementScreen />
+      </SafeAreaInsetsContext.Provider>,
+    );
+    await act(async () => {});
+
+    await fireEvent.press(view.getByText("Delete payment"));
+    expect(alert).toHaveBeenCalledWith(
+      "Delete payment?",
+      "This payment will be removed and its balances will be reversed.",
+      expect.any(Array),
+    );
+    const buttons = alert.mock.calls[0]?.[2];
+    const destructive = buttons?.find(
+      (button) => button.style === "destructive",
+    );
+    destructive?.onPress?.();
+
+    const removeHook = (
+      jest.requireMock("../lib/trpc") as {
+        api: { settlements: { remove: { useMutation: jest.Mock } } };
+      }
+    ).api.settlements.remove.useMutation;
+    const removeMutate = removeHook.mock.results
+      .map((result) => result.value.mutate as jest.Mock)
+      .find((mutate) => mutate.mock.calls.length > 0);
+    expect(removeMutate).toHaveBeenCalledWith({
+      settlementId: "settlement-1",
+      expectedVersion: 2,
+    });
   });
 });

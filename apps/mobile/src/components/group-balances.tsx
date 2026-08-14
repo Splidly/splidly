@@ -282,7 +282,7 @@ export function MemberRelationships({
                   size={34}
                 />
                 <Text
-                  selectable
+                  selectable={false}
                   style={{
                     flex: 1,
                     color: theme.muted,
@@ -312,7 +312,7 @@ export function MemberRelationships({
         </View>
       ) : (
         <Text
-          selectable
+          selectable={false}
           style={{
             color: theme.muted,
             fontSize: 15,
