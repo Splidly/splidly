@@ -50,6 +50,27 @@ Use these URLs:
 Before submission, make sure `privacy@splidly.site` accepts mail or replace it
 in `apps/server/src/pages.ts` with a monitored address.
 
+## Account deletion review path
+
+In the review notes, tell Apple that account deletion is available at
+**Profile → Account → Delete account**. The reviewer can delete immediately;
+open balances and active groups do not block the request. Splidly asks for a
+fresh sign-in when the current session is more than 15 minutes old and then
+shows one explicit irreversible-action confirmation.
+
+Deletion revokes an available Sign in with Apple token, removes authentication
+connections, sessions, invitations, push registrations, cached currency
+requests, notification preferences, identifying profile data, and protected
+Splidly data on the device. Shared financial history remains pseudonymized as
+“Deleted user” because removing it would alter other participants' balances.
+The public fallback deletion page is `https://splidly.site/account/delete`.
+
+Before submission, verify this path with fresh Apple and Google test accounts,
+including one account with an open balance. Confirm that the deleted account
+cannot reuse its old session and that another participant still sees an
+accurate balance attributed to “Deleted user.” Do not use a real account whose
+ledger history must be retained.
+
 ## External TestFlight review
 
 A reusable group invitation is a suitable reviewer path because group invites

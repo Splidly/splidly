@@ -21,6 +21,10 @@ import { PictureEditor } from "../../../components/picture-editor";
 import { authClient } from "../../../lib/auth-client";
 import { useConnectivity } from "../../../lib/connectivity";
 import { APP_URL } from "../../../lib/env";
+import {
+  clearLocalAccountData,
+  clearLocalAuthSession,
+} from "../../../lib/local-account-data";
 import { friendlyErrorMessage } from "../../../lib/network";
 import {
   getExistingPushInstallationId,
@@ -34,12 +38,11 @@ type SavedProfile = {
   avatarUrl: string | null;
 };
 
-const ACTIVE_GROUPS_ERROR = "Leave all groups before deleting your account";
+const RECENT_SIGN_IN_ERROR = "Sign in again before deleting your account";
 
 export default function ProfileScreen() {
   const profile = api.profile.me.useQuery();
   const { isOnline } = useConnectivity();
-  const groups = api.groups.list.useQuery();
   const utils = api.useUtils();
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
@@ -113,19 +116,42 @@ export default function ProfileScreen() {
   }, [avatarUrl, currency, isOnline, name, update.isPending]);
 
   const remove = api.profile.deleteAccount.useMutation({
-    async onSuccess() {
+    async onSuccess(result) {
       await unregisterNativePushNotifications().catch(() => {});
-      queryClient.clear();
       await authClient.signOut().catch(() => {
-        // The account is already deleted server-side. Local navigation must
-        // not be stranded if clearing the remote session loses connectivity.
+        // Server sessions are already gone after successful deletion.
       });
+      await clearLocalAccountData().catch(() => {
+        // Continue to the signed-out state even if secure storage is unavailable.
+      });
+      queryClient.clear();
       router.replace("/sign-in");
-    },
-    onError(error, input) {
-      if (!input.leaveGroups && error.message === ACTIVE_GROUPS_ERROR) {
-        confirmLeaveGroupsAndDelete();
+      if (result.manualAppleRevocationRequired) {
+        Alert.alert(
+          "Account deleted",
+          "Splidly had no Apple token it could revoke. You can remove Splidly manually in your Apple Account's Sign in with Apple settings.",
+        );
       }
+    },
+    onError(error) {
+      if (error.message !== RECENT_SIGN_IN_ERROR) return;
+      Alert.alert(
+        "Sign in again",
+        "For security, sign in again before deleting your account.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Sign in",
+            onPress: () => {
+              void authClient.signOut().finally(async () => {
+                await clearLocalAuthSession().catch(() => {});
+                queryClient.clear();
+                router.replace("/sign-in");
+              });
+            },
+          },
+        ],
+      );
     },
   });
   const unregisterPush = api.push.unregister.useMutation();
@@ -151,49 +177,16 @@ export default function ProfileScreen() {
     }
   }
 
-  function deleteAccount(leaveGroups = false) {
-    remove.mutate({ confirmation: "DELETE", leaveGroups });
-  }
-
-  function confirmLeaveGroupsAndDelete() {
-    const groupCount = groups.data?.length;
-    const membershipDescription = groupCount
-      ? `You're still a member of ${groupCount} ${
-          groupCount === 1 ? "group" : "groups"
-        }.`
-      : "You're still a member of one or more groups.";
-    Alert.alert(
-      "Leave groups and delete account?",
-      `${membershipDescription} Splidly can leave them all and then permanently delete your account. All balances must be settled first.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Leave & Delete",
-          style: "destructive",
-          onPress: () => deleteAccount(true),
-        },
-      ],
-    );
-  }
-
-  function startAccountDeletion() {
-    if (groups.data && groups.data.length > 0) {
-      confirmLeaveGroupsAndDelete();
-      return;
-    }
-    deleteAccount();
-  }
-
   function confirmDelete() {
     Alert.alert(
-      "Delete account?",
-      "All balances must be settled. This cannot be undone.",
+      "Permanently delete account?",
+      "Your profile, sign-in connections, sessions, invitations, notifications, and private app data will be removed. Shared expenses and settlements remain under “Deleted user” so other participants' balances stay correct. This cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Delete",
+          text: "Delete permanently",
           style: "destructive",
-          onPress: startAccountDeletion,
+          onPress: () => remove.mutate({ confirmation: "DELETE" }),
         },
       ],
     );

@@ -253,3 +253,8 @@ export async function rememberCurrency(
   }
   return cachedRecentCurrencies;
 }
+
+export async function clearRecentCurrencies(): Promise<void> {
+  cachedRecentCurrencies = [];
+  await SecureStore.deleteItemAsync(RECENT_CURRENCIES_KEY);
+}

@@ -316,7 +316,7 @@ export function privacyPage(): string {
   return documentLayout(
     "Privacy · Splidly",
     `<h1>Privacy Policy</h1>
-     <p><small>Effective July 31, 2026</small></p>
+     <p><small>Effective August 18, 2026</small></p>
      <p>Splidly is a shared-expense ledger. It records who paid, how a cost was split, and the settlements people record themselves. Splidly does not move money, show advertising, sell personal data, or use personal data for advertising tracking.</p>
 
      <h2>Data Splidly collects</h2>
@@ -339,8 +339,9 @@ export function privacyPage(): string {
      </ul>
 
      <h2>Retention and deletion</h2>
-     <p>Account and ledger data is retained while your account is active. You can delete your account in Profile after settling your balances and leaving active groups. Deletion removes provider connections, authentication tokens, active sessions, invitations you created, your name, email address, and profile image from the active account.</p>
-     <p>Shared financial records cannot always be removed without changing other participants’ ledgers. Splidly therefore retains a de-identified account record, shared expense and settlement history, currency snapshots, and audit revisions needed to preserve those ledgers. These records retain a random internal identifier but no longer retain your provider connection, name, email address, or profile image. If backups are enabled, they use a seven-day retention schedule, so deleted data may remain in a protected backup until that backup expires.</p>
+     <p>Account and ledger data is retained while your account is active. You can permanently delete your account from Profile at any time, including while you have open balances or active groups. For security, Splidly may ask you to sign in again. Deletion removes provider connections and tokens, active sessions, invitations you created, push-notification registrations, cached currency requests, notification preferences, your name, email address, and profile image. Splidly also clears its protected account data from the device used for deletion.</p>
+     <p>Shared financial records cannot always be removed without changing other participants’ ledgers. Splidly therefore retains a <strong>pseudonymized</strong> internal account identifier and the shared group memberships, expenses, settlements, exchange-rate snapshots, and audit revisions needed to preserve those ledgers. Other participants see “Deleted user” instead of your identity. This retained data is not anonymous because Splidly may still be able to associate the internal records with their prior account through operational records or other ledger participants. If backups are enabled, they use a seven-day retention schedule, so deleted data may remain in a protected backup until that backup expires.</p>
+     <p>If you used Sign in with Apple, Splidly revokes the Apple token when one is available. If Apple did not provide a revocable token, Splidly still completes deletion and tells you to remove Splidly manually in your Apple Account’s Sign in with Apple settings.</p>
      <p>Splidly may retain limited information for longer when required by law or reasonably necessary to resolve abuse, fraud, security, or legal issues.</p>
 
      <h2>Your choices</h2>
@@ -359,8 +360,9 @@ export function deletionPage(signedIn: boolean): string {
     return documentLayout(
       "Delete account · Splidly",
       `<h1>Delete your account</h1>
-       <p>You must settle all balances and leave every group first. Your identity and provider sessions will be removed; anonymized shared ledger facts remain for other participants.</p>
-       <form method="post"><input type="hidden" name="confirmation" value="DELETE" /><button class="button danger" type="submit">Permanently delete account</button></form>`,
+       <p>Your identity, sign-in connections, sessions, invitations, notifications, and private cached data will be removed immediately. Shared expenses and settlements remain under “Deleted user” so other participants’ balances stay correct.</p>
+       <p><strong>This cannot be undone.</strong> Type DELETE to confirm.</p>
+       <form method="post"><label for="confirmation">Confirmation</label><input id="confirmation" name="confirmation" required pattern="DELETE" autocomplete="off" /><button class="button danger" type="submit">Permanently delete account</button></form>`,
     );
   }
   return documentLayout(
@@ -385,11 +387,15 @@ export function deletionPage(signedIn: boolean): string {
   );
 }
 
-export function deletionResultPage(success: boolean, message?: string): string {
+export function deletionResultPage(
+  success: boolean,
+  message?: string,
+  manualAppleRevocationRequired = false,
+): string {
   return documentLayout(
     success ? "Account deleted · Splidly" : "Could not delete · Splidly",
     success
-      ? `<h1>Account deleted</h1><p>Your Splidly identity and sessions have been removed.</p>`
-      : `<h1>Account not deleted</h1><p>${escapeHtml(message ?? "Please settle balances and leave groups, then try again.")}</p>`,
+      ? `<h1>Account deleted</h1><p>Your Splidly identity, sign-in connections, sessions, and private cached data have been removed.</p>${manualAppleRevocationRequired ? "<p>Splidly had no Apple token it could revoke. Remove Splidly manually in your Apple Account’s Sign in with Apple settings.</p>" : ""}`
+      : `<h1>Account not deleted</h1><p>${escapeHtml(message ?? "Please try again.")}</p>`,
   );
 }

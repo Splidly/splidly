@@ -218,12 +218,25 @@ export function createApp(input: {
   });
   app.get("/privacy", (c) => c.html(privacyPage()));
   app.get("/account/delete", async (c) => {
+    c.header("cache-control", "no-store");
     const session = await input.auth.api.getSession({
       headers: c.req.raw.headers,
     });
     return c.html(deletionPage(Boolean(session?.user)));
   });
   app.post("/account/delete", async (c) => {
+    c.header("cache-control", "no-store");
+    const expectedOrigin = new URL(input.env.APP_PUBLIC_URL).origin;
+    if (c.req.header("origin") !== expectedOrigin) {
+      return c.html(deletionResultPage(false, "Invalid request origin."), 403);
+    }
+    const body = await c.req.parseBody();
+    if (body.confirmation !== "DELETE") {
+      return c.html(
+        deletionResultPage(false, 'Enter "DELETE" to confirm.'),
+        400,
+      );
+    }
     const context = await createTrpcContext({
       auth: input.auth,
       db: input.db,
@@ -236,10 +249,16 @@ export function createApp(input: {
       return c.html(deletionResultPage(false, "Please sign in again."), 401);
     }
     try {
-      await appRouter.createCaller(context).profile.deleteAccount({
+      const result = await appRouter.createCaller(context).profile.deleteAccount({
         confirmation: "DELETE",
       });
-      return c.html(deletionResultPage(true));
+      return c.html(
+        deletionResultPage(
+          true,
+          undefined,
+          result.manualAppleRevocationRequired,
+        ),
+      );
     } catch (error) {
       context.logger.warn("account.delete.failed", { error });
       return c.html(

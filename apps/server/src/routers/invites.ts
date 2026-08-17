@@ -237,10 +237,12 @@ export const invitesRouter = router({
         const existingMembers = await tx
           .select({ userId: groupMembers.userId })
           .from(groupMembers)
+          .innerJoin(profiles, eq(profiles.userId, groupMembers.userId))
           .where(
             and(
               eq(groupMembers.groupId, invite.groupId),
               isNull(groupMembers.removedAt),
+              isNull(profiles.deletedAt),
             ),
           );
         const friendshipsToUpsert = existingMembers.flatMap((member) => {

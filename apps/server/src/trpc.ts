@@ -100,3 +100,28 @@ export const protectedProcedure = observedProcedure.use(({ ctx, next }) => {
     },
   });
 });
+
+export const recentSessionMaxAgeMs = 15 * 60 * 1_000;
+
+export function isRecentSession(
+  createdAt: Date | string,
+  now = new Date(),
+): boolean {
+  const ageMs = now.getTime() - new Date(createdAt).getTime();
+  return ageMs >= 0 && ageMs < recentSessionMaxAgeMs;
+}
+
+export const recentProtectedProcedure = protectedProcedure.use(
+  ({ ctx, next }) => {
+    if (!isRecentSession(ctx.session.session.createdAt)) {
+      ctx.logger.warn("auth.authorization.denied", {
+        reason: "session-not-recent",
+      });
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "Sign in again before deleting your account",
+      });
+    }
+    return next({ ctx });
+  },
+);

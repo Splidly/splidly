@@ -17,6 +17,10 @@ export function getExistingPushInstallationId() {
   return SecureStore.getItemAsync(installationIdKey);
 }
 
+export function clearPushInstallationId() {
+  return SecureStore.deleteItemAsync(installationIdKey);
+}
+
 export async function unregisterNativePushNotifications() {
   if (Platform.OS === "ios") {
     await Notifications.unregisterForNotificationsAsync();

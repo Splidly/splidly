@@ -6,9 +6,13 @@ import ProfileScreen from "../app/(tabs)/profile";
 const mockDeleteAccount = jest.fn();
 let mockDeleteMutationOptions:
   | {
+      onSuccess?: (result: {
+        deleted: boolean;
+        manualAppleRevocationRequired: boolean;
+      }) => Promise<void>;
       onError?: (
         error: Error,
-        input: { confirmation: "DELETE"; leaveGroups?: boolean },
+        input: { confirmation: "DELETE" },
       ) => void;
     }
   | undefined;
@@ -33,8 +37,13 @@ jest.mock("expo-notifications", () => ({
 
 jest.mock("../lib/auth-client", () => ({
   authClient: {
-    signOut: jest.fn(),
+    signOut: jest.fn(async () => ({ error: null })),
   },
+}));
+
+jest.mock("../lib/local-account-data", () => ({
+  clearLocalAccountData: jest.fn(async () => {}),
+  clearLocalAuthSession: jest.fn(async () => {}),
 }));
 
 jest.mock("../components/currency-field", () => ({
@@ -149,57 +158,68 @@ describe("ProfileScreen account deletion", () => {
     button.onPress();
   }
 
-  it("offers to leave every group before deleting the account", async () => {
+  it("deletes directly even when the user still belongs to groups", async () => {
     mockGroups = [{ id: "group-1" }, { id: "group-2" }];
     const view = await renderProfile();
 
     await fireEvent.press(view.getByText("Delete account"));
-    pressAlertButton(0, "Delete");
-
-    expect(alert).toHaveBeenNthCalledWith(
-      2,
-      "Leave groups and delete account?",
-      expect.stringContaining("You're still a member of 2 groups."),
+    expect(alert).toHaveBeenCalledWith(
+      "Permanently delete account?",
+      expect.stringContaining("Shared expenses and settlements remain"),
       expect.any(Array),
     );
-
-    pressAlertButton(1, "Leave & Delete");
+    pressAlertButton(0, "Delete permanently");
     expect(mockDeleteAccount).toHaveBeenCalledWith({
       confirmation: "DELETE",
-      leaveGroups: true,
     });
   });
 
-  it("deletes directly after confirmation when no groups remain", async () => {
+  it("requires only one explicit destructive confirmation", async () => {
     const view = await renderProfile();
 
     await fireEvent.press(view.getByText("Delete account"));
-    pressAlertButton(0, "Delete");
+    pressAlertButton(0, "Delete permanently");
 
     expect(alert).toHaveBeenCalledTimes(1);
     expect(mockDeleteAccount).toHaveBeenCalledWith({
       confirmation: "DELETE",
-      leaveGroups: false,
     });
   });
 
-  it("offers the shortcut when a concurrent membership blocks deletion", async () => {
-    mockGroups = undefined;
+  it("asks for a new sign-in when the session is not recent", async () => {
     const view = await renderProfile();
 
     await fireEvent.press(view.getByText("Delete account"));
-    pressAlertButton(0, "Delete");
+    pressAlertButton(0, "Delete permanently");
     mockDeleteMutationOptions?.onError?.(
-      new Error("Leave all groups before deleting your account"),
-      { confirmation: "DELETE", leaveGroups: false },
+      new Error("Sign in again before deleting your account"),
+      { confirmation: "DELETE" },
     );
 
     expect(alert).toHaveBeenNthCalledWith(
       2,
-      "Leave groups and delete account?",
-      expect.stringContaining("one or more groups"),
+      "Sign in again",
+      expect.stringContaining("For security"),
       expect.any(Array),
     );
+  });
+
+  it("clears protected local data after server-side deletion", async () => {
+    await renderProfile();
+    const { clearLocalAccountData } = jest.requireMock(
+      "../lib/local-account-data",
+    ) as { clearLocalAccountData: jest.Mock };
+    const { router } = jest.requireMock("expo-router") as {
+      router: { replace: jest.Mock };
+    };
+
+    await mockDeleteMutationOptions?.onSuccess?.({
+      deleted: true,
+      manualAppleRevocationRequired: false,
+    });
+
+    expect(clearLocalAccountData).toHaveBeenCalled();
+    expect(router.replace).toHaveBeenCalledWith("/sign-in");
   });
 
   it("opens notification preferences without action chevrons on account rows", async () => {

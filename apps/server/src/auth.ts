@@ -8,6 +8,10 @@ import {
 } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { createAppleClientSecretFromFile } from "./apple-client-secret";
+import {
+  revokeAppleToken,
+  type AppleTokenType,
+} from "./apple-token-revocation";
 import { ensureDemoData } from "./demo-data";
 import type { Env } from "./env";
 import type { Logger } from "./logger";
@@ -21,6 +25,10 @@ export interface Auth {
       headers: Headers;
     }): Promise<{ session: Session; user: User } | null>;
   };
+  revokeAppleToken(input: {
+    token: string;
+    tokenType: AppleTokenType;
+  }): Promise<void>;
 }
 
 export async function createAuth(
@@ -36,6 +44,7 @@ export async function createAuth(
       appBundleIdentifier?: string;
     }
   > = {};
+  let appleClientSecret: string | undefined;
   if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
     socialProviders.google = {
       clientId: env.GOOGLE_CLIENT_ID,
@@ -47,14 +56,15 @@ export async function createAuth(
     env.APPLE_SIGN_IN_KEY_ID &&
     env.APPLE_SIGN_IN_PRIVATE_KEY_PATH
   ) {
+    appleClientSecret = await createAppleClientSecretFromFile({
+      clientId: env.APPLE_SIGN_IN_CLIENT_ID,
+      keyId: env.APPLE_SIGN_IN_KEY_ID,
+      privateKeyPath: env.APPLE_SIGN_IN_PRIVATE_KEY_PATH,
+      teamId: env.IOS_TEAM_ID,
+    });
     socialProviders.apple = {
       clientId: env.APPLE_SIGN_IN_CLIENT_ID,
-      clientSecret: await createAppleClientSecretFromFile({
-        clientId: env.APPLE_SIGN_IN_CLIENT_ID,
-        keyId: env.APPLE_SIGN_IN_KEY_ID,
-        privateKeyPath: env.APPLE_SIGN_IN_PRIVATE_KEY_PATH,
-        teamId: env.IOS_TEAM_ID,
-      }),
+      clientSecret: appleClientSecret,
       appBundleIdentifier: env.IOS_APP_ID,
     };
   }
@@ -142,5 +152,28 @@ export async function createAuth(
     providers: Object.keys(socialProviders),
   });
 
-  return betterAuth(options);
+  const auth = betterAuth(options);
+  return {
+    ...auth,
+    async revokeAppleToken(input) {
+      if (
+        !env.APPLE_SIGN_IN_CLIENT_ID ||
+        !env.APPLE_SIGN_IN_KEY_ID ||
+        !env.APPLE_SIGN_IN_PRIVATE_KEY_PATH
+      ) {
+        throw new Error("Sign in with Apple is not configured");
+      }
+      const currentClientSecret = await createAppleClientSecretFromFile({
+        clientId: env.APPLE_SIGN_IN_CLIENT_ID,
+        keyId: env.APPLE_SIGN_IN_KEY_ID,
+        privateKeyPath: env.APPLE_SIGN_IN_PRIVATE_KEY_PATH,
+        teamId: env.IOS_TEAM_ID,
+      });
+      await revokeAppleToken({
+        clientId: env.APPLE_SIGN_IN_CLIENT_ID,
+        clientSecret: currentClientSecret,
+        ...input,
+      });
+    },
+  };
 }

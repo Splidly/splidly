@@ -1,19 +1,21 @@
 import {
   accounts,
   and,
+  currencyQuotes,
   eq,
   groupMembers,
   groups,
   inArray,
   invites,
   isNull,
-  ledgerEntries,
-  or,
+  ledgerValuations,
+  notificationOutbox,
   profiles,
   pushInstallations,
   sessions,
   sql,
   users,
+  verifications,
 } from "@splidly/db";
 import {
   currencyCodeSchema,
@@ -22,7 +24,11 @@ import {
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { requireProfile } from "../domain/helpers";
-import { protectedProcedure, router } from "../trpc";
+import {
+  protectedProcedure,
+  recentProtectedProcedure,
+  router,
+} from "../trpc";
 
 export const profileRouter = router({
   me: protectedProcedure.query(async ({ ctx }) =>
@@ -96,16 +102,50 @@ export const profileRouter = router({
       return profile;
     }),
 
-  deleteAccount: protectedProcedure
+  deleteAccount: recentProtectedProcedure
     .input(
       z.object({
         confirmation: z.literal("DELETE"),
-        leaveGroups: z.boolean().optional().default(false),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx }) => {
       const userId = ctx.session.user.id;
       const tombstone = `deleted-${crypto.randomUUID()}@invalid.splidly`;
+      const providerAccounts = await ctx.db
+        .select({
+          providerId: accounts.providerId,
+          accessToken: accounts.accessToken,
+          refreshToken: accounts.refreshToken,
+        })
+        .from(accounts)
+        .where(eq(accounts.userId, userId));
+      let manualAppleRevocationRequired = false;
+      for (const account of providerAccounts) {
+        if (account.providerId !== "apple") continue;
+        const token = account.refreshToken ?? account.accessToken;
+        if (!token) {
+          manualAppleRevocationRequired = true;
+          continue;
+        }
+        try {
+          await ctx.auth.revokeAppleToken({
+            token,
+            tokenType: account.refreshToken
+              ? "refresh_token"
+              : "access_token",
+          });
+        } catch (cause) {
+          ctx.logger.error("account.delete.apple-revocation-failed", {
+            cause,
+          });
+          throw new TRPCError({
+            code: "SERVICE_UNAVAILABLE",
+            message:
+              "Apple authorization could not be revoked. Please try again.",
+          });
+        }
+      }
+
       return ctx.db.transaction(async (tx) => {
         const activeMemberships = await tx
           .select({ groupId: groupMembers.groupId })
@@ -118,49 +158,20 @@ export const profileRouter = router({
               isNull(groups.archivedAt),
             ),
           );
-        if (activeMemberships.length > 0 && !input.leaveGroups) {
-          throw new TRPCError({
-            code: "PRECONDITION_FAILED",
-            message: "Leave all groups before deleting your account",
-          });
-        }
-
-        const entries = await tx
-          .select()
-          .from(ledgerEntries)
-          .where(
-            or(
-              eq(ledgerEntries.debtorId, userId),
-              eq(ledgerEntries.creditorId, userId),
-            ),
-          );
-        const balances = new Map<string, bigint>();
-        for (const entry of entries) {
-          const key = `${entry.contextType}:${entry.contextId}:${entry.canonicalCurrency}`;
-          const signed =
-            entry.creditorId === userId
-              ? entry.canonicalAmountMinor
-              : -entry.canonicalAmountMinor;
-          balances.set(key, (balances.get(key) ?? 0n) + signed);
-        }
-        if ([...balances.values()].some((amount) => amount !== 0n)) {
-          throw new TRPCError({
-            code: "PRECONDITION_FAILED",
-            message: "Settle all balances before deleting your account",
-          });
-        }
-
         const deletedAt = new Date();
         const activeGroupIds = activeMemberships.map(
           (membership) => membership.groupId,
         );
-        if (input.leaveGroups && activeGroupIds.length > 0) {
+        if (activeGroupIds.length > 0) {
           const groupMemberships = await tx
             .select({
               groupId: groupMembers.groupId,
               userId: groupMembers.userId,
+              joinedAt: groupMembers.joinedAt,
+              memberDeletedAt: profiles.deletedAt,
             })
             .from(groupMembers)
+            .innerJoin(profiles, eq(profiles.userId, groupMembers.userId))
             .where(
               and(
                 inArray(groupMembers.groupId, activeGroupIds),
@@ -169,12 +180,29 @@ export const profileRouter = router({
             );
           const groupsWithOtherMembers = new Set(
             groupMemberships
-              .filter((membership) => membership.userId !== userId)
+              .filter(
+                (membership) =>
+                  membership.userId !== userId && !membership.memberDeletedAt,
+              )
               .map((membership) => membership.groupId),
           );
           const groupsToArchive = activeGroupIds.filter(
             (groupId) => !groupsWithOtherMembers.has(groupId),
           );
+          const successorByGroup = new Map<string, string>();
+          for (const membership of groupMemberships
+            .filter(
+              (membership) =>
+                membership.userId !== userId && !membership.memberDeletedAt,
+            )
+            .sort(
+              (left, right) =>
+                left.joinedAt.getTime() - right.joinedAt.getTime(),
+            )) {
+            if (!successorByGroup.has(membership.groupId)) {
+              successorByGroup.set(membership.groupId, membership.userId);
+            }
+          }
           if (groupsToArchive.length > 0) {
             await tx
               .update(groups)
@@ -185,29 +213,49 @@ export const profileRouter = router({
               })
               .where(inArray(groups.id, groupsToArchive));
           }
-          await tx
-            .update(groupMembers)
-            .set({ removedAt: deletedAt })
-            .where(
-              and(
-                eq(groupMembers.userId, userId),
-                inArray(groupMembers.groupId, activeGroupIds),
-                isNull(groupMembers.removedAt),
-              ),
-            );
+          for (const [groupId, successorId] of successorByGroup) {
+            await tx
+              .update(groups)
+              .set({
+                createdBy: successorId,
+                updatedAt: deletedAt,
+                version: sql`${groups.version} + 1`,
+              })
+              .where(
+                and(eq(groups.id, groupId), eq(groups.createdBy, userId)),
+              );
+          }
         }
 
         await tx.delete(invites).where(eq(invites.inviterId, userId));
         await tx
+          .delete(notificationOutbox)
+          .where(eq(notificationOutbox.recipientUserId, userId));
+        await tx
           .delete(pushInstallations)
           .where(eq(pushInstallations.userId, userId));
+        await tx.delete(currencyQuotes).where(eq(currencyQuotes.userId, userId));
+        await tx
+          .delete(ledgerValuations)
+          .where(eq(ledgerValuations.userId, userId));
         await tx.delete(sessions).where(eq(sessions.userId, userId));
         await tx.delete(accounts).where(eq(accounts.userId, userId));
+        await tx
+          .delete(verifications)
+          .where(
+            inArray(verifications.identifier, [
+              userId,
+              ctx.session.user.email,
+            ]),
+          );
         await tx
           .update(profiles)
           .set({
             displayName: "Deleted user",
             avatarUrl: null,
+            homeCurrency: "EUR",
+            notificationOnlyWhenInvolved: false,
+            summarizeNotificationBursts: false,
             onboardedAt: null,
             deletedAt,
             updatedAt: deletedAt,
@@ -222,7 +270,7 @@ export const profileRouter = router({
             updatedAt: deletedAt,
           })
           .where(eq(users.id, userId));
-        return { deleted: true };
+        return { deleted: true, manualAppleRevocationRequired };
       });
     }),
 });
