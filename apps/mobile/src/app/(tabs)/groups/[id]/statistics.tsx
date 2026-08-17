@@ -17,6 +17,7 @@ export default function GroupStatisticsScreen() {
   const [selection, setSelection] = useState<StatisticsRangeSelection>({
     range: "all",
   });
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const queryInput =
     selection.range === "custom" && selection.from && selection.to
       ? {
@@ -37,6 +38,14 @@ export default function GroupStatisticsScreen() {
           to: selection.to.toISOString(),
         }
       : {};
+  const refresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await statistics.refetch();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   if (statistics.isPending) {
     return (
@@ -59,8 +68,8 @@ export default function GroupStatisticsScreen() {
   return (
     <>
       <Screen
-        refreshing={statistics.isRefetching}
-        onRefresh={() => void statistics.refetch()}
+        refreshing={isRefreshing}
+        onRefresh={() => void refresh()}
       >
         <GroupStatistics
           data={statistics.data as GroupStatisticsData}

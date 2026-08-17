@@ -9,9 +9,17 @@ import { useTheme } from "../theme";
 export function DateField({
   value,
   onValueChange,
+  label = "Date",
+  minimumDate,
+  maximumDate,
+  testID = "expense-date",
 }: {
   value: Date;
   onValueChange: (value: Date) => void;
+  label?: string;
+  minimumDate?: Date;
+  maximumDate?: Date;
+  testID?: string;
 }) {
   const theme = useTheme();
 
@@ -26,7 +34,9 @@ export function DateField({
         gap: 12,
       }}
     >
-      <Text style={{ color: theme.text, fontSize: 17 }}>Date</Text>
+      <Text selectable={false} style={{ color: theme.text, fontSize: 17 }}>
+        {label}
+      </Text>
       <Host
         matchContents
         ignoreSafeArea="all"
@@ -34,13 +44,21 @@ export function DateField({
       >
         <DatePicker
           selection={value}
+          {...(minimumDate || maximumDate
+            ? {
+                range: {
+                  ...(minimumDate ? { start: minimumDate } : {}),
+                  ...(maximumDate ? { end: maximumDate } : {}),
+                },
+              }
+            : {})}
           displayedComponents={["date"]}
           onDateChange={onValueChange}
           modifiers={[
             datePickerStyle("compact"),
             tint(theme.primary),
           ]}
-          testID="expense-date"
+          testID={testID}
         />
       </Host>
     </View>

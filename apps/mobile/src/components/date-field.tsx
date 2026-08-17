@@ -6,9 +6,17 @@ import { useTheme } from "../theme";
 export function DateField({
   value,
   onValueChange,
+  label = "Date",
+  minimumDate,
+  maximumDate,
+  testID = "expense-date",
 }: {
   value: Date;
   onValueChange: (value: Date) => void;
+  label?: string;
+  minimumDate?: Date;
+  maximumDate?: Date;
+  testID?: string;
 }) {
   const theme = useTheme();
   const [open, setOpen] = useState(false);
@@ -16,7 +24,7 @@ export function DateField({
   return (
     <>
       <ListRow
-        title="Date"
+        title={label}
         value={value.toLocaleDateString(undefined, {
           dateStyle: "medium",
         })}
@@ -32,8 +40,10 @@ export function DateField({
           onDismiss={() => setOpen(false)}
           mode="date"
           presentation="dialog"
+          {...(minimumDate ? { minimumDate } : {})}
+          {...(maximumDate ? { maximumDate } : {})}
           accentColor={String(theme.primary)}
-          testID="expense-date"
+          testID={testID}
         />
       ) : null}
     </>

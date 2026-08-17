@@ -6,13 +6,13 @@ allowBuilds:
   esbuild: true
 
 minimumReleaseAgeExclude:
-  - '@expo/cli@57.0.10'
+  - '@expo/cli@57.0.10 || 57.0.16'
   - '@expo/config-plugins@57.0.6'
-  - '@expo/config@57.0.6'
-  - '@expo/fingerprint@0.20.6'
+  - '@expo/config@57.0.6 || 57.0.8'
+  - '@expo/fingerprint@0.20.6 || 0.20.8'
   - '@expo/image-utils@0.11.4'
   - '@expo/metro-config@57.0.7'
-  - '@expo/metro-runtime@57.0.7'
+  - '@expo/metro-runtime@57.0.7 || 57.0.11'
   - '@expo/prebuild-config@57.0.9'
   - '@expo/require-utils@57.0.4'
   - '@expo/router-server@57.0.4'
@@ -23,19 +23,27 @@ minimumReleaseAgeExclude:
   - '@turbo/windows-64@2.10.6'
   - '@turbo/windows-arm64@2.10.6'
   - babel-preset-expo@57.0.4
-  - expo-asset@57.0.7
-  - expo-constants@57.0.7
+  - expo-asset@57.0.7 || 57.0.12
+  - expo-constants@57.0.7 || 57.0.12
   - expo-linking@57.0.4
   - expo-modules-autolinking@57.0.9
   - expo-modules-core@57.0.7
   - expo-modules-jsi@57.0.4
-  - expo-router@57.0.8
+  - expo-router@57.0.8 || 57.0.14
   - expo-web-browser@57.0.2
-  - expo@57.0.8
+  - expo@57.0.8 || 57.0.14
   - turbo@2.10.6
   - esbuild@0.25.0
   - uuid@11.1.1
   - brace-expansion@5.0.8
+  - '@expo/inline-modules@0.1.6'
+  - '@expo/log-box@57.0.3'
+  - expo-dev-client@57.0.13
+  - expo-dev-launcher@57.0.13
+  - expo-dev-menu@57.0.13
+  - expo-image-manipulator@57.0.11
+  - expo-image-picker@57.0.11
+  - expo-notifications@57.0.12
 
 overrides:
   brace-expansion@<=5.0.7: ^5.0.8

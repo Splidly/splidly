@@ -1,6 +1,8 @@
 import type { CurrencyCode, ExpenseIconKey, Money } from "@splidly/shared";
-import DateTimePicker from "@expo/ui/community/datetime-picker";
-import { useMemo, useState } from "react";
+import { Host, Icon } from "@expo/ui";
+import { MenuView, type MenuAction } from "@expo/ui/community/menu";
+import SegmentedControl from "@expo/ui/community/segmented-control";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -15,10 +17,17 @@ import { formatConvertedMoney } from "../lib/money-display";
 import { normalizeGroupColor } from "../lib/group-colors";
 import { useTheme } from "../theme";
 import { Avatar } from "./ui";
+import { DateField } from "./date-field";
 import { ExpenseIcon, expenseIconLabel } from "./expense-icon";
 
 export type StatisticsRange = "all" | "12-months" | "30-days" | "custom";
 export type StatisticsTimelineBucket = "day" | "week" | "month" | "year";
+type MemberSort = "share" | "paid" | "name";
+
+const memberSortIcon = Icon.select({
+  ios: "arrow.up.arrow.down",
+  android: import("@expo/material-symbols/sort.xml"),
+});
 
 export type StatisticsRangeSelection = {
   range: StatisticsRange;
@@ -80,20 +89,15 @@ export type GroupStatisticsData = {
   }[];
 };
 
-const quickRanges: readonly {
-  value: Exclude<StatisticsRange, "custom">;
+const rangeOptions: readonly {
+  value: StatisticsRange;
   label: string;
 }[] = [
+  { value: "all", label: "All time" },
   { value: "30-days", label: "30 days" },
   { value: "12-months", label: "1 year" },
-  { value: "all", label: "All time" },
+  { value: "custom", label: "Custom" },
 ];
-
-const quickRangeDetails: Record<Exclude<StatisticsRange, "custom">, string> = {
-  "30-days": "Recent",
-  "12-months": "Trends",
-  all: "Everything",
-};
 
 function startOfDay(date: Date) {
   return new Date(
@@ -137,22 +141,6 @@ function shortDate(date: Date) {
   }).format(date);
 }
 
-function CalendarGlyph({ color }: { color: string }) {
-  return (
-    <View style={[styles.calendarGlyph, { borderColor: color }]}>
-      <View style={[styles.calendarGlyphBar, { backgroundColor: color }]} />
-      <View style={styles.calendarGlyphDots}>
-        {[0, 1, 2, 3].map((dot) => (
-          <View
-            key={dot}
-            style={[styles.calendarGlyphDot, { backgroundColor: color }]}
-          />
-        ))}
-      </View>
-    </View>
-  );
-}
-
 function RangeSelector({
   selection,
   onSelectionChange,
@@ -161,318 +149,95 @@ function RangeSelector({
   onSelectionChange: (selection: StatisticsRangeSelection) => void;
 }) {
   const theme = useTheme();
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [activeBoundary, setActiveBoundary] = useState<"from" | "to">();
-  const [draft, setDraft] = useState(() => defaultCustomRange());
-  const isIOS = process.env.EXPO_OS === "ios";
-
-  const openEditor = () => {
-    setDraft(
-      selection.range === "custom" && selection.from && selection.to
-        ? { from: selection.from, to: selection.to }
-        : defaultCustomRange(),
-    );
-    setActiveBoundary(undefined);
-    setEditorOpen(true);
-  };
-  const customLabel =
+  const customRange =
     selection.range === "custom" && selection.from && selection.to
-      ? `${shortDate(selection.from)} – ${shortDate(selection.to)}`
-      : "Custom";
+      ? { from: selection.from, to: selection.to }
+      : defaultCustomRange();
   const updateBoundary = (boundary: "from" | "to", date: Date) => {
-    setDraft((current) => {
-      if (boundary === "from") {
-        const from = startOfDay(date);
-        return {
-          from,
-          to: from > current.to ? endOfDay(date) : current.to,
-        };
-      }
-      const to = endOfDay(date);
-      return {
-        from: to < current.from ? startOfDay(date) : current.from,
-        to,
-      };
-    });
+    const next =
+      boundary === "from"
+        ? {
+            from: startOfDay(date),
+            to:
+              startOfDay(date) > customRange.to
+                ? endOfDay(date)
+                : customRange.to,
+          }
+        : {
+            from:
+              endOfDay(date) < customRange.from
+                ? startOfDay(date)
+                : customRange.from,
+            to: endOfDay(date),
+          };
+    onSelectionChange({ range: "custom", ...next });
   };
-  const selectedQuickRange = quickRanges.find(
+  const selectedIndex = rangeOptions.findIndex(
     (range) => range.value === selection.range,
   );
 
+  const selectRange = (index: number) => {
+    const option = rangeOptions[index];
+    if (!option) return;
+    if (option.value === "custom") {
+      const range = defaultCustomRange();
+      onSelectionChange({ range: "custom", ...range });
+      return;
+    }
+    onSelectionChange({ range: option.value });
+  };
+
   return (
-    <View
-      style={[
-        styles.rangeControl,
-        { backgroundColor: theme.surface, borderColor: theme.border },
-      ]}
-    >
-      <View style={styles.rangeHeading}>
-        <View style={styles.rangeHeadingCopy}>
-          <Text
-            selectable={false}
-            style={[styles.rangeEyebrow, { color: theme.muted }]}
-          >
-            TIME PERIOD
-          </Text>
-          <Text
-            selectable={false}
-            numberOfLines={1}
-            style={[styles.rangeCurrent, { color: theme.text }]}
-          >
-            {editorOpen
-              ? "Choose a date range"
-              : selectedQuickRange?.label ?? customLabel}
-          </Text>
-        </View>
+    <View testID="statistics-range-selector" style={styles.rangeControl}>
+      <SegmentedControl
+        testID="statistics-range-control"
+        values={rangeOptions.map((option) => option.label)}
+        selectedIndex={selectedIndex}
+        onChange={({ nativeEvent }) =>
+          selectRange(nativeEvent.selectedSegmentIndex)
+        }
+        style={styles.segmentedControl}
+      />
+
+      {selection.range === "custom" ? (
         <View
-          style={[styles.rangeStatusDot, { backgroundColor: theme.primary }]}
-        />
-      </View>
-
-      {!editorOpen ? (
-        <>
-          <View accessibilityRole="tablist" style={styles.quickRangeRow}>
-            {quickRanges.map((option) => {
-              const selected = selection.range === option.value;
-              return (
-                <Pressable
-                  key={option.value}
-                  testID={`statistics-range-${option.value}`}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected }}
-                  onPress={() => onSelectionChange({ range: option.value })}
-                  style={({ pressed }) => [
-                    styles.quickRange,
-                    {
-                      backgroundColor: selected
-                        ? theme.primary
-                        : theme.elevated,
-                      opacity: pressed ? 0.68 : 1,
-                    },
-                  ]}
-                >
-                  <Text
-                    selectable={false}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.72}
-                    style={[
-                      styles.quickRangeText,
-                      { color: selected ? theme.primaryText : theme.text },
-                    ]}
-                  >
-                    {option.label}
-                  </Text>
-                  <Text
-                    selectable={false}
-                    numberOfLines={1}
-                    style={[
-                      styles.quickRangeDetail,
-                      { color: selected ? theme.primaryText : theme.muted },
-                    ]}
-                  >
-                    {quickRangeDetails[option.value]}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <Pressable
-            testID="statistics-range-custom"
-            accessibilityRole="button"
-            accessibilityState={{ selected: selection.range === "custom" }}
-            accessibilityLabel={
-              selection.range === "custom"
-                ? `Custom range, ${customLabel}`
-                : "Choose custom date range"
-            }
-            onPress={openEditor}
-            style={({ pressed }) => [
-              styles.customRange,
-              {
-                backgroundColor: theme.elevated,
-                borderColor:
-                  selection.range === "custom" ? theme.primary : "transparent",
-                opacity: pressed ? 0.68 : 1,
-              },
-            ]}
-          >
-            <View
-              style={[
-                styles.calendarGlyphWrap,
-                {
-                  backgroundColor:
-                    selection.range === "custom" ? theme.primary : theme.surface,
-                },
-              ]}
-            >
-              <CalendarGlyph
-                color={String(
-                  selection.range === "custom"
-                    ? theme.primaryText
-                    : theme.primary,
-                )}
-              />
-            </View>
-            <View style={styles.customRangeCopy}>
-              <Text
-                selectable={false}
-                style={[styles.customRangeTitle, { color: theme.text }]}
+          testID="statistics-custom-range-editor"
+          style={[
+            styles.customRange,
+            { backgroundColor: theme.surface, borderColor: theme.border },
+          ]}
+        >
+          {(["from", "to"] as const).map((boundary) => {
+            const label = boundary === "from" ? "From" : "To";
+            return (
+              <View
+                key={boundary}
+                style={
+                  boundary === "from"
+                    ? {
+                        borderBottomWidth: StyleSheet.hairlineWidth,
+                        borderBottomColor: theme.border,
+                      }
+                    : undefined
+                }
               >
-                {selection.range === "custom" ? "Custom dates" : "Choose dates"}
-              </Text>
-              <Text
-                selectable={false}
-                numberOfLines={1}
-                style={[styles.customRangeValue, { color: theme.muted }]}
-              >
-                {selection.range === "custom"
-                  ? customLabel
-                  : "Pick an exact start and end"}
-              </Text>
-            </View>
-            <Text
-              selectable={false}
-              accessibilityElementsHidden
-              style={[styles.customRangeChevron, { color: theme.subtle }]}
-            >
-              ›
-            </Text>
-          </Pressable>
-        </>
-      ) : null}
-
-      {editorOpen ? (
-        <View testID="statistics-custom-range-editor" style={styles.rangeEditor}>
-          <View style={styles.dateBoundaryRow}>
-            {(["from", "to"] as const).map((boundary) => {
-              const selected = activeBoundary === boundary;
-              return (
-                <View key={boundary} style={styles.dateBoundaryLine}>
-                  <View style={styles.dateTimeline}>
-                    <View
-                      style={[
-                        styles.dateTimelineDot,
-                        { backgroundColor: theme.primary },
-                      ]}
-                    />
-                    {boundary === "from" ? (
-                      <View
-                        style={[
-                          styles.dateTimelineStem,
-                          { backgroundColor: theme.border },
-                        ]}
-                      />
-                    ) : null}
-                  </View>
-                  <Pressable
-                    testID={`statistics-custom-${boundary}`}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                    accessibilityLabel={`${boundary === "from" ? "Start" : "End"} date, ${shortDate(draft[boundary])}`}
-                    onPress={() => setActiveBoundary(boundary)}
-                    style={({ pressed }) => [
-                      styles.dateBoundary,
-                      {
-                        backgroundColor: theme.elevated,
-                        borderColor: selected ? theme.primary : "transparent",
-                        opacity: pressed ? 0.68 : 1,
-                      },
-                    ]}
-                  >
-                    <View style={styles.dateBoundaryCopy}>
-                      <Text
-                        selectable={false}
-                        style={[
-                          styles.dateBoundaryLabel,
-                          { color: theme.muted },
-                        ]}
-                      >
-                        {boundary === "from" ? "START DATE" : "END DATE"}
-                      </Text>
-                      <Text
-                        selectable={false}
-                        style={[styles.dateBoundaryValue, { color: theme.text }]}
-                      >
-                        {shortDate(draft[boundary])}
-                      </Text>
-                    </View>
-                    <Text
-                      selectable={false}
-                      accessibilityElementsHidden
-                      style={[styles.dateBoundaryChevron, { color: theme.subtle }]}
-                    >
-                      ›
-                    </Text>
-                  </Pressable>
-                </View>
-              );
-            })}
-          </View>
-
-          {activeBoundary ? (
-            <DateTimePicker
-              testID={
-                isIOS
-                  ? `statistics-custom-${activeBoundary}-picker`
-                  : "statistics-custom-date-picker"
-              }
-              value={draft[activeBoundary]}
-              mode="date"
-              display={isIOS ? "inline" : "default"}
-              presentation={isIOS ? "inline" : "dialog"}
-              maximumDate={new Date()}
-              accentColor={String(theme.primary)}
-              onValueChange={(_, date) => {
-                updateBoundary(activeBoundary, date);
-                if (!isIOS) setActiveBoundary(undefined);
-              }}
-              onDismiss={() => setActiveBoundary(undefined)}
-              style={isIOS ? styles.inlineDatePicker : undefined}
-            />
-          ) : null}
-
-          <View style={styles.rangeActions}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setEditorOpen(false)}
-              style={styles.rangeAction}
-            >
-              <Text
-                selectable={false}
-                style={[styles.rangeActionText, { color: theme.muted }]}
-              >
-                Cancel
-              </Text>
-            </Pressable>
-            <Pressable
-              testID="statistics-custom-apply"
-              accessibilityRole="button"
-              onPress={() => {
-                onSelectionChange({ range: "custom", ...draft });
-                setEditorOpen(false);
-              }}
-              style={({ pressed }) => [
-                styles.rangeAction,
-                styles.rangeApply,
-                {
-                  backgroundColor: theme.primary,
-                  opacity: pressed ? 0.72 : 1,
-                },
-              ]}
-            >
-              <Text
-                selectable={false}
-                style={[
-                  styles.rangeActionText,
-                  { color: theme.primaryText },
-                ]}
-              >
-                Apply dates
-              </Text>
-            </Pressable>
-          </View>
+                <DateField
+                  label={label}
+                  testID={`statistics-custom-${boundary}-picker`}
+                  value={customRange[boundary]}
+                  {...(boundary === "to"
+                    ? { minimumDate: customRange.from }
+                    : {})}
+                  maximumDate={
+                    boundary === "from"
+                      ? customRange.to
+                      : endOfDay(new Date())
+                  }
+                  onValueChange={(date) => updateBoundary(boundary, date)}
+                />
+              </View>
+            );
+          })}
         </View>
       ) : null}
     </View>
@@ -604,27 +369,35 @@ function timelineBucketLabel(bucket: StatisticsTimelineBucket) {
 function SectionCard({
   title,
   subtitle,
+  action,
   children,
 }: {
   title: string;
   subtitle?: string;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const theme = useTheme();
   return (
     <View style={styles.sectionBlock}>
       <View style={styles.sectionHeading}>
-        <Text selectable={false} style={[styles.sectionTitle, { color: theme.text }]}>
-          {title}
-        </Text>
-        {subtitle ? (
+        <View style={styles.sectionHeadingCopy}>
           <Text
             selectable={false}
-            style={[styles.sectionSubtitle, { color: theme.muted }]}
+            style={[styles.sectionTitle, { color: theme.text }]}
           >
-            {subtitle}
+            {title}
           </Text>
-        ) : null}
+          {subtitle ? (
+            <Text
+              selectable={false}
+              style={[styles.sectionSubtitle, { color: theme.muted }]}
+            >
+              {subtitle}
+            </Text>
+          ) : null}
+        </View>
+        {action}
       </View>
       <View style={[styles.card, { backgroundColor: theme.surface }]}>
         {children}
@@ -757,7 +530,18 @@ function TimelineChart({
 }) {
   const theme = useTheme();
   const { width } = useWindowDimensions();
+  const scrollViewRef = useRef<ScrollView>(null);
+  const scrolledTimelineKey = useRef<string | undefined>(undefined);
   const completedData = useMemo(() => completeTimeline(data), [data]);
+  const chartData = useMemo(() => {
+    let latestNonZeroIndex = -1;
+    completedData.forEach((point, index) => {
+      if (BigInt(point.amount.minor) > 0n) latestNonZeroIndex = index;
+    });
+    return latestNonZeroIndex >= 0
+      ? completedData.slice(0, latestNonZeroIndex + 1)
+      : completedData;
+  }, [completedData]);
   const rangeKey = `${new Date(data.rangeStart).getTime()}:${new Date(data.rangeEnd).getTime()}:${data.timelineBucket}`;
   const [selectionState, setSelectionState] = useState<{
     rangeKey: string;
@@ -765,23 +549,27 @@ function TimelineChart({
   }>();
   const selectedPeriod =
     selectionState?.rangeKey === rangeKey ? selectionState.period : undefined;
-  const maximum = completedData.reduce((current, point) => {
+  const maximum = chartData.reduce((current, point) => {
     const value = BigInt(point.amount.minor);
     return value > current ? value : current;
   }, 0n);
-  const peak = completedData.find(
-    (point) => BigInt(point.amount.minor) === maximum,
-  );
-  const selected = completedData.find(
+  const latest = chartData[chartData.length - 1];
+  const selected = chartData.find(
     (point) => point.period === selectedPeriod,
   );
-  const highlighted = selected ?? peak;
+  const highlighted = selected ?? latest;
   const columnWidth = Math.max(
     44,
-    Math.floor((width - 80) / Math.max(1, Math.min(completedData.length, 8))),
+    Math.floor((width - 80) / Math.max(1, Math.min(chartData.length, 8))),
   );
+  const timelineKey = `${rangeKey}:${latest?.period ?? "empty"}`;
+  const scrollToLatest = useCallback(() => {
+    if (scrolledTimelineKey.current === timelineKey) return;
+    scrollViewRef.current?.scrollToEnd({ animated: false });
+    scrolledTimelineKey.current = timelineKey;
+  }, [timelineKey]);
 
-  if (completedData.length === 0) {
+  if (chartData.length === 0) {
     return (
       <Text selectable={false} style={[styles.emptyCopy, { color: theme.muted }]}>
         Spending trends will appear after the first expense.
@@ -796,7 +584,7 @@ function TimelineChart({
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: accent }]} />
             <Text selectable={false} style={[styles.summaryLabel, { color: theme.muted }]}>
-              {selected ? "Selected total" : "Highest total"}
+              {selected ? "Selected total" : "Latest total"}
             </Text>
           </View>
           <Text selectable={false} style={[styles.summaryValue, { color: theme.text }]}>
@@ -812,18 +600,21 @@ function TimelineChart({
         Tap a bar to see its exact total
       </Text>
       <ScrollView
+        ref={scrollViewRef}
+        testID="statistics-timeline-scroll"
         horizontal
         nestedScrollEnabled
         directionalLockEnabled
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.chart}
+        onContentSizeChange={scrollToLatest}
       >
-        {completedData.map((point) => {
+        {chartData.map((point) => {
           const amount = BigInt(point.amount.minor);
           const height = proportionalWidth(amount, maximum);
-          const isPeak = amount === maximum;
+          const isLatest = point.period === latest?.period;
           const isSelected = point.period === selectedPeriod;
-          const isHighlighted = selectedPeriod ? isSelected : isPeak;
+          const isHighlighted = selectedPeriod ? isSelected : isLatest;
           return (
             <Pressable
               key={point.period}
@@ -1081,6 +872,7 @@ function MemberMetric({
         ]}
       >
         <View
+          testID={`member-${metric}-fill-${member.userId}`}
           style={[
             styles.progressFill,
             {
@@ -1118,10 +910,12 @@ function MemberMetric({
 function MemberBreakdown({
   members,
   accent,
+  sort,
   onOpenMember,
 }: {
   members: GroupStatisticsData["members"];
   accent: string;
+  sort: MemberSort;
   onOpenMember: (
     member: GroupStatisticsData["members"][number],
     metric: "paid" | "share",
@@ -1132,19 +926,27 @@ function MemberBreakdown({
   const sorted = useMemo(
     () =>
       [...members].sort((left, right) => {
-        const leftAmount = BigInt(left.share.minor);
-        const rightAmount = BigInt(right.share.minor);
+        if (sort === "name") {
+          return left.displayName.localeCompare(right.displayName, undefined, {
+            sensitivity: "base",
+          });
+        }
+        const leftAmount = BigInt(left[sort].minor);
+        const rightAmount = BigInt(right[sort].minor);
         if (leftAmount === rightAmount) {
           return left.displayName.localeCompare(right.displayName);
         }
         return leftAmount > rightAmount ? -1 : 1;
       }),
-    [members],
+    [members, sort],
   );
-  const maximumMinor = sorted.reduce((current, member) => {
-    const paid = BigInt(member.paid.minor);
+  const maximumShareMinor = sorted.reduce((current, member) => {
     const share = BigInt(member.share.minor);
-    return paid > current ? paid : share > current ? share : current;
+    return share > current ? share : current;
+  }, 0n);
+  const maximumPaidMinor = sorted.reduce((current, member) => {
+    const paid = BigInt(member.paid.minor);
+    return paid > current ? paid : current;
   }, 0n);
 
   return (
@@ -1200,14 +1002,14 @@ function MemberBreakdown({
                 <MemberMetric
                   member={member}
                   metric="share"
-                  maximumMinor={maximumMinor}
+                  maximumMinor={maximumShareMinor}
                   color={shareColor}
                   onOpen={() => onOpenMember(member, "share")}
                 />
                 <MemberMetric
                   member={member}
                   metric="paid"
-                  maximumMinor={maximumMinor}
+                  maximumMinor={maximumPaidMinor}
                   color={accent}
                   onOpen={() => onOpenMember(member, "paid")}
                 />
@@ -1217,6 +1019,70 @@ function MemberBreakdown({
         })}
       </View>
     </View>
+  );
+}
+
+const memberSortDescriptions: Record<MemberSort, string> = {
+  share: "Ranked by share · initial payments shown for context",
+  paid: "Ranked by paid amount · shares shown for context",
+  name: "Sorted by name · share and paid amounts shown",
+};
+
+function MemberSortButton({
+  value,
+  onValueChange,
+}: {
+  value: MemberSort;
+  onValueChange: (value: MemberSort) => void;
+}) {
+  const theme = useTheme();
+  const actions: MenuAction[] = [
+    { id: "share", title: "Share", state: value === "share" ? "on" : "off" },
+    { id: "paid", title: "Paid", state: value === "paid" ? "on" : "off" },
+    { id: "name", title: "Name", state: value === "name" ? "on" : "off" },
+  ];
+
+  return (
+    <MenuView
+      title="Sort members"
+      actions={actions}
+      testID="member-sort-menu"
+      onPressAction={({ nativeEvent }) => {
+        const next = nativeEvent.event;
+        if (next === "share" || next === "paid" || next === "name") {
+          onValueChange(next);
+        }
+      }}
+    >
+      <Pressable
+        testID="member-sort-button"
+        accessibilityRole="button"
+        accessibilityLabel={`Sort members, currently by ${value}`}
+        accessibilityHint="Opens sorting options"
+        hitSlop={8}
+        style={({ pressed }) => [
+          styles.sortButton,
+          {
+            backgroundColor: theme.surface,
+            borderColor: theme.border,
+            opacity: pressed ? 0.55 : 1,
+          },
+        ]}
+      >
+        <Host
+          matchContents
+          ignoreSafeArea="all"
+          style={styles.sortIcon}
+        >
+          <Icon
+            name={memberSortIcon}
+            size={17}
+            color={theme.primary}
+            accessibilityLabel="Sort"
+          />
+        </Host>
+      </Pressable>
+    </MenuView>
   );
 }
 
@@ -1239,6 +1105,7 @@ export function GroupStatistics({
   const theme = useTheme();
   const accent = normalizeGroupColor(data.group.color, data.group.id);
   const totalMinor = BigInt(data.totalSpent.minor);
+  const [memberSort, setMemberSort] = useState<MemberSort>("share");
 
   return (
     <View style={styles.content}>
@@ -1280,11 +1147,18 @@ export function GroupStatistics({
 
           <SectionCard
             title="Spending by member"
-            subtitle="Ranked by share · initial payments shown for context"
+            subtitle={memberSortDescriptions[memberSort]}
+            action={
+              <MemberSortButton
+                value={memberSort}
+                onValueChange={setMemberSort}
+              />
+            }
           >
             <MemberBreakdown
               members={data.members}
               accent={accent}
+              sort={memberSort}
               onOpenMember={onOpenMember}
             />
           </SectionCard>
@@ -1307,169 +1181,15 @@ export function GroupStatistics({
 const styles = StyleSheet.create({
   content: { gap: 20 },
   rangeControl: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 24,
-    borderCurve: "continuous",
-    padding: 16,
-    gap: 14,
-  },
-  rangeHeading: {
-    minHeight: 36,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  rangeHeadingCopy: { flex: 1, minWidth: 0, gap: 1 },
-  rangeEyebrow: {
-    fontSize: 10,
-    lineHeight: 13,
-    fontWeight: "700",
-    letterSpacing: 0.8,
-  },
-  rangeCurrent: {
-    fontSize: 20,
-    lineHeight: 25,
-    fontWeight: "700",
-    letterSpacing: -0.3,
-  },
-  rangeStatusDot: { width: 9, height: 9, borderRadius: 5, marginRight: 4 },
-  quickRangeRow: {
-    minHeight: 58,
-    flexDirection: "row",
     gap: 8,
   },
-  quickRange: {
-    minHeight: 58,
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 16,
-    borderCurve: "continuous",
-    paddingHorizontal: 6,
-    gap: 1,
-  },
-  quickRangeText: {
-    width: "100%",
-    textAlign: "center",
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: "700",
-  },
-  quickRangeDetail: {
-    width: "100%",
-    textAlign: "center",
-    fontSize: 10,
-    lineHeight: 13,
-    fontWeight: "500",
-  },
+  segmentedControl: { width: "100%" },
   customRange: {
-    minHeight: 58,
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 14,
     borderCurve: "continuous",
-    paddingHorizontal: 10,
-    gap: 11,
-  },
-  calendarGlyphWrap: {
-    width: 36,
-    height: 36,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 11,
-    borderCurve: "continuous",
-  },
-  calendarGlyph: {
-    width: 18,
-    height: 17,
-    borderWidth: 1.7,
-    borderRadius: 4,
-    paddingTop: 6,
     overflow: "hidden",
   },
-  calendarGlyphBar: {
-    position: "absolute",
-    top: 3,
-    left: 0,
-    right: 0,
-    height: 1.5,
-  },
-  calendarGlyphDots: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    paddingHorizontal: 3,
-    gap: 2.5,
-  },
-  calendarGlyphDot: { width: 3, height: 3, borderRadius: 1 },
-  customRangeCopy: { flex: 1, minWidth: 0, gap: 1 },
-  customRangeTitle: { fontSize: 14, lineHeight: 18, fontWeight: "700" },
-  customRangeValue: { fontSize: 11, lineHeight: 15 },
-  customRangeChevron: { fontSize: 25, lineHeight: 27, fontWeight: "300" },
-  rangeEditor: {
-    gap: 16,
-  },
-  dateBoundaryRow: { gap: 8 },
-  dateBoundaryLine: {
-    minHeight: 58,
-    flexDirection: "row",
-    alignItems: "stretch",
-  },
-  dateTimeline: { width: 22, alignItems: "center" },
-  dateTimelineDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginTop: 24,
-    zIndex: 1,
-  },
-  dateTimelineStem: {
-    position: "absolute",
-    top: 29,
-    bottom: -37,
-    width: 2,
-  },
-  dateBoundary: {
-    minHeight: 58,
-    flex: 1,
-    minWidth: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderWidth: 1.5,
-    borderRadius: 14,
-    borderCurve: "continuous",
-    paddingHorizontal: 14,
-    gap: 10,
-  },
-  dateBoundaryCopy: { flex: 1, minWidth: 0, gap: 1 },
-  dateBoundaryLabel: {
-    fontSize: 10,
-    lineHeight: 13,
-    fontWeight: "700",
-    letterSpacing: 0.7,
-  },
-  dateBoundaryValue: {
-    fontSize: 16,
-    lineHeight: 21,
-    fontWeight: "700",
-    fontVariant: ["tabular-nums"],
-  },
-  dateBoundaryChevron: { fontSize: 24, lineHeight: 26, fontWeight: "300" },
-  inlineDatePicker: { width: "100%", minHeight: 330 },
-  rangeActions: { flexDirection: "row", gap: 8 },
-  rangeAction: {
-    minHeight: 46,
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: 14,
-    borderCurve: "continuous",
-    paddingHorizontal: 12,
-  },
-  rangeApply: { flex: 1.55 },
-  rangeActionText: { fontSize: 14, lineHeight: 18, fontWeight: "700" },
   hero: {
     minHeight: 108,
     borderWidth: StyleSheet.hairlineWidth,
@@ -1530,7 +1250,15 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
   },
   sectionBlock: { gap: 9 },
-  sectionHeading: { paddingHorizontal: 4, gap: 2 },
+  sectionHeading: {
+    minHeight: 42,
+    paddingHorizontal: 4,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  sectionHeadingCopy: { flex: 1, minWidth: 0, gap: 2 },
   sectionTitle: {
     fontSize: 20,
     lineHeight: 25,
@@ -1538,6 +1266,15 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   sectionSubtitle: { fontSize: 13, lineHeight: 17 },
+  sortButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sortIcon: { width: 17, height: 17 },
   card: {
     borderRadius: 20,
     borderCurve: "continuous",
@@ -1567,9 +1304,11 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   chart: {
+    minWidth: "100%",
     height: 178,
     flexDirection: "row",
     alignItems: "stretch",
+    justifyContent: "flex-end",
     gap: 4,
     paddingHorizontal: 12,
     paddingTop: 16,

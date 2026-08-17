@@ -22,6 +22,27 @@ jest.mock("expo-router", () => ({
   Stack: { Screen: () => null },
 }));
 
+jest.mock("@expo/ui", () => {
+  const React = require("react") as typeof import("react");
+  const { View } = require("react-native") as typeof import("react-native");
+
+  function Host({
+    children,
+    ...props
+  }: {
+    children: React.ReactNode;
+    [key: string]: unknown;
+  }) {
+    return <View {...props}>{children}</View>;
+  }
+  const Icon = Object.assign(
+    (props: Record<string, unknown>) => <View {...props} />,
+    { select: (options: { ios: unknown }) => options.ios },
+  );
+
+  return { Host, Icon };
+});
+
 jest.mock("@expo/ui/community/datetime-picker", () => {
   const React = require("react") as typeof import("react");
   const { View } = require("react-native") as typeof import("react-native");
@@ -35,6 +56,34 @@ jest.mock("@expo/ui/community/datetime-picker", () => {
   }
 
   return { __esModule: true, default: DateTimePicker, DateTimePicker };
+});
+
+jest.mock("@expo/ui/community/segmented-control", () => {
+  const React = require("react") as typeof import("react");
+  const { View } = require("react-native") as typeof import("react-native");
+
+  function SegmentedControl(props: Record<string, unknown>) {
+    return <View {...props} />;
+  }
+
+  return { __esModule: true, default: SegmentedControl };
+});
+
+jest.mock("@expo/ui/community/menu", () => {
+  const React = require("react") as typeof import("react");
+  const { View } = require("react-native") as typeof import("react-native");
+
+  function MenuView({
+    children,
+    ...props
+  }: {
+    children: React.ReactNode;
+    [key: string]: unknown;
+  }) {
+    return <View {...props}>{children}</View>;
+  }
+
+  return { MenuView };
 });
 
 const mockUseQuery = jest.fn((_input: unknown, _options?: unknown) => ({
@@ -264,8 +313,16 @@ describe("group statistics", () => {
     expect(view.getByText("You paid")).toBeTruthy();
     expect(view.getAllByText("Your share").length).toBeGreaterThan(0);
     expect(view.getByText("Spending over time")).toBeTruthy();
-    expect(view.getByText("Highest total")).toBeTruthy();
-    expect(view.getByText("Jul 2026 · 130.00 €")).toBeTruthy();
+    const timelineScroll = view.getByTestId("statistics-timeline-scroll");
+    expect(timelineScroll.props.horizontal).toBe(true);
+    expect(
+      StyleSheet.flatten(timelineScroll.props.contentContainerStyle),
+    ).toMatchObject({ minWidth: "100%", justifyContent: "flex-end" });
+    expect(
+      timelineScroll.props.onContentSizeChange,
+    ).toEqual(expect.any(Function));
+    expect(view.getByText("Latest total")).toBeTruthy();
+    expect(view.getByText("Aug 2026 · 60.00 €")).toBeTruthy();
     expect(view.getByText("Monthly totals · adapts to your timeframe")).toBeTruthy();
     expect(view.getByText("Tap a bar to see its exact total")).toBeTruthy();
     await fireEvent.press(view.getByTestId("timeline-bar-2026-08"));
@@ -276,6 +333,19 @@ describe("group statistics", () => {
     expect(
       view.getByText("Ranked by share · initial payments shown for context"),
     ).toBeTruthy();
+    const memberSortMenu = view.getByTestId("member-sort-menu");
+    const memberSortButton = view.getByTestId("member-sort-button");
+    expect(StyleSheet.flatten(memberSortButton.props.style)).toMatchObject({
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+    });
+    expect(view.queryByText("Sort")).toBeNull();
+    expect(memberSortMenu.props.actions).toEqual([
+      { id: "share", title: "Share", state: "on" },
+      { id: "paid", title: "Paid", state: "off" },
+      { id: "name", title: "Name", state: "off" },
+    ]);
     expect(view.getByText("Uncategorized")).toBeTruthy();
     expect(
       StyleSheet.flatten(
@@ -292,9 +362,17 @@ describe("group statistics", () => {
         view.getByTestId("category-segment-transport").props.style,
       ).width,
     ).toBe("32%");
-    expect(
-      view.getByTestId("statistics-range-all").props.accessibilityState,
-    ).toEqual({ selected: true });
+    const rangeControl = view.getByTestId("statistics-range-control");
+    expect(rangeControl.props.values).toEqual([
+      "All time",
+      "30 days",
+      "1 year",
+      "Custom",
+    ]);
+    expect(rangeControl.props.selectedIndex).toBe(0);
+    expect(StyleSheet.flatten(rangeControl.props.style).width).toBe("100%");
+    expect(view.queryByText("TIME PERIOD")).toBeNull();
+    expect(view.queryByText("Everything")).toBeNull();
 
     expect(
       view
@@ -306,6 +384,26 @@ describe("group statistics", () => {
       "Show expenses where you had a share",
       "Show expenses where you paid",
     ]);
+
+    await fireEvent(memberSortMenu, "pressAction", {
+      nativeEvent: { event: "paid" },
+    });
+    expect(
+      view.getByText("Ranked by paid amount · shares shown for context"),
+    ).toBeTruthy();
+    expect(
+      view
+        .getAllByLabelText(/Show expenses where/)
+        .map((row) => row.props.accessibilityLabel),
+    ).toEqual([
+      "Show expenses where you had a share",
+      "Show expenses where you paid",
+      "Show expenses where Alex had a share",
+      "Show expenses where Alex paid",
+    ]);
+    await fireEvent(view.getByTestId("member-sort-menu"), "pressAction", {
+      nativeEvent: { event: "share" },
+    });
 
     expect(view.getByText("Paid 40.00 € less")).toBeTruthy();
     expect(view.getByText("Paid 40.00 € more")).toBeTruthy();
@@ -364,17 +462,19 @@ describe("group statistics", () => {
       },
     });
 
-    await fireEvent.press(view.getByText("30 days"));
+    await fireEvent(rangeControl, "change", {
+      nativeEvent: { selectedSegmentIndex: 2, value: "1 year" },
+    });
     expect(mockUseQuery).toHaveBeenLastCalledWith(
       {
         groupId: "group-1",
-        range: "30-days",
+        range: "12-months",
       },
       { placeholderData: expect.any(Function) },
     );
-    expect(
-      view.getByTestId("statistics-range-30-days").props.accessibilityState,
-    ).toEqual({ selected: true });
+    expect(view.getByTestId("statistics-range-control").props.selectedIndex).toBe(
+      2,
+    );
   });
 
   it("fills short-range charts with tappable daily totals", async () => {
@@ -385,7 +485,7 @@ describe("group statistics", () => {
         data: {
           ...result.data,
           rangeStart: new Date("2026-08-01T00:00:00.000Z"),
-          rangeEnd: new Date("2026-08-03T23:59:59.999Z"),
+          rangeEnd: new Date("2026-08-05T23:59:59.999Z"),
           timelineBucket: "day" as const,
           timeline: [
             {
@@ -409,11 +509,86 @@ describe("group statistics", () => {
     );
 
     expect(view.getByText("Daily totals · adapts to your timeframe")).toBeTruthy();
+    expect(view.getByText(/Aug 3, 2026 · 60.00 €/)).toBeTruthy();
+    expect(view.queryByTestId("timeline-bar-2026-08-04")).toBeNull();
+    expect(view.queryByTestId("timeline-bar-2026-08-05")).toBeNull();
     const emptyDay = view.getByTestId("timeline-bar-2026-08-02");
     expect(emptyDay.props.accessibilityLabel).toMatch(/total, 0.00 €/);
     await fireEvent.press(emptyDay);
     expect(view.getByText("Selected total")).toBeTruthy();
     expect(view.getByText(/Aug 2, 2026 · 0.00 €/)).toBeTruthy();
+  });
+
+  it("scales share and paid member bars against separate maxima", async () => {
+    mockUseQuery.mockImplementation((input, options) => {
+      const result = defaultUseQueryImplementation(input, options);
+      return {
+        ...result,
+        data: {
+          ...result.data,
+          members: [
+            {
+              ...result.data.members[0]!,
+              paid: { currency: "EUR" as const, minor: "5000" },
+              share: { currency: "EUR" as const, minor: "12000" },
+            },
+            {
+              ...result.data.members[1]!,
+              paid: { currency: "EUR" as const, minor: "6000" },
+              share: { currency: "EUR" as const, minor: "7000" },
+            },
+          ],
+        },
+      };
+    });
+
+    const view = await render(
+      <SafeAreaInsetsContext.Provider
+        value={{ top: 0, right: 0, bottom: 0, left: 0 }}
+      >
+        <GroupStatisticsScreen />
+      </SafeAreaInsetsContext.Provider>,
+    );
+
+    expect(
+      StyleSheet.flatten(
+        view.getByTestId("member-share-fill-viewer").props.style,
+      ).width,
+    ).toBe("100%");
+    expect(
+      StyleSheet.flatten(
+        view.getByTestId("member-share-fill-alex").props.style,
+      ).width,
+    ).toBe("58%");
+    expect(
+      StyleSheet.flatten(
+        view.getByTestId("member-paid-fill-alex").props.style,
+      ).width,
+    ).toBe("100%");
+    expect(
+      StyleSheet.flatten(
+        view.getByTestId("member-paid-fill-viewer").props.style,
+      ).width,
+    ).toBe("83%");
+  });
+
+  it("keeps automatic range reloads out of the pull-to-refresh control", async () => {
+    mockUseQuery.mockImplementation((input, options) => ({
+      ...defaultUseQueryImplementation(input, options),
+      isRefetching: true,
+    }));
+
+    const view = await render(
+      <SafeAreaInsetsContext.Provider
+        value={{ top: 0, right: 0, bottom: 0, left: 0 }}
+      >
+        <GroupStatisticsScreen />
+      </SafeAreaInsetsContext.Provider>,
+    );
+
+    let screen = view.getByTestId("statistics-range-selector").parent;
+    while (screen && !screen.props.refreshControl) screen = screen.parent;
+    expect(screen?.props.refreshControl.props.refreshing).toBe(false);
   });
 
   it("applies exact custom dates and keeps them in drill-down links", async () => {
@@ -425,31 +600,29 @@ describe("group statistics", () => {
       </SafeAreaInsetsContext.Provider>,
     );
 
-    await fireEvent.press(view.getByTestId("statistics-range-custom"));
+    await fireEvent(view.getByTestId("statistics-range-control"), "change", {
+      nativeEvent: { selectedSegmentIndex: 3, value: "Custom" },
+    });
     expect(view.getByTestId("statistics-custom-range-editor")).toBeTruthy();
-    expect(view.getByText("Choose a date range")).toBeTruthy();
-    expect(view.queryByLabelText("Close custom date range")).toBeNull();
-    expect(view.queryByTestId("statistics-range-all")).toBeNull();
+    expect(view.getByTestId("statistics-range-control").props.selectedIndex).toBe(
+      3,
+    );
     expect(view.queryByTestId("statistics-custom-date-picker")).toBeNull();
-    expect(view.queryByTestId("statistics-custom-from-picker")).toBeNull();
+    expect(view.getByTestId("statistics-custom-from-picker")).toBeTruthy();
+    expect(view.getByTestId("statistics-custom-to-picker")).toBeTruthy();
 
     const fromDate = new Date(2026, 5, 2, 12);
-    await fireEvent.press(view.getByTestId("statistics-custom-from"));
     await fireEvent(
       view.getByTestId("statistics-custom-from-picker"),
-      "valueChange",
-      { nativeEvent: { timestamp: fromDate.getTime(), utcOffset: 0 } },
-      fromDate,
+      "dateChange",
+      { nativeEvent: { date: fromDate } },
     );
     const toDate = new Date(2026, 6, 18, 12);
-    await fireEvent.press(view.getByTestId("statistics-custom-to"));
     await fireEvent(
       view.getByTestId("statistics-custom-to-picker"),
-      "valueChange",
-      { nativeEvent: { timestamp: toDate.getTime(), utcOffset: 0 } },
-      toDate,
+      "dateChange",
+      { nativeEvent: { date: toDate } },
     );
-    await fireEvent.press(view.getByTestId("statistics-custom-apply"));
 
     const expectedFrom = new Date(2026, 5, 2, 0, 0, 0, 0);
     const expectedTo = new Date(2026, 6, 18, 23, 59, 59, 999);
@@ -462,10 +635,11 @@ describe("group statistics", () => {
       },
       { placeholderData: expect.any(Function) },
     );
-    expect(
-      view.getByTestId("statistics-range-custom").props.accessibilityState,
-    ).toEqual({ selected: true });
-    expect(view.getByText("Custom dates")).toBeTruthy();
+    expect(view.getByTestId("statistics-range-control").props.selectedIndex).toBe(
+      3,
+    );
+    expect(view.getByText("From")).toBeTruthy();
+    expect(view.getByText("To")).toBeTruthy();
 
     await fireEvent.press(view.getByLabelText("Show Uncategorized expenses"));
     expect(mockPush).toHaveBeenCalledWith({
@@ -611,7 +785,7 @@ describe("group statistics", () => {
         data: {
           ...result.data,
           viewerShare:
-            range === "30-days"
+            range === "12-months"
               ? { currency: "EUR" as const, minor: "2500" }
               : result.data.viewerShare,
         },
@@ -631,7 +805,9 @@ describe("group statistics", () => {
         .length,
     ).toBeGreaterThan(0);
 
-    await fireEvent.press(view.getByText("30 days"));
+    await fireEvent(view.getByTestId("statistics-range-control"), "change", {
+      nativeEvent: { selectedSegmentIndex: 2, value: "1 year" },
+    });
 
     const updatedHero = view.getByTestId("statistics-hero");
     expect(within(updatedHero).getAllByText("Your share").length).toBeGreaterThan(
