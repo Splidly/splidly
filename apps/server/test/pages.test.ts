@@ -39,7 +39,7 @@ describe("landing page", () => {
     expect(html).toContain('src="/google-play-badge.png"');
     expect(html).not.toContain("play-mark");
     expect(html).toContain("https://splidly.site/og.png");
-    expect(html).toContain("https://github.com/LosFarmosCTL/splidly");
+    expect(html).toContain("https://github.com/Splidly/splidly");
     expect(html).toContain("Florian2807");
     expect(html).toContain("LosFarmosCTL");
     expect(html.indexOf('id="open-source"')).toBeLessThan(

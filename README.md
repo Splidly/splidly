@@ -25,8 +25,8 @@ Splidly is developed by
 [Florian2807](https://github.com/Florian2807) and
 [LosFarmosCTL](https://github.com/LosFarmosCTL).
 
-[Explore the source](https://github.com/LosFarmosCTL/splidly) ·
-[Report an issue](https://github.com/LosFarmosCTL/splidly/issues)
+[Explore the source](https://github.com/Splidly/splidly) ·
+[Report an issue](https://github.com/Splidly/splidly/issues)
 
 ---
 

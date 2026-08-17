@@ -272,7 +272,7 @@ export function landingPage(env: Env): string {
         <div class="open-source-card">
           <div class="open-source-copy"><small>Open source</small><h2>Built in the open.</h2><p>Splidly is an open-source project. Explore the code, follow development, and help shape what comes next on GitHub.</p></div>
           <div class="collaborators"><span>Collaborators</span><div class="collaborator-list"><a class="collaborator" href="https://github.com/Florian2807" target="_blank" rel="noreferrer"><span class="collaborator-initial">F</span>Florian2807</a><a class="collaborator" href="https://github.com/LosFarmosCTL" target="_blank" rel="noreferrer"><span class="collaborator-initial">L</span>LosFarmosCTL</a></div></div>
-          <a class="repo-button" href="https://github.com/LosFarmosCTL/splidly" target="_blank" rel="noreferrer">View repository&nbsp; ↗</a>
+          <a class="repo-button" href="https://github.com/Splidly/splidly" target="_blank" rel="noreferrer">View repository&nbsp; ↗</a>
         </div>
       </section>
       <section class="shell steps" id="how-it-works">
@@ -294,7 +294,7 @@ export function landingPage(env: Env): string {
       </section>
       <section class="shell cta"><div class="cta-inner"><h2>Ready to make it easy?</h2><p>Start your first group in a minute.</p>${stores}</div></section>
     </main>
-    <footer><div class="shell footer-inner"><span>© 2026 Splidly</span><div class="footer-links"><a href="https://github.com/LosFarmosCTL/splidly" target="_blank" rel="noreferrer">GitHub</a><a href="/privacy">Privacy</a><a href="/account/delete">Delete account</a><a href="mailto:info@splidly.site">Contact</a></div></div></footer>
+    <footer><div class="shell footer-inner"><span>© 2026 Splidly</span><div class="footer-links"><a href="https://github.com/Splidly/splidly" target="_blank" rel="noreferrer">GitHub</a><a href="/privacy">Privacy</a><a href="/account/delete">Delete account</a><a href="mailto:info@splidly.site">Contact</a></div></div></footer>
   </body>
 </html>`;
 }
