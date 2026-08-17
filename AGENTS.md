@@ -2,8 +2,10 @@
 
 ## Never allow text selection
 
-Text displayed by the app must never be selectable. This is a project-wide UI
-requirement for every platform and every screen.
+This requirement applies only to the React Native app in `apps/mobile`. Text
+displayed by the mobile app must never be selectable on any mobile platform or
+screen. It does not apply to websites or server-rendered pages, where normal
+browser text selection must remain available.
 
 - Keep `selectable={false}` on React Native `Text` components and shared text
   primitives. Never set `selectable` to `true`.

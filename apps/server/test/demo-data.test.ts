@@ -13,7 +13,7 @@ describe("demo workspace fixture", () => {
       "Bea Chen",
       "Chris Taylor",
     ]);
-    expect(fixture.expenses).toHaveLength(3);
+    expect(fixture.expenses).toHaveLength(15);
 
     for (const expense of fixture.expenses) {
       expect(
@@ -38,7 +38,37 @@ describe("demo workspace fixture", () => {
     expect(totals.get("demo-member-alex")).toBe(11_000n);
     expect(totals.get("demo-member-sam")).toBe(-3_000n);
     expect(totals.get("demo-member-bea")).toBe(-7_000n);
-    expect(totals.has("demo-member-chris")).toBe(false);
+    expect(totals.get("demo-member-chris")).toBe(0n);
+
+    expect(
+      fixture.expenses.filter((expense) => expense.daysAgo <= 30),
+    ).toHaveLength(8);
+    expect(Math.max(...fixture.expenses.map((expense) => expense.daysAgo))).toBe(
+      330,
+    );
+    expect(new Set(fixture.expenses.map((expense) => expense.iconKey)).size).toBe(
+      8,
+    );
+    expect(new Set(fixture.expenses.map((expense) => expense.id)).size).toBe(
+      fixture.expenses.length,
+    );
+    const transferIds = fixture.expenses.flatMap((expense) =>
+      expense.transfers.map((transfer) => transfer.id),
+    );
+    expect(new Set(transferIds).size).toBe(transferIds.length);
+    for (const memberId of [
+      demoUserId,
+      ...fixture.members.map((member) => member.id),
+    ]) {
+      expect(
+        fixture.expenses.some((expense) => expense.payerId === memberId),
+      ).toBe(true);
+      expect(
+        fixture.expenses.some((expense) =>
+          expense.shares.some((share) => share.userId === memberId),
+        ),
+      ).toBe(true);
+    }
 
     const demoTransfers = fixture.expenses.flatMap((expense) =>
       expense.transfers.filter(

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { eq, sql } from "@splidly/db";
 import { Hono } from "hono";
@@ -11,6 +12,7 @@ import {
   deletionPage,
   deletionResultPage,
   invitePage,
+  landingPage,
   privacyPage,
 } from "./pages";
 import { appRouter } from "./router";
@@ -87,6 +89,61 @@ export function createApp(input: {
   app.get("/health/ready", async (c) => {
     await input.db.execute(sql`select 1`);
     return c.json({ status: "ready" });
+  });
+
+  app.get("/", (c) => c.html(landingPage(input.env)));
+  app.get("/og.png", async (c) => {
+    const image = await readFile(new URL("../assets/og.png", import.meta.url));
+    return new Response(image, {
+      headers: {
+        "cache-control": "public, max-age=86400",
+        "content-type": "image/png",
+      },
+    });
+  });
+  app.get("/app-group-overview.png", async () => {
+    const image = await readFile(
+      new URL("../assets/app-group-overview.png", import.meta.url),
+    );
+    return new Response(image, {
+      headers: {
+        "cache-control": "public, max-age=86400",
+        "content-type": "image/png",
+      },
+    });
+  });
+  app.get("/app-statistics.png", async () => {
+    const image = await readFile(
+      new URL("../assets/app-statistics.png", import.meta.url),
+    );
+    return new Response(image, {
+      headers: {
+        "cache-control": "public, max-age=86400",
+        "content-type": "image/png",
+      },
+    });
+  });
+  app.get("/app-store-badge.svg", async () => {
+    const image = await readFile(
+      new URL("../assets/app-store-badge.svg", import.meta.url),
+    );
+    return new Response(image, {
+      headers: {
+        "cache-control": "public, max-age=86400",
+        "content-type": "image/svg+xml",
+      },
+    });
+  });
+  app.get("/google-play-badge.png", async () => {
+    const image = await readFile(
+      new URL("../assets/google-play-badge.png", import.meta.url),
+    );
+    return new Response(image, {
+      headers: {
+        "cache-control": "public, max-age=86400",
+        "content-type": "image/png",
+      },
+    });
   });
 
   app.get("/.well-known/apple-app-site-association", (c) =>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Env } from "../src/env";
-import { invitePage, privacyPage } from "../src/pages";
+import { invitePage, landingPage, privacyPage } from "../src/pages";
 
 const env = {
   APP_SCHEME: "splidly",
@@ -19,6 +19,39 @@ describe("invite page", () => {
   it("escapes untrusted token content", () => {
     const html = invitePage(`"><script>alert(1)</script>`, env);
     expect(html).not.toContain("<script>alert(1)</script>");
+  });
+});
+
+describe("landing page", () => {
+  it("presents the product and links to both app stores", () => {
+    const html = landingPage(env);
+    expect(html).toContain("Split the cost.");
+    expect(html).toContain("How it works");
+    expect(html).toContain("Open source");
+    expect(html).not.toContain("No awkward spreadsheets");
+    expect(html).toContain("Lisbon Weekend");
+    expect(html).toContain('src="/app-group-overview.png"');
+    expect(html).toContain('src="/app-statistics.png"');
+    expect(html).not.toContain("Dinner at Prado");
+    expect(html).toContain(env.IOS_STORE_URL);
+    expect(html).toContain(env.ANDROID_STORE_URL);
+    expect(html).toContain('src="/app-store-badge.svg"');
+    expect(html).toContain('src="/google-play-badge.png"');
+    expect(html).not.toContain("play-mark");
+    expect(html).toContain("https://splidly.site/og.png");
+    expect(html).toContain("https://github.com/LosFarmosCTL/splidly");
+    expect(html).toContain("Florian2807");
+    expect(html).toContain("LosFarmosCTL");
+    expect(html.indexOf('id="open-source"')).toBeLessThan(
+      html.indexOf('id="how-it-works"'),
+    );
+    expect(html.indexOf('href="#open-source"')).toBeLessThan(
+      html.indexOf('href="#how-it-works"'),
+    );
+  });
+
+  it("keeps normal browser text selection enabled", () => {
+    expect(landingPage(env)).not.toContain("user-select: none");
   });
 });
 
