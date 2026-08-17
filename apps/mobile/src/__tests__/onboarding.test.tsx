@@ -118,7 +118,7 @@ describe("OnboardingScreen", () => {
   });
 
   it("prefills a display name supplied by the identity provider", async () => {
-    mockProfileData.displayName = "Lasse Petzel";
+    mockProfileData.displayName = "Jordan Lee";
     const view = await render(
       <SafeAreaInsetsContext.Provider
         value={{ top: 0, right: 0, bottom: 0, left: 0 }}
@@ -128,7 +128,7 @@ describe("OnboardingScreen", () => {
     );
 
     expect(view.getByLabelText("Display name").props.value).toBe(
-      "Lasse Petzel",
+      "Jordan Lee",
     );
     expect(view.getByLabelText("Display name").props.autoFocus).toBeUndefined();
   });

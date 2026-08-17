@@ -147,7 +147,9 @@ curl https://your-domain.example/health/ready
 The API binds to `127.0.0.1:${API_BIND_PORT:-4000}` for a host reverse proxy.
 An Nginx example is available at `ops/nginx-splidly.conf`. PostgreSQL and the
 private Frankfurter service remain on the internal Docker network, and
-migrations must complete before the server starts.
+migrations must complete before the server starts. The migration job also
+encrypts existing OAuth tokens; new tokens are encrypted when written. Keep
+`BETTER_AUTH_SECRET` available to both the migration and server containers.
 
 Install production keys outside the repository:
 
@@ -181,11 +183,15 @@ sudo chmod 400 /etc/splidly/secrets/apple-sign-in.p8 \
 Install [`age`](https://age-encryption.org/), set `BACKUP_AGE_RECIPIENT`, and
 schedule the backup script. Seven days are retained locally; copy encrypted
 backups to independent off-host storage and test restoration periodically.
+The script refuses to write an unencrypted backup.
 
 ```sh
 BACKUP_AGE_RECIPIENT=age1... ./ops/backup.sh
 ./ops/restore.sh backups/splidly-TIMESTAMP.sql.gz.age
 ```
+
+Review [Security operations](SECURITY_OPERATIONS.md) before exposing a
+production instance.
 
 ## Verification and store delivery
 

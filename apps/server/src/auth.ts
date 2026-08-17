@@ -15,6 +15,7 @@ import {
 import { ensureDemoData } from "./demo-data";
 import type { Env } from "./env";
 import type { Logger } from "./logger";
+import { decryptOAuthToken } from "./oauth-token-crypto";
 
 const demoEmail = "demo@local.splidly.invalid";
 
@@ -29,6 +30,7 @@ export interface Auth {
     token: string;
     tokenType: AppleTokenType;
   }): Promise<void>;
+  decryptOAuthToken(token: string): Promise<string>;
 }
 
 export async function createAuth(
@@ -78,10 +80,9 @@ export async function createAuth(
       schema: authSchema,
     }),
     session: {
-      cookieCache: {
-        enabled: true,
-        maxAge: 60,
-      },
+      expiresIn: 7 * 24 * 60 * 60,
+      updateAge: 24 * 60 * 60,
+      freshAge: 15 * 60,
     },
     emailAndPassword: { enabled: env.NODE_ENV === "development" },
     socialProviders,
@@ -93,18 +94,34 @@ export async function createAuth(
       ...(env.NODE_ENV === "development" ? ["exp://", "exp://**"] : []),
     ],
     account: {
+      encryptOAuthTokens: true,
       accountLinking: {
         enabled: true,
-        trustedProviders: ["google", "apple"],
+      },
+    },
+    verification: { storeIdentifier: "hashed" },
+    rateLimit: {
+      enabled: env.NODE_ENV === "production",
+      window: 60,
+      max: 100,
+      customRules: {
+        "/sign-in/*": { window: 60, max: 10 },
+        "/sign-up/*": { window: 60, max: 5 },
+      },
+    },
+    advanced: {
+      useSecureCookies: env.NODE_ENV === "production",
+      ipAddress: {
+        ipAddressHeaders: ["x-real-ip"],
+        ipv6Subnet: 64,
       },
     },
     logger: {
       disableColors: true,
       level: env.LOG_LEVEL === "fatal" ? "error" : env.LOG_LEVEL,
-      log(level, message, ...args) {
+      log(level, message) {
         logger[level]("auth.internal", {
           authMessage: message,
-          ...(args.length > 0 ? { details: args } : {}),
         });
       },
     },
@@ -155,6 +172,9 @@ export async function createAuth(
   const auth = betterAuth(options);
   return {
     ...auth,
+    async decryptOAuthToken(token) {
+      return decryptOAuthToken(token, env.BETTER_AUTH_SECRET);
+    },
     async revokeAppleToken(input) {
       if (
         !env.APPLE_SIGN_IN_CLIENT_ID ||

@@ -18,6 +18,12 @@ const apnsCredentialKeys = [
   "APNS_PRIVATE_KEY_PATH",
 ] as const;
 
+const googleCredentialKeys = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"] as const;
+
+function looksLikePlaceholder(value: string) {
+  return /replace|changeme|example|placeholder/i.test(value);
+}
+
 const envSchema = z
   .object({
     NODE_ENV: z
@@ -30,7 +36,10 @@ const envSchema = z
     BETTER_AUTH_SECRET: z.string().min(32),
     API_PUBLIC_URL: z.string().url(),
     APP_PUBLIC_URL: z.string().url(),
-    APP_SCHEME: z.string().default("splidly"),
+    APP_SCHEME: z
+      .string()
+      .regex(/^[a-z][a-z0-9+.-]*$/, "Use a valid lowercase URL scheme")
+      .default("splidly"),
     APPLE_SIGN_IN_CLIENT_ID: optionalCredential,
     APPLE_SIGN_IN_KEY_ID: optionalCredential,
     APPLE_SIGN_IN_PRIVATE_KEY_PATH: optionalCredential,
@@ -79,6 +88,57 @@ const envSchema = z
         ctx.addIssue({
           code: "custom",
           message: `${key} is required when APNs delivery is configured`,
+          path: [key],
+        });
+      }
+    }
+    const googleConfiguredCount = googleCredentialKeys.filter(
+      (key) => env[key],
+    ).length;
+    if (
+      googleConfiguredCount !== 0 &&
+      googleConfiguredCount !== googleCredentialKeys.length
+    ) {
+      for (const key of googleCredentialKeys) {
+        if (env[key]) continue;
+        ctx.addIssue({
+          code: "custom",
+          message: `${key} is required when Google Sign-In is configured`,
+          path: [key],
+        });
+      }
+    }
+    if (env.NODE_ENV !== "production") return;
+    for (const key of ["API_PUBLIC_URL", "APP_PUBLIC_URL"] as const) {
+      if (new URL(env[key]).protocol !== "https:") {
+        ctx.addIssue({
+          code: "custom",
+          message: `${key} must use HTTPS in production`,
+          path: [key],
+        });
+      }
+    }
+    if (
+      env.BETTER_AUTH_SECRET.length < 48 ||
+      looksLikePlaceholder(env.BETTER_AUTH_SECRET) ||
+      new Set(env.BETTER_AUTH_SECRET).size < 12
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "BETTER_AUTH_SECRET must be a high-entropy production secret of at least 48 characters",
+        path: ["BETTER_AUTH_SECRET"],
+      });
+    }
+    for (const key of [
+      "APPLE_SIGN_IN_PRIVATE_KEY_PATH",
+      "APNS_PRIVATE_KEY_PATH",
+    ] as const) {
+      const value = env[key];
+      if (value && !value.startsWith("/")) {
+        ctx.addIssue({
+          code: "custom",
+          message: `${key} must be an absolute path in production`,
           path: [key],
         });
       }

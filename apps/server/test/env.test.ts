@@ -51,4 +51,35 @@ describe("server environment", () => {
       }),
     ).toThrow(/APNS_KEY_ID/);
   });
+
+  it("rejects a partially configured Google credential set", () => {
+    expect(() =>
+      readEnv({
+        ...baseEnv,
+        GOOGLE_CLIENT_ID: "client-id",
+      }),
+    ).toThrow(/GOOGLE_CLIENT_SECRET/);
+  });
+
+  it("rejects insecure URLs and placeholder secrets in production", () => {
+    expect(() =>
+      readEnv({
+        ...baseEnv,
+        NODE_ENV: "production",
+        API_PUBLIC_URL: "http://api.example.com",
+        BETTER_AUTH_SECRET: "replace-with-at-least-48-random-characters-value",
+      }),
+    ).toThrow(/must use HTTPS|high-entropy production secret/);
+  });
+
+  it("accepts a high-entropy HTTPS production configuration", () => {
+    expect(
+      readEnv({
+        ...baseEnv,
+        NODE_ENV: "production",
+        BETTER_AUTH_SECRET:
+          "2YQv9#jF7x!Lp4@cR8$wN6^mK3&zT5*eH1+uB0=sDgVaXqPi",
+      }),
+    ).toMatchObject({ NODE_ENV: "production" });
+  });
 });

@@ -10,6 +10,7 @@
     "build": "tsdown",
     "dev": "LOG_FORMAT=${LOG_FORMAT:-pretty} node --env-file-if-exists=../../.env --import tsx --watch src/index.ts",
     "start": "node dist/index.js",
+    "security:encrypt-oauth-tokens": "tsx --env-file-if-exists=../../.env src/encrypt-oauth-tokens.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

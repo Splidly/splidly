@@ -3,7 +3,9 @@ import { readFile } from "node:fs/promises";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { eq, sql } from "@splidly/db";
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
+import { NONCE, secureHeaders } from "hono/secure-headers";
 import type { Auth } from "./auth";
 import type { Database } from "@splidly/db";
 import type { Env } from "./env";
@@ -75,6 +77,55 @@ export function createApp(input: {
     const logger = c.get("logger") ?? input.logger.child({ requestId });
     logger.error("http.request.unhandled", { error });
     return c.json({ error: "Internal server error", requestId }, 500);
+  });
+  app.use(
+    "*",
+    secureHeaders({
+      contentSecurityPolicy: {
+        defaultSrc: ["'self'"],
+        baseUri: ["'none'"],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"],
+        imgSrc: ["'self'", "data:"],
+        objectSrc: ["'none'"],
+        scriptSrc: ["'self'", NONCE],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        ...(input.env.NODE_ENV === "production"
+          ? { upgradeInsecureRequests: [] }
+          : {}),
+      },
+      crossOriginResourcePolicy: "same-site",
+      permissionsPolicy: {
+        camera: [],
+        geolocation: [],
+        microphone: [],
+        payment: [],
+        usb: [],
+      },
+      referrerPolicy: "no-referrer",
+      strictTransportSecurity:
+        input.env.NODE_ENV === "production"
+          ? "max-age=31536000; includeSubDomains"
+          : false,
+      xFrameOptions: "DENY",
+    }),
+  );
+  const privateRequestLimit = bodyLimit({
+    maxSize: 1_000_000,
+    onError: (c) => c.json({ error: "Request body is too large" }, 413),
+  });
+  app.use("/api/auth/*", privateRequestLimit);
+  app.use("/trpc/*", privateRequestLimit);
+  app.use("/account/delete", privateRequestLimit);
+  app.use("/api/auth/*", async (c, next) => {
+    await next();
+    c.header("cache-control", "no-store");
+  });
+  app.use("/trpc/*", async (c, next) => {
+    await next();
+    c.header("cache-control", "no-store");
   });
   app.use(
     "/trpc/*",
@@ -222,7 +273,9 @@ export function createApp(input: {
     const session = await input.auth.api.getSession({
       headers: c.req.raw.headers,
     });
-    return c.html(deletionPage(Boolean(session?.user)));
+    return c.html(
+      deletionPage(Boolean(session?.user), c.get("secureHeadersNonce")),
+    );
   });
   app.post("/account/delete", async (c) => {
     c.header("cache-control", "no-store");

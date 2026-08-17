@@ -6,6 +6,13 @@ services:
       context: .
       dockerfile: apps/server/Dockerfile
     restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
     ports:
       - "127.0.0.1:${API_BIND_PORT:-4000}:4000"
     environment:
@@ -52,17 +59,28 @@ services:
       context: .
       dockerfile: apps/server/Dockerfile
     command:
-      ["./packages/db/node_modules/.bin/tsx", "packages/db/src/migrate.ts"]
+      - sh
+      - -c
+      - >-
+        ./packages/db/node_modules/.bin/tsx packages/db/src/migrate.ts &&
+        ./apps/server/node_modules/.bin/tsx apps/server/src/encrypt-oauth-tokens.ts
     restart: "no"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-splidly}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-splidly}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET}
     depends_on:
       postgres:
         condition: service_healthy
     networks: [backend]
 
   postgres:
-    image: postgres:17.6-alpine
+    image: postgres:17.10-alpine3.24
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-splidly}
@@ -82,7 +100,7 @@ services:
     networks: [backend]
 
   frankfurter:
-    image: lineofflight/frankfurter:latest
+    image: lineofflight/frankfurter:2.3.5
     restart: unless-stopped
     environment:
       DATABASE_URL: sqlite:///data/db.sqlite3
@@ -94,7 +112,7 @@ services:
     networks: [backend, egress]
 
   frankfurter-data-init:
-    image: lineofflight/frankfurter:latest
+    image: lineofflight/frankfurter:2.3.5
     user: root
     command: ["sh", "-c", "chown -R frankfurter:frankfurter /data"]
     restart: "no"

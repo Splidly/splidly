@@ -11,7 +11,7 @@ describe("groupBalanceLines", () => {
         [
           {
             userId: "alex",
-            displayName: "Lasse Petzel",
+            displayName: "Jordan Lee",
             balance: { currency: "EUR", minor: "-1250" },
           },
           {
@@ -26,9 +26,9 @@ describe("groupBalanceLines", () => {
     ).toEqual([
       {
         key: "negative-alex",
-        label: "You owe Lasse Petzel",
-        compactLabel: "You owe L.P.",
-        text: "You owe Lasse Petzel 12.50 €",
+        label: "You owe Jordan Lee",
+        compactLabel: "You owe J.L.",
+        text: "You owe Jordan Lee 12.50 €",
         amount: "12.50 €",
         tone: "negative",
       },

@@ -1,5 +1,6 @@
 #!/bin/sh
 set -eu
+umask 077
 
 if [ "$#" -ne 1 ]; then
   echo "Usage: $0 <backup.sql.gz|backup.sql.gz.age>" >&2
@@ -16,6 +17,10 @@ case "$backup_file" in
       psql -v ON_ERROR_STOP=1 -U "$database_user" "$database_name"
     ;;
   *.gz)
+    if [ "${ALLOW_PLAINTEXT_RESTORE:-}" != "1" ]; then
+      echo "Refusing a plaintext backup; set ALLOW_PLAINTEXT_RESTORE=1 only for a trusted legacy file" >&2
+      exit 1
+    fi
     gunzip -c "$backup_file" | docker compose exec -T postgres \
       psql -v ON_ERROR_STOP=1 -U "$database_user" "$database_name"
     ;;
@@ -24,4 +29,3 @@ case "$backup_file" in
     exit 1
     ;;
 esac
-

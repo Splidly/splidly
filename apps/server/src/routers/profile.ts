@@ -122,12 +122,13 @@ export const profileRouter = router({
       let manualAppleRevocationRequired = false;
       for (const account of providerAccounts) {
         if (account.providerId !== "apple") continue;
-        const token = account.refreshToken ?? account.accessToken;
-        if (!token) {
+        const storedToken = account.refreshToken ?? account.accessToken;
+        if (!storedToken) {
           manualAppleRevocationRequired = true;
           continue;
         }
         try {
+          const token = await ctx.auth.decryptOAuthToken(storedToken);
           await ctx.auth.revokeAppleToken({
             token,
             tokenType: account.refreshToken

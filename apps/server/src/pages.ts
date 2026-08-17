@@ -294,7 +294,7 @@ export function landingPage(env: Env): string {
       </section>
       <section class="shell cta"><div class="cta-inner"><h2>Ready to make it easy?</h2><p>Start your first group in a minute.</p>${stores}</div></section>
     </main>
-    <footer><div class="shell footer-inner"><span>© 2026 Splidly</span><div class="footer-links"><a href="https://github.com/LosFarmosCTL/splidly" target="_blank" rel="noreferrer">GitHub</a><a href="/privacy">Privacy</a><a href="/account/delete">Delete account</a><a href="mailto:hello@splidly.site">Contact</a></div></div></footer>
+    <footer><div class="shell footer-inner"><span>© 2026 Splidly</span><div class="footer-links"><a href="https://github.com/LosFarmosCTL/splidly" target="_blank" rel="noreferrer">GitHub</a><a href="/privacy">Privacy</a><a href="/account/delete">Delete account</a><a href="mailto:info@splidly.site">Contact</a></div></div></footer>
   </body>
 </html>`;
 }
@@ -355,7 +355,7 @@ export function privacyPage(): string {
   );
 }
 
-export function deletionPage(signedIn: boolean): string {
+export function deletionPage(signedIn: boolean, scriptNonce?: string): string {
   if (signedIn) {
     return documentLayout(
       "Delete account · Splidly",
@@ -371,7 +371,7 @@ export function deletionPage(signedIn: boolean): string {
      <p>Sign in with the same provider you use in Splidly. You’ll be returned here to confirm deletion.</p>
      <button class="button" onclick="signIn('google')">Continue with Google</button>
      <button class="button secondary" onclick="signIn('apple')">Continue with Apple</button>
-     <script>
+     <script${scriptNonce ? ` nonce="${escapeHtml(scriptNonce)}"` : ""}>
        async function signIn(provider) {
          const response = await fetch('/api/auth/sign-in/social', {
            method: 'POST',

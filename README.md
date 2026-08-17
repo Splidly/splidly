@@ -42,6 +42,9 @@ Better Auth.
 
 See **[Development and deployment setup](docs/SETUP.md)** to run Splidly,
 configure identity providers and notifications, or deploy your own instance.
+For vulnerability reporting and production controls, see the
+**[security policy](SECURITY.md)** and
+**[security operations runbook](docs/SECURITY_OPERATIONS.md)**.
 
 ```sh
 pnpm typecheck
