@@ -62,8 +62,10 @@ IOS_TEAM_ID=TEAMID
 IOS_APP_ID=com.example.splidly
 ```
 
-Set the final bundle ID, Apple Team ID, Android package, and Android signing
-SHA-256 fingerprint before rebuilding both native apps. Provider accounts are
+Set the final bundle ID and Apple Team ID before rebuilding the iOS app. Android
+release configuration is deliberately deferred; set `ANDROID_ENABLED=true`, a
+final package, and the Play signing SHA-256 fingerprint only when the Android
+app is ready. Provider accounts are
 linked only from authenticated accounts; provider emails are not used as public
 identifiers or invite targets.
 
@@ -138,11 +140,18 @@ includes SQL text with placeholders and pool lifecycle events.
 Copy `.env.production.example` to `.env`, replace every placeholder, and run:
 
 ```sh
-docker compose config
+pnpm production:check
+docker compose config --quiet
 docker compose up --build -d
 docker compose ps
-curl https://your-domain.example/health/ready
+curl --fail --silent --show-error https://splidly.site/health/ready
 ```
+
+`production:check` validates the domain, provider configuration, enabled store
+IDs and signing identities, secret strength, readable key files, and the agreement
+between server and mobile public configuration. It never prints secret values.
+Generate independent secrets rather than editing the example strings, for
+example with `openssl rand -base64 48`.
 
 The API binds to `127.0.0.1:${API_BIND_PORT:-4000}` for a host reverse proxy.
 An Nginx example is available at `ops/nginx-splidly.conf`. PostgreSQL and the
@@ -150,6 +159,9 @@ private Frankfurter service remain on the internal Docker network, and
 migrations must complete before the server starts. The migration job also
 encrypts existing OAuth tokens; new tokens are encrypted when written. Keep
 `BETTER_AUTH_SECRET` available to both the migration and server containers.
+The Nginx configuration expects a certificate at
+`/etc/letsencrypt/live/splidly.site/`; obtain or restore that certificate before
+enabling the HTTPS server block.
 
 Install production keys outside the repository:
 
@@ -203,5 +215,35 @@ pnpm dlx expo-doctor@latest apps/mobile
 ```
 
 Verify Apple/Google authentication and universal links on signed physical-device
-builds. For store delivery, build and sign locally, then run
-`pnpm --filter @splidly/mobile submit:ios` or `submit:android`.
+builds. Version 1.0.0 is an iPhone/iPad release. Production EAS builds use the
+dedicated `production` environment and fail if final URLs, the iOS bundle ID,
+or Google clients are missing or inconsistent. Configure these public project
+variables in EAS:
+
+```text
+EXPO_PUBLIC_API_URL
+EXPO_PUBLIC_APP_URL
+EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
+EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID
+GOOGLE_IOS_REVERSED_CLIENT_ID
+IOS_APP_ID
+```
+
+Then build and submit through the pinned EAS CLI:
+
+```sh
+pnpm --filter @splidly/mobile build:production:ios
+pnpm --filter @splidly/mobile submit:ios
+```
+
+The default `build:production` command is also iOS-only. Android production
+builds are blocked while `ANDROID_ENABLED=false`, and no Android submission
+command is exposed. When Android is release-ready, add its final package,
+certificate fingerprint, store URL, EAS variable, and submission profile, then
+enable it only after Play Console testing. EAS remotely owns the monotonically
+increasing iOS build number.
+
+The same iOS binary supports iPhone and iPad; no separate iPad app or build is
+needed. Before submission, test the signed build on a physical iPad and upload
+the required iPad screenshots in App Store Connect. See
+`apps/mobile/APP_STORE_CONNECT.md` for the device checklist.

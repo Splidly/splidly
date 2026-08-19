@@ -15,14 +15,18 @@ COPY packages/shared packages/shared
 WORKDIR /app/apps/server
 RUN node node_modules/tsdown/dist/run.mjs
 
+FROM build AS migration
+WORKDIR /app
+USER node
+
+FROM build AS production-dependencies
+WORKDIR /app
+RUN pnpm --filter @splidly/server deploy --prod --legacy /prod/server
+
 FROM node:24-alpine AS runtime
-RUN corepack enable
 WORKDIR /app
 ENV NODE_ENV=production
-COPY --from=build /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
-COPY --from=build /app/node_modules node_modules
-COPY --from=build /app/apps/server apps/server
-COPY --from=build /app/packages packages
+COPY --from=production-dependencies --chown=node:node /prod/server ./apps/server
 USER node
 EXPOSE 4000
 CMD ["node", "apps/server/dist/index.js"]

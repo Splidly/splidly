@@ -64,6 +64,7 @@ Run before every release:
 
 ```sh
 pnpm install --frozen-lockfile
+pnpm production:check
 pnpm audit --prod
 pnpm typecheck
 pnpm test

@@ -4,6 +4,35 @@ This checklist reflects the data and features currently present in Splidly.
 Recheck it whenever authentication, analytics, advertising, payments, uploads,
 support tooling, or server-side retention changes.
 
+## Release scope: iPhone and iPad
+
+Version 1.0.0 is an iOS-only release that supports both iPhone and iPad. Expo's
+`ios.supportsTablet` setting is enabled, so iPhone and iPad use the same build;
+do not create a separate iPad platform or app record. Android remains a future
+target and must not be submitted with this release.
+
+Because the app runs on iPad, App Store Connect requires iPad screenshots.
+Upload at least one current 13-inch iPad screenshot (up to ten are allowed),
+without transparency, alongside the required iPhone screenshots. Use the
+current sizes listed in Apple's screenshot specifications rather than resizing
+an iPhone capture.
+
+Before submission, install the signed TestFlight build on a physical iPad and
+check:
+
+- sign-in with Apple and Google, notification permission, and invite links;
+- short and long Friends and Groups lists, including dragging empty space;
+- group overview, Profile, group settings, and statistics;
+- New Group and New Expense sheets, keyboard behavior, photo picking, and
+  account deletion;
+- portrait layout in light and dark mode, including the tab bar, navigation
+  headers, home indicator, and all final buttons; and
+- that the App Store build page lists both iPhone and iPad in its device family.
+
+The app is intentionally portrait-only. If landscape support is desired later,
+that is a separate product/layout change and should be tested before enabling
+it.
+
 ## App Privacy
 
 Splidly does not use data for advertising or cross-app tracking. Unless the

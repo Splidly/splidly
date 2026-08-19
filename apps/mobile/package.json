@@ -1,17 +1,21 @@
 {
   "name": "@splidly/mobile",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "main": "expo-router/entry",
   "scripts": {
     "dev": "expo start --dev-client",
     "ios": "expo run:ios",
     "android": "expo run:android",
     "build": "expo export --platform all --output-dir dist",
+    "config:production:ios": "pnpm dlx eas-cli@22.0.0 env:exec production 'pnpm dlx eas-cli@22.0.0 config --platform ios --profile production --non-interactive'",
+    "config:production:android": "pnpm dlx eas-cli@22.0.0 env:exec production 'pnpm dlx eas-cli@22.0.0 config --platform android --profile production --non-interactive'",
+    "build:production": "pnpm run build:production:ios",
+    "build:production:ios": "pnpm dlx eas-cli@22.0.0 env:exec production 'pnpm dlx eas-cli@22.0.0 build --platform ios --profile production'",
+    "build:production:android": "pnpm dlx eas-cli@22.0.0 env:exec production 'pnpm dlx eas-cli@22.0.0 build --platform android --profile production'",
     "typecheck": "tsc --noEmit",
     "test": "jest --passWithNoTests",
-    "submit:ios": "eas submit --platform ios",
-    "submit:android": "eas submit --platform android"
+    "submit:ios": "pnpm dlx eas-cli@22.0.0 env:exec production 'pnpm dlx eas-cli@22.0.0 submit --platform ios --profile production --latest'"
   },
   "dependencies": {
     "@better-auth/expo": "1.6.27",

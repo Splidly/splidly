@@ -1,18 +1,27 @@
 name: splidly
 
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   server:
     build:
       context: .
       dockerfile: apps/server/Dockerfile
     restart: unless-stopped
+    stop_grace_period: 30s
     init: true
+    pids_limit: 200
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=32m
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
+    logging: *default-logging
     ports:
       - "127.0.0.1:${API_BIND_PORT:-4000}:4000"
     environment:
@@ -35,10 +44,11 @@ services:
       FRANKFURTER_URL: http://frankfurter:8080
       IOS_APP_ID: ${IOS_APP_ID:?Set IOS_APP_ID}
       IOS_TEAM_ID: ${IOS_TEAM_ID:?Set IOS_TEAM_ID}
-      ANDROID_PACKAGE: ${ANDROID_PACKAGE:?Set ANDROID_PACKAGE}
-      ANDROID_SHA256_FINGERPRINT: ${ANDROID_SHA256_FINGERPRINT:?Set ANDROID_SHA256_FINGERPRINT}
+      ANDROID_ENABLED: ${ANDROID_ENABLED:-false}
+      ANDROID_PACKAGE: ${ANDROID_PACKAGE:-}
+      ANDROID_SHA256_FINGERPRINT: ${ANDROID_SHA256_FINGERPRINT:-}
       IOS_STORE_URL: ${IOS_STORE_URL:?Set IOS_STORE_URL}
-      ANDROID_STORE_URL: ${ANDROID_STORE_URL:?Set ANDROID_STORE_URL}
+      ANDROID_STORE_URL: ${ANDROID_STORE_URL:-}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -58,6 +68,7 @@ services:
     build:
       context: .
       dockerfile: apps/server/Dockerfile
+      target: migration
     command:
       - sh
       - -c
@@ -65,12 +76,14 @@ services:
         ./packages/db/node_modules/.bin/tsx packages/db/src/migrate.ts &&
         ./apps/server/node_modules/.bin/tsx apps/server/src/encrypt-oauth-tokens.ts
     restart: "no"
+    pids_limit: 100
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=32m
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
+    logging: *default-logging
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-splidly}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-splidly}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET}
@@ -82,6 +95,11 @@ services:
   postgres:
     image: postgres:17.10-alpine3.24
     restart: unless-stopped
+    stop_grace_period: 60s
+    pids_limit: 200
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-splidly}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
@@ -102,6 +120,15 @@ services:
   frankfurter:
     image: lineofflight/frankfurter:2.3.5
     restart: unless-stopped
+    init: true
+    read_only: true
+    pids_limit: 100
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=16m
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
     environment:
       DATABASE_URL: sqlite:///data/db.sqlite3
     volumes:
@@ -116,6 +143,7 @@ services:
     user: root
     command: ["sh", "-c", "chown -R frankfurter:frankfurter /data"]
     restart: "no"
+    logging: *default-logging
     volumes:
       - frankfurter_data:/data
 

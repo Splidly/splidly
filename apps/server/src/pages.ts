@@ -38,13 +38,18 @@ function documentLayout(title: string, body: string): string {
 }
 
 function appStoreLinks(env: Env): string {
+  const androidLink =
+    env.ANDROID_ENABLED && env.ANDROID_STORE_URL
+      ? `
+    <a class="store-badge-link" href="${escapeHtml(env.ANDROID_STORE_URL)}" aria-label="Get Splidly on Google Play">
+      <img class="store-badge google-play-badge" src="/google-play-badge.png" alt="Get it on Google Play" />
+    </a>`
+      : "";
   return `<div class="store-links" aria-label="Download Splidly">
     <a class="store-badge-link" href="${escapeHtml(env.IOS_STORE_URL)}" aria-label="Download Splidly on the App Store">
       <img class="store-badge app-store-badge" src="/app-store-badge.svg" alt="Download on the App Store" />
     </a>
-    <a class="store-badge-link" href="${escapeHtml(env.ANDROID_STORE_URL)}" aria-label="Get Splidly on Google Play">
-      <img class="store-badge google-play-badge" src="/google-play-badge.png" alt="Get it on Google Play" />
-    </a>
+    ${androidLink}
   </div>`;
 }
 
@@ -260,7 +265,7 @@ export function landingPage(env: Env): string {
           <h1>Split the cost.<br />Keep the good part.</h1>
           <p>Splidly makes shared expenses feel effortless — from weekend trips to the everyday stuff at home.</p>
           ${stores}
-          <div class="hero-note">Free to start · No ads · Built for iPhone &amp; Android</div>
+          <div class="hero-note">Free to start · No ads · Built for iPhone &amp; iPad</div>
         </div>
         <div class="product-stage" aria-label="Splidly app preview">
           <div class="device hero-device"><img class="app-preview-image" src="/app-group-overview.png" alt="Splidly group screen showing shared expenses for a Lisbon Weekend" /></div>
@@ -301,13 +306,17 @@ export function landingPage(env: Env): string {
 
 export function invitePage(token: string, env: Env): string {
   const safeToken = escapeHtml(token);
+  const androidInstall =
+    env.ANDROID_ENABLED && env.ANDROID_STORE_URL
+      ? `<a class="button secondary" href="${escapeHtml(env.ANDROID_STORE_URL)}">Install for Android</a>`
+      : "";
   return documentLayout(
     "Open invite · Splidly",
     `<h1>You’ve been invited</h1>
      <p>Open Splidly to preview who invited you and decide whether to accept.</p>
      <a class="button" href="${escapeHtml(env.APP_SCHEME)}://invite/${safeToken}">Open Splidly</a>
-     <a class="button secondary" href="${escapeHtml(env.IOS_STORE_URL)}">Install for iPhone</a>
-     <a class="button secondary" href="${escapeHtml(env.ANDROID_STORE_URL)}">Install for Android</a>
+     <a class="button secondary" href="${escapeHtml(env.IOS_STORE_URL)}">Install for iPhone or iPad</a>
+     ${androidInstall}
      <p><small>If you install the app now, return to this original invite link afterward.</small></p>`,
   );
 }

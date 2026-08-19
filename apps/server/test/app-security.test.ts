@@ -11,6 +11,7 @@ const env = {
   APP_SCHEME: "splidly",
   IOS_APP_ID: "com.example.splidly",
   IOS_TEAM_ID: "TEAM123",
+  ANDROID_ENABLED: false,
   ANDROID_PACKAGE: "com.example.splidly",
   ANDROID_SHA256_FINGERPRINT: "AA:BB",
   IOS_STORE_URL: "https://apps.apple.com/example",
@@ -72,5 +73,10 @@ describe("HTTP security boundary", () => {
     await expect(response.json()).resolves.toEqual({
       error: "Request body is too large",
     });
+  });
+
+  it("publishes no Android association while Android is unreleased", async () => {
+    const response = await testApp().request("/.well-known/assetlinks.json");
+    await expect(response.json()).resolves.toEqual([]);
   });
 });

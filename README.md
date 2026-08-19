@@ -45,9 +45,15 @@ configure identity providers and notifications, or deploy your own instance.
 For vulnerability reporting and production controls, see the
 **[security policy](SECURITY.md)** and
 **[security operations runbook](docs/SECURITY_OPERATIONS.md)**.
+Production server and store configuration is covered in the
+**[deployment section](docs/SETUP.md#production)**.
 
 ```sh
 pnpm typecheck
 pnpm test
 pnpm build
 ```
+
+## License
+
+Splidly is available under the [MIT License](LICENSE).

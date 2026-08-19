@@ -6,6 +6,16 @@ const optionalCredential = z
   .optional()
   .transform((value) => value || undefined);
 
+const environmentBoolean = z.preprocess(
+  (value) => {
+    if (value === undefined || value === "") return false;
+    if (value === "true") return true;
+    if (value === "false") return false;
+    return value;
+  },
+  z.boolean(),
+);
+
 const appleCredentialKeys = [
   "APPLE_SIGN_IN_CLIENT_ID",
   "APPLE_SIGN_IN_KEY_ID",
@@ -18,7 +28,13 @@ const apnsCredentialKeys = [
   "APNS_PRIVATE_KEY_PATH",
 ] as const;
 
-const googleCredentialKeys = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"] as const;
+const googleCredentialKeys = [
+  "GOOGLE_CLIENT_ID",
+  "GOOGLE_CLIENT_SECRET",
+] as const;
+
+const reverseDnsIdentifier = /^[a-zA-Z][a-zA-Z0-9]*(?:\.[a-zA-Z0-9][a-zA-Z0-9_-]*)+$/;
+const androidFingerprint = /^(?:[0-9A-F]{2}:){31}[0-9A-F]{2}$/i;
 
 function looksLikePlaceholder(value: string) {
   return /replace|changeme|example|placeholder/i.test(value);
@@ -54,10 +70,14 @@ const envSchema = z
     FRANKFURTER_URL: z.string().url(),
     IOS_APP_ID: z.string(),
     IOS_TEAM_ID: z.string(),
-    ANDROID_PACKAGE: z.string(),
-    ANDROID_SHA256_FINGERPRINT: z.string(),
+    ANDROID_ENABLED: environmentBoolean.default(false),
+    ANDROID_PACKAGE: optionalCredential,
+    ANDROID_SHA256_FINGERPRINT: optionalCredential,
     IOS_STORE_URL: z.string().url(),
-    ANDROID_STORE_URL: z.string().url(),
+    ANDROID_STORE_URL: z.preprocess(
+      (value) => value || undefined,
+      z.string().url().optional(),
+    ),
   })
   .superRefine((env, ctx) => {
     const configuredCount = appleCredentialKeys.filter(
@@ -109,6 +129,35 @@ const envSchema = z
       }
     }
     if (env.NODE_ENV !== "production") return;
+
+    for (const [label, keys] of [
+      ["Sign in with Apple", appleCredentialKeys],
+      ["APNs", apnsCredentialKeys],
+      ["Google Sign-In", googleCredentialKeys],
+    ] as const) {
+      for (const key of keys) {
+        if (env[key]) continue;
+        ctx.addIssue({
+          code: "custom",
+          message: `${key} is required for ${label} in production`,
+          path: [key],
+        });
+      }
+    }
+    if (env.APNS_ENVIRONMENT !== "production") {
+      ctx.addIssue({
+        code: "custom",
+        message: "APNS_ENVIRONMENT must be production in production",
+        path: ["APNS_ENVIRONMENT"],
+      });
+    }
+    if (env.LOG_FORMAT !== "json") {
+      ctx.addIssue({
+        code: "custom",
+        message: "LOG_FORMAT must be json in production",
+        path: ["LOG_FORMAT"],
+      });
+    }
     for (const key of ["API_PUBLIC_URL", "APP_PUBLIC_URL"] as const) {
       if (new URL(env[key]).protocol !== "https:") {
         ctx.addIssue({
@@ -140,6 +189,117 @@ const envSchema = z
           code: "custom",
           message: `${key} must be an absolute path in production`,
           path: [key],
+        });
+      }
+    }
+    for (const key of ["IOS_APP_ID"] as const) {
+      if (
+        !reverseDnsIdentifier.test(env[key]) ||
+        looksLikePlaceholder(env[key])
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          message: `${key} must be a final reverse-DNS identifier in production`,
+          path: [key],
+        });
+      }
+    }
+    if (env.ANDROID_ENABLED) {
+      if (
+        !env.ANDROID_PACKAGE ||
+        !reverseDnsIdentifier.test(env.ANDROID_PACKAGE) ||
+        looksLikePlaceholder(env.ANDROID_PACKAGE)
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          message:
+            "ANDROID_PACKAGE must be a final reverse-DNS identifier when Android is enabled",
+          path: ["ANDROID_PACKAGE"],
+        });
+      }
+      if (!env.ANDROID_STORE_URL) {
+        ctx.addIssue({
+          code: "custom",
+          message: "ANDROID_STORE_URL is required when Android is enabled",
+          path: ["ANDROID_STORE_URL"],
+        });
+      }
+    }
+    if (!/^[A-Z0-9]{10}$/.test(env.IOS_TEAM_ID)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "IOS_TEAM_ID must be a 10-character Apple Team ID",
+        path: ["IOS_TEAM_ID"],
+      });
+    }
+    for (const key of ["APPLE_SIGN_IN_KEY_ID", "APNS_KEY_ID"] as const) {
+      if (!/^[A-Z0-9]{10}$/.test(env[key] ?? "")) {
+        ctx.addIssue({
+          code: "custom",
+          message: `${key} must be a 10-character Apple key ID`,
+          path: [key],
+        });
+      }
+    }
+    if (
+      !reverseDnsIdentifier.test(env.APPLE_SIGN_IN_CLIENT_ID ?? "") ||
+      looksLikePlaceholder(env.APPLE_SIGN_IN_CLIENT_ID ?? "")
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "APPLE_SIGN_IN_CLIENT_ID must be the final Apple Services ID",
+        path: ["APPLE_SIGN_IN_CLIENT_ID"],
+      });
+    }
+    if (
+      !/^[a-zA-Z0-9-]+\.apps\.googleusercontent\.com$/.test(
+        env.GOOGLE_CLIENT_ID ?? "",
+      )
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: "GOOGLE_CLIENT_ID must be the Google web OAuth client ID",
+        path: ["GOOGLE_CLIENT_ID"],
+      });
+    }
+    const fingerprints = (env.ANDROID_SHA256_FINGERPRINT ?? "").split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+    if (
+      env.ANDROID_ENABLED &&
+      (fingerprints.length === 0 ||
+        fingerprints.some((value) => !androidFingerprint.test(value)))
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "ANDROID_SHA256_FINGERPRINT must contain comma-separated SHA-256 certificate fingerprints",
+        path: ["ANDROID_SHA256_FINGERPRINT"],
+      });
+    }
+    const iosStoreUrl = new URL(env.IOS_STORE_URL);
+    if (
+      iosStoreUrl.hostname !== "apps.apple.com" ||
+      !/\/id\d+(?:\/|$)/.test(iosStoreUrl.pathname)
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: "IOS_STORE_URL must be the final apps.apple.com app URL",
+        path: ["IOS_STORE_URL"],
+      });
+    }
+    if (env.ANDROID_ENABLED && env.ANDROID_STORE_URL) {
+      const androidStoreUrl = new URL(env.ANDROID_STORE_URL);
+      if (
+        androidStoreUrl.hostname !== "play.google.com" ||
+        androidStoreUrl.pathname !== "/store/apps/details" ||
+        androidStoreUrl.searchParams.get("id") !== env.ANDROID_PACKAGE
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          message: "ANDROID_STORE_URL must match ANDROID_PACKAGE",
+          path: ["ANDROID_STORE_URL"],
         });
       }
     }

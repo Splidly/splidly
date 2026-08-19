@@ -1,25 +1,42 @@
 {
   "cli": {
-    "version": ">= 16.0.0",
+    "version": "22.0.0",
     "appVersionSource": "remote",
     "promptToConfigurePushNotifications": false
   },
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "environment": "development",
+      "env": {
+        "APP_ENV": "development"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "environment": "preview",
+      "env": {
+        "APP_ENV": "preview"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "distribution": "store",
+      "environment": "production",
+      "env": {
+        "APP_ENV": "production",
+        "ANDROID_ENABLED": "false"
+      },
+      "android": {
+        "buildType": "app-bundle"
+      }
     }
   },
   "submit": {
     "production": {
       "ios": {
         "ascAppId": "6795323135"
-      },
-      "android": {
-        "track": "internal"
       }
     }
   }

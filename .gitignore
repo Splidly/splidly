@@ -10,6 +10,9 @@ dist/
 .idea/
 coverage/
 *.log
+*.p8
+*service-account*.json
+AuthKey_*.p8
 .DS_Store
 apps/mobile/ios/
 apps/mobile/android/

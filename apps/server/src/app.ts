@@ -211,19 +211,25 @@ export function createApp(input: {
     }),
   );
   app.get("/.well-known/assetlinks.json", (c) =>
-    c.json([
-      {
-        relation: ["delegate_permission/common.handle_all_urls"],
-        target: {
-          namespace: "android_app",
-          package_name: input.env.ANDROID_PACKAGE,
-          sha256_cert_fingerprints: input.env.ANDROID_SHA256_FINGERPRINT
-            .split(",")
-            .map((value) => value.trim())
-            .filter(Boolean),
-        },
-      },
-    ]),
+    c.json(
+      input.env.ANDROID_ENABLED &&
+        input.env.ANDROID_PACKAGE &&
+        input.env.ANDROID_SHA256_FINGERPRINT
+        ? [
+            {
+              relation: ["delegate_permission/common.handle_all_urls"],
+              target: {
+                namespace: "android_app",
+                package_name: input.env.ANDROID_PACKAGE,
+                sha256_cert_fingerprints: input.env.ANDROID_SHA256_FINGERPRINT
+                  .split(",")
+                  .map((value) => value.trim())
+                  .filter(Boolean),
+              },
+            },
+          ]
+        : [],
+    ),
   );
 
   app.on(["GET", "POST"], "/api/auth/*", async (c) => {
