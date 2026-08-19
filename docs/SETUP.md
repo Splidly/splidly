@@ -150,8 +150,10 @@ curl --fail --silent --show-error https://splidly.site/health/ready
 `production:check` validates the domain, provider configuration, enabled store
 IDs and signing identities, secret strength, readable key files, and the agreement
 between server and mobile public configuration. It never prints secret values.
-Generate independent secrets rather than editing the example strings, for
-example with `openssl rand -base64 48`.
+Production accepts a high-entropy 32-byte secret encoded as Base64 or Base64URL
+(43 characters unpadded or 44 characters padded). Generate independent secrets
+rather than editing the example strings, for example with
+`openssl rand -base64 48`.
 
 The API binds to `127.0.0.1:${API_BIND_PORT:-4000}` for a host reverse proxy.
 An Nginx example is available at `ops/nginx-splidly.conf`. PostgreSQL and the

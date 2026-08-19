@@ -168,14 +168,14 @@ const envSchema = z
       }
     }
     if (
-      env.BETTER_AUTH_SECRET.length < 48 ||
+      env.BETTER_AUTH_SECRET.length < 43 ||
       looksLikePlaceholder(env.BETTER_AUTH_SECRET) ||
       new Set(env.BETTER_AUTH_SECRET).size < 12
     ) {
       ctx.addIssue({
         code: "custom",
         message:
-          "BETTER_AUTH_SECRET must be a high-entropy production secret of at least 48 characters",
+          "BETTER_AUTH_SECRET must be a high-entropy production secret of at least 43 characters",
         path: ["BETTER_AUTH_SECRET"],
       });
     }

@@ -61,8 +61,8 @@ if ((process.env.POSTGRES_PASSWORD?.length ?? 0) < 24) {
   errors.push("POSTGRES_PASSWORD must contain at least 24 characters");
 }
 const authSecret = process.env.BETTER_AUTH_SECRET ?? "";
-if (authSecret.length < 48 || new Set(authSecret).size < 12) {
-  errors.push("BETTER_AUTH_SECRET must be a high-entropy 48+ character value");
+if (authSecret.length < 43 || new Set(authSecret).size < 12) {
+  errors.push("BETTER_AUTH_SECRET must be a high-entropy 43+ character value");
 }
 if (process.env.APNS_ENVIRONMENT !== "production") {
   errors.push("APNS_ENVIRONMENT must be production");

@@ -102,6 +102,15 @@ describe("server environment", () => {
     ).toMatchObject({ ANDROID_ENABLED: false, NODE_ENV: "production" });
   });
 
+  it("accepts a 32-byte Base64 production secret", () => {
+    expect(
+      readEnv({
+        ...productionEnv,
+        BETTER_AUTH_SECRET: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefg=",
+      }),
+    ).toMatchObject({ NODE_ENV: "production" });
+  });
+
   it("requires production providers and the iOS signing identity", () => {
     expect(() =>
       readEnv({
