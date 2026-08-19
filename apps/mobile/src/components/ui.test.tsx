@@ -10,6 +10,7 @@ import {
   Field,
   Screen,
 } from "./ui";
+import { SERVER_UNAVAILABLE_MESSAGE } from "../lib/network";
 
 function ControlledField() {
   const [value, setValue] = useState("");
@@ -42,6 +43,20 @@ describe("EmptyState", () => {
     expect(
       view.container.queryAll((instance) => instance.props.selectable === true),
     ).toHaveLength(0);
+  });
+});
+
+describe("ErrorState", () => {
+  it("shows a clean retryable state when the server is unavailable", async () => {
+    const onRetry = jest.fn();
+    const view = await render(
+      <ErrorState message={SERVER_UNAVAILABLE_MESSAGE} onRetry={onRetry} />,
+    );
+
+    expect(view.getByText("Splidly is unavailable")).toBeTruthy();
+    expect(view.getByText(SERVER_UNAVAILABLE_MESSAGE)).toBeTruthy();
+    await fireEvent.press(view.getByText("Try Again"));
+    expect(onRetry).toHaveBeenCalledTimes(1);
   });
 });
 

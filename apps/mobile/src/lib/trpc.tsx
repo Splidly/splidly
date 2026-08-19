@@ -7,7 +7,11 @@ import superjson from "superjson";
 import { authClient } from "./auth-client";
 import { ConnectivityProvider } from "./connectivity";
 import { API_URL } from "./env";
-import { friendlyFetch, isNetworkError } from "./network";
+import {
+  friendlyFetch,
+  isNetworkError,
+  isServerUnavailableError,
+} from "./network";
 
 export const api = createTRPCReact<AppRouter>();
 
@@ -21,7 +25,8 @@ export function ApiProvider({ children }: PropsWithChildren) {
             gcTime: 24 * 60 * 60 * 1_000,
             networkMode: "online",
             retry: (failureCount, error) =>
-              isNetworkError(error) && failureCount < 1,
+              (isNetworkError(error) || isServerUnavailableError(error)) &&
+              failureCount < 1,
           },
           // A save made while offline must fail visibly and leave its sheet
           // open. It must not sit in React Query's paused mutation queue and

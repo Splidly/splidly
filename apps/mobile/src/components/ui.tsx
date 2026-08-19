@@ -40,7 +40,9 @@ import {
 import {
   friendlyErrorMessage,
   isNetworkError,
+  isServerUnavailableError,
   NETWORK_ERROR_MESSAGE,
+  SERVER_UNAVAILABLE_MESSAGE,
 } from "../lib/network";
 import { spacing, useTheme } from "../theme";
 import { AppIcon } from "./app-icon";
@@ -924,40 +926,44 @@ export function ErrorState({
   const theme = useTheme();
   const { isOnline } = useConnectivity();
   const networkError = isNetworkError(message);
+  const serverUnavailable = isServerUnavailableError(message);
+  const retryableError = networkError || serverUnavailable;
   const resolvedMessage = networkError
     ? NETWORK_ERROR_MESSAGE
-    : friendlyErrorMessage(message);
+    : serverUnavailable
+      ? SERVER_UNAVAILABLE_MESSAGE
+      : friendlyErrorMessage(message);
   return (
     <View
       accessibilityRole="alert"
       style={[
         styles.error,
         {
-          backgroundColor: networkError
+          backgroundColor: retryableError
             ? theme.elevated
             : theme.negativeSurface,
           borderCurve: "continuous",
         },
       ]}
     >
-      {networkError ? (
+      {retryableError ? (
         <Text
           selectable={false}
           style={{ color: theme.text, fontWeight: "700", fontSize: 16 }}
         >
-          You’re offline
+          {networkError ? "You’re offline" : "Splidly is unavailable"}
         </Text>
       ) : null}
       <Text
         selectable={false}
         style={{
-          color: networkError ? theme.muted : theme.negative,
+          color: retryableError ? theme.muted : theme.negative,
           lineHeight: 20,
         }}
       >
         {resolvedMessage}
       </Text>
-      {networkError && onRetry && isOnline ? (
+      {retryableError && onRetry && isOnline ? (
         <PrimaryButton label="Try Again" compact onPress={onRetry} />
       ) : null}
     </View>

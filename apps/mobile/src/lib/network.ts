@@ -1,5 +1,9 @@
 export const NETWORK_ERROR_MESSAGE =
   "Splidly can’t reach the internet. Check your connection and try again.";
+export const SERVER_UNAVAILABLE_MESSAGE =
+  "Splidly is temporarily unavailable. Please try again in a moment.";
+const REQUEST_ERROR_MESSAGE =
+  "Splidly couldn’t complete that request. Please try again.";
 const NETWORK_TIMEOUT_MS = 15_000;
 
 const networkMessagePatterns = [
@@ -28,8 +32,19 @@ export function isNetworkError(cause: unknown): boolean {
   return networkMessagePatterns.some((pattern) => normalized.includes(pattern));
 }
 
+export function isServerUnavailableError(cause: unknown): boolean {
+  const message =
+    typeof cause === "string"
+      ? cause
+      : cause instanceof Error
+        ? cause.message
+        : "";
+  return message.includes(SERVER_UNAVAILABLE_MESSAGE);
+}
+
 export function friendlyErrorMessage(cause: unknown, fallback?: string) {
   if (isNetworkError(cause)) return NETWORK_ERROR_MESSAGE;
+  if (isServerUnavailableError(cause)) return SERVER_UNAVAILABLE_MESSAGE;
   const message =
     cause instanceof Error
       ? cause.message.trim()
@@ -37,11 +52,11 @@ export function friendlyErrorMessage(cause: unknown, fallback?: string) {
         ? cause.trim()
         : "";
   if (
-    /drizzlequeryerror|failed query:|internal_server_error|server_error/i.test(
+    /drizzlequeryerror|failed query:|internal_server_error|server_error|json parse error|unexpected (?:character|token).*</i.test(
       message,
     )
   ) {
-    return "Splidly couldn’t complete that request. Please try again.";
+    return REQUEST_ERROR_MESSAGE;
   }
   if (message) return message;
   return fallback ?? "Something went wrong. Please try again.";
@@ -57,8 +72,9 @@ export const friendlyFetch: typeof fetch = async (input, init) => {
     once: true,
   });
   const timeout = setTimeout(() => controller.abort(), NETWORK_TIMEOUT_MS);
+  let response: Response;
   try {
-    return await fetch(input, { ...init, signal: controller.signal });
+    response = await fetch(input, { ...init, signal: controller.signal });
   } catch (cause) {
     if (upstreamSignal?.aborted) throw cause;
     throw new Error(NETWORK_ERROR_MESSAGE, { cause });
@@ -66,4 +82,17 @@ export const friendlyFetch: typeof fetch = async (input, init) => {
     clearTimeout(timeout);
     upstreamSignal?.removeEventListener("abort", abortFromUpstream);
   }
+
+  if (response.ok) return response;
+
+  if (response.status >= 500 && response.status <= 599) {
+    throw new Error(SERVER_UNAVAILABLE_MESSAGE);
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!/(?:application|text)\/(?:[\w.+-]*\+)?json\b/i.test(contentType)) {
+    throw new Error(REQUEST_ERROR_MESSAGE);
+  }
+
+  return response;
 };
