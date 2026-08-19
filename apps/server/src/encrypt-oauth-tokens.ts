@@ -1,4 +1,3 @@
-import "dotenv/config";
 import { accounts, createDatabase, eq } from "@splidly/db";
 import { encryptOAuthToken } from "./oauth-token-crypto";
 
