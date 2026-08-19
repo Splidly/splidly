@@ -143,6 +143,17 @@ export function createApp(input: {
   });
 
   app.get("/", (c) => c.html(landingPage(input.env)));
+  app.get("/favicon.svg", async () => {
+    const image = await readFile(
+      new URL("../assets/favicon.svg", import.meta.url),
+    );
+    return new Response(image, {
+      headers: {
+        "cache-control": "public, max-age=86400",
+        "content-type": "image/svg+xml",
+      },
+    });
+  });
   app.get("/og.png", async (c) => {
     const image = await readFile(new URL("../assets/og.png", import.meta.url));
     return new Response(image, {

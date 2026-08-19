@@ -51,6 +51,9 @@ describe("landing page", () => {
     expect(html).toContain(env.ANDROID_STORE_URL);
     expect(html).toContain('src="/app-store-badge.svg"');
     expect(html).toContain('src="/google-play-badge.png"');
+    expect(html).toContain(
+      '<link rel="icon" type="image/svg+xml" href="/favicon.svg" />',
+    );
     expect(html).not.toContain("play-mark");
     expect(html).toContain("https://splidly.site/og.png");
     expect(html).toContain("https://github.com/Splidly/splidly");
@@ -77,6 +80,12 @@ describe("landing page", () => {
 });
 
 describe("privacy page", () => {
+  it("uses the site favicon", () => {
+    expect(privacyPage()).toContain(
+      '<link rel="icon" type="image/svg+xml" href="/favicon.svg" />',
+    );
+  });
+
   it("describes collected data, retention, deletion, and contact", () => {
     const html = privacyPage();
     expect(html).toContain("Account and profile data");

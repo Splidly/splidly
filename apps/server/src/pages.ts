@@ -16,6 +16,7 @@ function documentLayout(title: string, body: string): string {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="color-scheme" content="light dark" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>${escapeHtml(title)}</title>
     <style>
       :root { font-family: ui-rounded, system-ui, sans-serif; color: #17211b; background: #f4f7f4; }
@@ -61,6 +62,7 @@ export function landingPage(env: Env): string {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#f7f7f2" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="description" content="Splidly makes shared expenses simple for trips, homes, and everyday plans." />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Splidly — Split the cost. Keep the good part." />

@@ -62,6 +62,17 @@ describe("HTTP security boundary", () => {
     );
   });
 
+  it("serves the site favicon as an SVG image", async () => {
+    const response = await testApp().request("/favicon.svg");
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/svg+xml");
+    expect(response.headers.get("cache-control")).toBe(
+      "public, max-age=86400",
+    );
+    expect(await response.text()).toContain("<svg");
+  });
+
   it("rejects oversized private API requests", async () => {
     const response = await testApp().request("/trpc/example", {
       method: "POST",
