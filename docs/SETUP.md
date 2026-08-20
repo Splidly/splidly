@@ -194,15 +194,36 @@ sudo chmod 400 /etc/splidly/secrets/apple-sign-in.p8 \
 
 ## Backups
 
-Install [`age`](https://age-encryption.org/), set `BACKUP_AGE_RECIPIENT`, and
-schedule the backup script. Seven days are retained locally; copy encrypted
-backups to independent off-host storage and test restoration periodically.
-The script refuses to write an unencrypted backup.
+Install [`age`](https://age-encryption.org/) and create a root-only identity.
+Install the supplied systemd units to run an encrypted backup every day at
+02:00 Europe/Berlin. Successful snapshots are retained for exactly seven days;
+the timer catches up after server downtime.
 
 ```sh
-BACKUP_AGE_RECIPIENT=age1... ./ops/backup.sh
-./ops/restore.sh backups/splidly-TIMESTAMP.sql.gz.age
+sudo install -d -m 700 /etc/splidly /var/backups/splidly
+sudo age-keygen -o /etc/splidly/backup.agekey
+sudo chmod 600 /etc/splidly/backup.agekey
+sudo install -m 644 ops/systemd/splidly-backup.service /etc/systemd/system/
+sudo install -m 644 ops/systemd/splidly-backup.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now splidly-backup.timer
+sudo systemctl start splidly-backup.service
+sudo systemctl status splidly-backup.timer
 ```
+
+Each root-only snapshot contains a validated encrypted PostgreSQL dump and an
+encrypted configuration archive. Frankfurter is excluded because its public
+exchange-rate cache can be rebuilt. To restore the database after testing the
+procedure in an isolated environment:
+
+```sh
+sudo env BACKUP_AGE_IDENTITY=/etc/splidly/backup.agekey \
+  ./ops/restore.sh /var/backups/splidly/splidly-TIMESTAMP
+```
+
+Copy encrypted backups and the age identity to separate, access-controlled
+off-host locations when a second storage location becomes available. Without
+that, these backups do not protect against loss of the server or its disk.
 
 Review [Security operations](SECURITY_OPERATIONS.md) before exposing a
 production instance.

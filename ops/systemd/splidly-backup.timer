@@ -1,0 +1,12 @@
+[Unit]
+Description=Run the Splidly production backup daily at 02:00 Europe/Berlin
+
+[Timer]
+OnCalendar=*-*-* 02:00:00 Europe/Berlin
+Persistent=true
+AccuracySec=1min
+RandomizedDelaySec=0
+Unit=splidly-backup.service
+
+[Install]
+WantedBy=timers.target

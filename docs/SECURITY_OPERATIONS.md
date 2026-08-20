@@ -36,14 +36,28 @@ security review.
 
 ## Backups
 
-`ops/backup.sh` refuses to create a backup unless `BACKUP_AGE_RECIPIENT` and the
-`age` binary are available. Files are created with owner-only permissions,
-retained locally for seven days, and should be copied to access-controlled
-off-host storage. Protect the matching age identity separately from the backup.
+`ops/backup.sh` creates an atomic, encrypted snapshot containing a PostgreSQL
+custom-format dump plus the production `.env` and `/etc/splidly/secrets`. It
+refuses to run without `age` and a readable age identity, validates both
+encrypted streams before publishing the snapshot, prevents overlapping runs,
+and removes snapshot directories once they are seven days old. Files and the
+backup directory must remain root-only.
 
-Test an encrypted restore periodically in an isolated environment. Plaintext
-legacy dumps require the explicit `ALLOW_PLAINTEXT_RESTORE=1` override and must
-be securely removed immediately afterward.
+Frankfurter is excluded because its large historical exchange-rate database is
+public and reconstructable. Backing it up every day would consume substantial
+space without protecting user data.
+
+The production systemd timer runs at 02:00 Europe/Berlin and catches up after
+downtime. Same-server backups protect against accidental deletion and bad
+deployments, but not disk or server loss. Copy encrypted snapshots off-host and
+protect a copy of the matching age identity separately from both locations.
+
+Test an encrypted restore periodically in an isolated environment. The restore
+script accepts a complete snapshot directory and checks its hashes before
+restoring PostgreSQL. Inspect and restore `config.tar.age` separately and with
+care; it contains production secrets. Plaintext legacy dumps require the
+explicit `ALLOW_PLAINTEXT_RESTORE=1` override and must be securely removed
+immediately afterward.
 
 ## Monitoring and response
 

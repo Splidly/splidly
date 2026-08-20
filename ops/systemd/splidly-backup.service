@@ -1,0 +1,30 @@
+[Unit]
+Description=Create an encrypted Splidly production backup
+Requires=docker.service
+After=docker.service
+ConditionPathExists=/opt/deploy/splidly/compose.yaml
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/deploy/splidly
+Environment=SPLIDLY_PROJECT_DIRECTORY=/opt/deploy/splidly
+Environment=BACKUP_DIRECTORY=/var/backups/splidly
+Environment=BACKUP_AGE_IDENTITY=/etc/splidly/backup.agekey
+Environment=BACKUP_LOCK_FILE=/run/splidly-backup/backup.lock
+ExecStart=/opt/deploy/splidly/ops/backup.sh
+RuntimeDirectory=splidly-backup
+RuntimeDirectoryMode=0700
+UMask=0077
+TimeoutStartSec=30min
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadOnlyPaths=/opt/deploy/splidly /etc/splidly
+ReadWritePaths=/var/backups/splidly
+
