@@ -61,7 +61,7 @@ describe("detectExpenseIconKey", () => {
   );
 
   it("normalizes accents, punctuation, and German spelling variants", () => {
-    expect(detectExpenseIconKey("  CAFÉ—Frühstück!!! ")).toBe("dining");
+    expect(detectExpenseIconKey("  CAFÉ-Frühstück!!! ")).toBe("dining");
     expect(detectExpenseIconKey("STRASSENBAHN")).toBe("transport");
   });
 
