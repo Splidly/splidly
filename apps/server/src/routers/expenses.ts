@@ -39,6 +39,7 @@ import {
 } from "../domain/finance";
 import { allocateByUser, expenseTransfers } from "../domain/expense-allocation";
 import {
+  assertRecordCreator,
   requireActiveGroupMember,
   requireFriendshipParticipant,
 } from "../domain/helpers";
@@ -626,6 +627,11 @@ export const expensesRouter = router({
       if (!current || current.deletedAt) {
         throw new TRPCError({ code: "NOT_FOUND" });
       }
+      assertRecordCreator(
+        current.createdBy,
+        ctx.session.user.id,
+        "expense",
+      );
       if (current.version !== input.expectedVersion) {
         throw new TRPCError({ code: "CONFLICT" });
       }
@@ -751,6 +757,11 @@ export const expensesRouter = router({
       if (!current || current.deletedAt) {
         throw new TRPCError({ code: "NOT_FOUND" });
       }
+      assertRecordCreator(
+        current.createdBy,
+        ctx.session.user.id,
+        "expense",
+      );
       if (current.groupId) {
         await requireActiveGroupMember(
           ctx.db,

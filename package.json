@@ -17,7 +17,8 @@
     "db:migrate": "pnpm --filter @splidly/db db:migrate",
     "docker:up": "docker compose up --build",
     "docker:down": "docker compose down",
-    "production:check": "node ops/validate-production-config.mjs"
+    "production:check": "node ops/validate-production-config.mjs",
+    "publication:check": "node ops/validate-publication.mjs"
   },
   "devDependencies": {
     "turbo": "2.10.9",

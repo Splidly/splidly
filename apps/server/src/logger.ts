@@ -17,6 +17,12 @@ const levelPriority: Record<LogLevel, number> = {
 const logContext = new AsyncLocalStorage<LogFields>();
 const hostName = hostname();
 
+const invitePathPattern = /^(\/invite\/)[^/]+/;
+
+export function sanitizeHttpPath(path: string): string {
+  return path.replace(invitePathPattern, "$1[REDACTED]");
+}
+
 export function withLogContext<T>(fields: LogFields, callback: () => T): T {
   return logContext.run({ ...logContext.getStore(), ...fields }, callback);
 }

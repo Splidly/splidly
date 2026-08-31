@@ -22,8 +22,6 @@ const batchSize = 50;
 const lockTimeoutMs = 5 * 60 * 1_000;
 const maxAttempts = 8;
 const pollIntervalMs = 5_000;
-const cleanupIntervalMs = 24 * 60 * 60 * 1_000;
-const outboxRetentionMs = 30 * cleanupIntervalMs;
 const invalidTokenReasons = new Set([
   "BadDeviceToken",
   "DeviceTokenNotForTopic",
@@ -95,7 +93,6 @@ export async function startNotificationWorker(
   });
   let running = false;
   let stopped = false;
-  let lastCleanupAt = 0;
 
   async function processBatch() {
     if (running || stopped) {
@@ -108,23 +105,6 @@ export async function startNotificationWorker(
     const batchStartedAt = performance.now();
     try {
       const now = new Date();
-      if (now.getTime() - lastCleanupAt >= cleanupIntervalMs) {
-        const deleted = await db
-          .delete(notificationOutbox)
-          .where(
-            and(
-              inArray(notificationOutbox.status, ["completed", "failed"]),
-              lt(
-                notificationOutbox.updatedAt,
-                new Date(now.getTime() - outboxRetentionMs),
-              ),
-            ),
-          );
-        lastCleanupAt = now.getTime();
-        logger.info("notifications.cleanup.completed", {
-          deletedCount: deleted.rowCount ?? 0,
-        });
-      }
       const staleBefore = new Date(now.getTime() - lockTimeoutMs);
       const candidates = await db
         .select({

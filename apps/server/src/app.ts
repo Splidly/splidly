@@ -1,15 +1,21 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { eq, sql } from "@splidly/db";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
+import { getCookie, setCookie } from "hono/cookie";
 import { NONCE, secureHeaders } from "hono/secure-headers";
 import type { Auth } from "./auth";
 import type { Database } from "@splidly/db";
 import type { Env } from "./env";
-import { durationMs, withLogContext, type Logger } from "./logger";
+import {
+  durationMs,
+  sanitizeHttpPath,
+  withLogContext,
+  type Logger,
+} from "./logger";
 import {
   deletionPage,
   deletionResultPage,
@@ -35,10 +41,11 @@ export function createApp(input: {
       suppliedRequestId && /^[A-Za-z0-9._:-]{1,128}$/.test(suppliedRequestId)
         ? suppliedRequestId
         : randomUUID();
+    const httpPath = sanitizeHttpPath(c.req.path);
     const logger = input.logger.child({
       requestId,
       httpMethod: c.req.method,
-      httpPath: c.req.path,
+      httpPath,
     });
     const startedAt = performance.now();
     c.set("logger", logger);
@@ -47,7 +54,7 @@ export function createApp(input: {
     logger.debug("http.request.started");
     try {
       await withLogContext(
-        { requestId, httpMethod: c.req.method, httpPath: c.req.path },
+        { requestId, httpMethod: c.req.method, httpPath },
         () => next(),
       );
     } catch (error) {
@@ -280,6 +287,7 @@ export function createApp(input: {
   );
 
   app.get("/invite/:token", (c) => {
+    c.header("cache-control", "no-store");
     const token = c.req.param("token");
     if (!/^[A-Za-z0-9_-]{20,200}$/.test(token)) return c.notFound();
     return c.html(invitePage(token, input.env));
@@ -290,8 +298,22 @@ export function createApp(input: {
     const session = await input.auth.api.getSession({
       headers: c.req.raw.headers,
     });
+    const csrfToken = session?.user ? randomBytes(32).toString("base64url") : undefined;
+    if (csrfToken) {
+      setCookie(c, "splidly_delete_csrf", csrfToken, {
+        httpOnly: true,
+        maxAge: 15 * 60,
+        path: "/account/delete",
+        sameSite: "Strict",
+        secure: input.env.NODE_ENV === "production",
+      });
+    }
     return c.html(
-      deletionPage(Boolean(session?.user), c.get("secureHeadersNonce")),
+      deletionPage(
+        Boolean(session?.user),
+        c.get("secureHeadersNonce"),
+        csrfToken,
+      ),
     );
   });
   app.post("/account/delete", async (c) => {
@@ -301,6 +323,17 @@ export function createApp(input: {
       return c.html(deletionResultPage(false, "Invalid request origin."), 403);
     }
     const body = await c.req.parseBody();
+    const cookieToken = getCookie(c, "splidly_delete_csrf");
+    const submittedToken =
+      typeof body.csrfToken === "string" ? body.csrfToken : undefined;
+    const validCsrfToken =
+      cookieToken &&
+      submittedToken &&
+      cookieToken.length === submittedToken.length &&
+      timingSafeEqual(Buffer.from(cookieToken), Buffer.from(submittedToken));
+    if (!validCsrfToken) {
+      return c.html(deletionResultPage(false, "Invalid security token."), 403);
+    }
     if (body.confirmation !== "DELETE") {
       return c.html(
         deletionResultPage(false, 'Enter "DELETE" to confirm.'),

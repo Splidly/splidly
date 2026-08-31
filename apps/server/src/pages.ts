@@ -327,7 +327,7 @@ export function privacyPage(): string {
   return documentLayout(
     "Privacy · Splidly",
     `<h1>Privacy Policy</h1>
-     <p><small>Effective August 18, 2026</small></p>
+     <p><small>Effective August 20, 2026</small></p>
      <p>Splidly is a shared-expense ledger. It records who paid, how a cost was split, and the settlements people record themselves. Splidly does not move money, show advertising, sell personal data, or use personal data for advertising tracking.</p>
 
      <h2>Data Splidly collects</h2>
@@ -335,6 +335,7 @@ export function privacyPage(): string {
        <li><strong>Account and profile data:</strong> the account identifier, name, email address, and profile-image URL provided by Apple or Google; your display name, home currency, and profile picture you choose; and authentication tokens needed to keep you signed in.</li>
        <li><strong>Shared-ledger data:</strong> friendships, groups and memberships, group pictures, invitations, expense descriptions and notes, dates, amounts, currencies, payers, splits, exchange-rate snapshots, settlements, and the resulting ledger history.</li>
        <li><strong>Security and session data:</strong> session identifiers and expiry times, IP address, and user-agent information used to authenticate requests and protect the service.</li>
+       <li><strong>Notification data:</strong> a random installation identifier, Apple Push Notification service device token, delivery status, and the group or expense identifier needed to open the correct screen. Lock-screen notification text is deliberately generic and does not contain names, group names, expense descriptions, notes, balances, or amounts.</li>
        <li><strong>On-device data:</strong> the app stores session credentials, pending invitation details, and recently selected currencies in protected device storage.</li>
      </ul>
      <p>Names, profile and group pictures, expense details, notes, balances, and settlements are visible to the other people who participate in the applicable friendship or group.</p>
@@ -344,19 +345,20 @@ export function privacyPage(): string {
 
      <h2>Service providers</h2>
      <ul>
-       <li><strong>Apple and Google:</strong> if you choose one of these sign-in methods, that provider processes the sign-in and gives Splidly the account information described above. <a href="https://www.apple.com/legal/privacy/">Apple’s privacy policy</a> or <a href="https://policies.google.com/privacy">Google’s privacy policy</a> applies to the provider’s processing. The Google Sign-In software may also process coarse location, device and user identifiers, phone number, and usage data for app functionality and analytics; it declares that this data is not used for tracking.</li>
+       <li><strong>Apple and Google:</strong> if you choose one of these sign-in methods, that provider processes the sign-in and gives Splidly the account information described above. Apple also processes the device token and generic notification payload when Splidly sends a push notification through APNs. <a href="https://www.apple.com/legal/privacy/">Apple’s privacy policy</a> or <a href="https://policies.google.com/privacy">Google’s privacy policy</a> applies to the provider’s processing. The Google Sign-In software may also process coarse location, device and user identifiers, phone number, and usage data for app functionality and analytics; it declares that this data is not used for tracking.</li>
        <li><strong>Currency-rate service:</strong> Splidly uses a private Frankfurter service for reference exchange rates. It receives requested currency pairs and dates, not your identity, group names, expense descriptions, or notes.</li>
-       <li><strong>Hosting infrastructure:</strong> the server, database, and backups are processed by infrastructure providers only as needed to operate and protect Splidly. Providers are required to protect data consistently with this policy.</li>
+       <li><strong>Hosting and delivery infrastructure:</strong> Cloudflare processes network requests, IP addresses, security signals, and invitation URLs as Splidly’s delivery and abuse-protection provider. The server, database, logs, and encrypted backups are processed by hosting infrastructure only as needed to operate and protect Splidly. Providers are required to protect data consistently with this policy.</li>
      </ul>
 
      <h2>Retention and deletion</h2>
-     <p>Account and ledger data is retained while your account is active. You can permanently delete your account from Profile at any time, including while you have open balances or active groups. For security, Splidly may ask you to sign in again. Deletion removes provider connections and tokens, active sessions, invitations you created, push-notification registrations, cached currency requests, notification preferences, your name, email address, and profile image. Splidly also clears its protected account data from the device used for deletion.</p>
-     <p>Shared financial records cannot always be removed without changing other participants’ ledgers. Splidly therefore retains a <strong>pseudonymized</strong> internal account identifier and the shared group memberships, expenses, settlements, exchange-rate snapshots, and audit revisions needed to preserve those ledgers. Other participants see “Deleted user” instead of your identity. This retained data is not anonymous because Splidly may still be able to associate the internal records with their prior account through operational records or other ledger participants. If backups are enabled, they use a seven-day retention schedule, so deleted data may remain in a protected backup until that backup expires.</p>
-     <p>If you used Sign in with Apple, Splidly revokes the Apple token when one is available. If Apple did not provide a revocable token, Splidly still completes deletion and tells you to remove Splidly manually in your Apple Account’s Sign in with Apple settings.</p>
+     <p>Account and ledger data is retained while your account is active. You can permanently delete your account from Profile at any time, including while you have open balances or active groups. For security, Splidly may ask you to sign in again. Deletion removes provider connections and tokens, active sessions, invitations you created, push-notification registrations, cached currency requests, notification preferences, your name, email address, profile image, group images on groups you created, and the descriptions and notes on financial records you authored or most recently edited. Splidly also clears its protected account data from the device used for deletion.</p>
+     <p>Shared financial records cannot always be removed without changing other participants’ ledgers. Splidly therefore retains a <strong>pseudonymized</strong> internal account identifier and the shared group memberships, financial amounts, dates, currencies, exchange-rate snapshots, and minimized audit revisions needed to preserve those ledgers. Other participants see “Deleted user” instead of your identity. This retained data is not anonymous because Splidly may still be able to associate the internal records with their prior account through operational records or other ledger participants. If backups are enabled, they use a seven-day retention schedule, so deleted data may remain in a protected backup until that backup expires.</p>
+     <p>If you used Sign in with Apple, Splidly attempts to revoke the Apple token before removing the provider connection. A missing token or temporary Apple failure never prevents account deletion; Splidly tells you when manual removal in your Apple Account’s Sign in with Apple settings is still required.</p>
+     <p>Expired sessions, verification requests, currency quotes, and invitations are removed by a daily retention job. Completed or permanently failed notification jobs are retained for up to 30 days for delivery troubleshooting. Push installations that have not contacted Splidly for 180 days are removed. Invitations are one-time credentials, expire after seven days, are stored only as cryptographic hashes, and are removed after expiry.</p>
      <p>Splidly may retain limited information for longer when required by law or reasonably necessary to resolve abuse, fraud, security, or legal issues.</p>
 
      <h2>Your choices</h2>
-     <p>You can edit or remove your profile picture, display name, and home currency; edit or remove a group picture while you are a member; sign out; or start account deletion from Profile. You can also revoke Splidly’s access through your Apple or Google account settings. For access, correction, a portable copy of your data, or another privacy request, email <a href="mailto:privacy@splidly.site">privacy@splidly.site</a>.</p>
+     <p>You can edit or remove your profile picture, display name, and home currency; edit or remove a group picture while you own the group; sign out; or start account deletion from Profile. You can also revoke Splidly’s access through your Apple or Google account settings. For access, correction, a portable copy of your data, or another privacy request, email <a href="mailto:privacy@splidly.site">privacy@splidly.site</a>.</p>
 
      <h2>Security</h2>
      <p>Splidly uses HTTPS in transit, protected device storage for session credentials, and access controls for servers, databases, and backups. No internet service can guarantee absolute security.</p>
@@ -366,14 +368,19 @@ export function privacyPage(): string {
   );
 }
 
-export function deletionPage(signedIn: boolean, scriptNonce?: string): string {
+export function deletionPage(
+  signedIn: boolean,
+  scriptNonce?: string,
+  csrfToken?: string,
+): string {
   if (signedIn) {
+    if (!csrfToken) throw new Error("A CSRF token is required for account deletion");
     return documentLayout(
       "Delete account · Splidly",
       `<h1>Delete your account</h1>
-       <p>Your identity, sign-in connections, sessions, invitations, notifications, and private cached data will be removed immediately. Shared expenses and settlements remain under “Deleted user” so other participants’ balances stay correct.</p>
+       <p>Your identity, sign-in connections, sessions, invitations, notifications, private cached data, and financial descriptions and notes you authored will be removed immediately. Shared amounts and dates remain under “Deleted user” so other participants’ balances stay correct.</p>
        <p><strong>This cannot be undone.</strong> Type DELETE to confirm.</p>
-       <form method="post"><label for="confirmation">Confirmation</label><input id="confirmation" name="confirmation" required pattern="DELETE" autocomplete="off" /><button class="button danger" type="submit">Permanently delete account</button></form>`,
+       <form method="post"><input type="hidden" name="csrfToken" value="${escapeHtml(csrfToken)}" /><label for="confirmation">Confirmation</label><input id="confirmation" name="confirmation" required pattern="DELETE" autocomplete="off" /><button class="button danger" type="submit">Permanently delete account</button></form>`,
     );
   }
   return documentLayout(
@@ -406,7 +413,7 @@ export function deletionResultPage(
   return documentLayout(
     success ? "Account deleted · Splidly" : "Could not delete · Splidly",
     success
-      ? `<h1>Account deleted</h1><p>Your Splidly identity, sign-in connections, sessions, and private cached data have been removed.</p>${manualAppleRevocationRequired ? "<p>Splidly had no Apple token it could revoke. Remove Splidly manually in your Apple Account’s Sign in with Apple settings.</p>" : ""}`
+      ? `<h1>Account deleted</h1><p>Your Splidly identity, sign-in connections, sessions, and private cached data have been removed.</p>${manualAppleRevocationRequired ? "<p>Splidly could not automatically revoke its Apple authorization. Remove Splidly manually in your Apple Account’s Sign in with Apple settings.</p>" : ""}`
       : `<h1>Account not deleted</h1><p>${escapeHtml(message ?? "Please try again.")}</p>`,
   );
 }

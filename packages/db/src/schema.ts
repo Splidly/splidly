@@ -30,7 +30,6 @@ export interface ExpenseEventNotificationPayload {
   expenseId: string;
   expenseVersion: number;
   groupId: string;
-  groupName: string;
   title: string;
   body: string;
 }
@@ -38,7 +37,6 @@ export interface ExpenseEventNotificationPayload {
 export interface ExpenseSummaryNotificationPayload {
   eventType: "expense.summary";
   groupId: string;
-  groupName: string;
   eventCount: number;
   title: string;
   body: string;

@@ -2,6 +2,7 @@ import { serve } from "@hono/node-server";
 import { createDatabase, sql } from "@splidly/db";
 import { createApp } from "./app";
 import { createAuth } from "./auth";
+import { startDataRetentionWorker } from "./data-retention";
 import { readEnv } from "./env";
 import { Logger } from "./logger";
 import { startNotificationWorker } from "./notification-worker";
@@ -42,6 +43,10 @@ async function main() {
 
   const auth = await createAuth(db, env, logger.child({ component: "auth" }));
   const app = createApp({ auth, db, env, logger });
+  const dataRetentionWorker = startDataRetentionWorker(
+    db,
+    logger.child({ component: "data-retention" }),
+  );
   const notificationWorker = await startNotificationWorker(
     db,
     env,
@@ -59,6 +64,7 @@ async function main() {
     shuttingDown = true;
     logger.info("server.shutdown.started", { reason });
     notificationWorker.stop();
+    dataRetentionWorker.stop();
     await new Promise<void>((resolve) => server.close(() => resolve()));
     await pool.end();
     logger.info("server.shutdown.completed", { reason });

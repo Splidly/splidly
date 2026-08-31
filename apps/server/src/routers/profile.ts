@@ -3,6 +3,8 @@ import {
   and,
   currencyQuotes,
   eq,
+  expenses,
+  financialRevisions,
   groupMembers,
   groups,
   inArray,
@@ -10,9 +12,11 @@ import {
   isNull,
   ledgerValuations,
   notificationOutbox,
+  or,
   profiles,
   pushInstallations,
   sessions,
+  settlements,
   sql,
   users,
   verifications,
@@ -24,11 +28,44 @@ import {
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { requireProfile } from "../domain/helpers";
+import type { Auth } from "../auth";
+import type { Logger } from "../logger";
 import {
   protectedProcedure,
   recentProtectedProcedure,
   router,
 } from "../trpc";
+
+export async function revokeAppleProviderAccounts(
+  providerAccounts: {
+    providerId: string;
+    accessToken: string | null;
+    refreshToken: string | null;
+  }[],
+  auth: Pick<Auth, "decryptOAuthToken" | "revokeAppleToken">,
+  logger: Logger,
+): Promise<boolean> {
+  let manualAppleRevocationRequired = false;
+  for (const account of providerAccounts) {
+    if (account.providerId !== "apple") continue;
+    const storedToken = account.refreshToken ?? account.accessToken;
+    if (!storedToken) {
+      manualAppleRevocationRequired = true;
+      continue;
+    }
+    try {
+      const token = await auth.decryptOAuthToken(storedToken);
+      await auth.revokeAppleToken({
+        token,
+        tokenType: account.refreshToken ? "refresh_token" : "access_token",
+      });
+    } catch (cause) {
+      manualAppleRevocationRequired = true;
+      logger.warn("account.delete.apple-revocation-failed", { cause });
+    }
+  }
+  return manualAppleRevocationRequired;
+}
 
 export const profileRouter = router({
   me: protectedProcedure.query(async ({ ctx }) =>
@@ -119,35 +156,53 @@ export const profileRouter = router({
         })
         .from(accounts)
         .where(eq(accounts.userId, userId));
-      let manualAppleRevocationRequired = false;
-      for (const account of providerAccounts) {
-        if (account.providerId !== "apple") continue;
-        const storedToken = account.refreshToken ?? account.accessToken;
-        if (!storedToken) {
-          manualAppleRevocationRequired = true;
-          continue;
-        }
-        try {
-          const token = await ctx.auth.decryptOAuthToken(storedToken);
-          await ctx.auth.revokeAppleToken({
-            token,
-            tokenType: account.refreshToken
-              ? "refresh_token"
-              : "access_token",
-          });
-        } catch (cause) {
-          ctx.logger.error("account.delete.apple-revocation-failed", {
-            cause,
-          });
-          throw new TRPCError({
-            code: "SERVICE_UNAVAILABLE",
-            message:
-              "Apple authorization could not be revoked. Please try again.",
-          });
-        }
-      }
+      const manualAppleRevocationRequired =
+        await revokeAppleProviderAccounts(
+          providerAccounts,
+          ctx.auth,
+          ctx.logger,
+        );
 
       return ctx.db.transaction(async (tx) => {
+        const [
+          authoredExpenses,
+          authoredSettlements,
+          latestEditedExpenses,
+          latestEditedSettlements,
+        ] = await Promise.all([
+          tx
+            .select({ id: expenses.id })
+            .from(expenses)
+            .where(eq(expenses.createdBy, userId)),
+          tx
+            .select({ id: settlements.id })
+            .from(settlements)
+            .where(eq(settlements.createdBy, userId)),
+          tx
+            .select({ id: expenses.id })
+            .from(expenses)
+            .innerJoin(
+              financialRevisions,
+              and(
+                eq(financialRevisions.recordType, "expense"),
+                eq(financialRevisions.recordId, expenses.id),
+                eq(financialRevisions.version, expenses.version),
+                eq(financialRevisions.actorId, userId),
+              ),
+            ),
+          tx
+            .select({ id: settlements.id })
+            .from(settlements)
+            .innerJoin(
+              financialRevisions,
+              and(
+                eq(financialRevisions.recordType, "settlement"),
+                eq(financialRevisions.recordId, settlements.id),
+                eq(financialRevisions.version, settlements.version),
+                eq(financialRevisions.actorId, userId),
+              ),
+            ),
+        ]);
         const activeMemberships = await tx
           .select({ groupId: groupMembers.groupId })
           .from(groupMembers)
@@ -160,6 +215,10 @@ export const profileRouter = router({
             ),
           );
         const deletedAt = new Date();
+        await tx
+          .update(groups)
+          .set({ imageUrl: null, updatedAt: deletedAt })
+          .where(eq(groups.createdBy, userId));
         const activeGroupIds = activeMemberships.map(
           (membership) => membership.groupId,
         );
@@ -249,6 +308,65 @@ export const profileRouter = router({
               ctx.session.user.email,
             ]),
           );
+        const expenseIdsToMinimize = [
+          ...new Set(
+            [...authoredExpenses, ...latestEditedExpenses].map(({ id }) => id),
+          ),
+        ];
+        const settlementIdsToMinimize = [
+          ...new Set(
+            [...authoredSettlements, ...latestEditedSettlements].map(
+              ({ id }) => id,
+            ),
+          ),
+        ];
+        if (expenseIdsToMinimize.length > 0) {
+          await tx
+            .update(expenses)
+            .set({
+              description: "Deleted expense",
+              notes: "",
+              updatedAt: deletedAt,
+            })
+            .where(inArray(expenses.id, expenseIdsToMinimize));
+        }
+        if (settlementIdsToMinimize.length > 0) {
+          await tx
+            .update(settlements)
+            .set({ notes: "", updatedAt: deletedAt })
+            .where(inArray(settlements.id, settlementIdsToMinimize));
+        }
+        const revisionRecordFilters = [eq(financialRevisions.actorId, userId)];
+        if (authoredExpenses.length > 0) {
+          revisionRecordFilters.push(
+            and(
+              eq(financialRevisions.recordType, "expense"),
+              inArray(
+                financialRevisions.recordId,
+                authoredExpenses.map(({ id }) => id),
+              ),
+            )!,
+          );
+        }
+        if (authoredSettlements.length > 0) {
+          revisionRecordFilters.push(
+            and(
+              eq(financialRevisions.recordType, "settlement"),
+              inArray(
+                financialRevisions.recordId,
+                authoredSettlements.map(({ id }) => id),
+              ),
+            )!,
+          );
+        }
+        if (revisionRecordFilters.length > 0) {
+          await tx
+            .update(financialRevisions)
+            .set({
+              snapshot: sql`${financialRevisions.snapshot} - 'notes' - 'description'`,
+            })
+            .where(or(...revisionRecordFilters));
+        }
         await tx
           .update(profiles)
           .set({

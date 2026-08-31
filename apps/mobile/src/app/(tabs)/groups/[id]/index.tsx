@@ -166,17 +166,20 @@ export default function GroupDetailScreen() {
                 return (
                   <SettlementActivityRow
                     settlement={item.record}
-                    onPress={() =>
-                      router.push({
-                        pathname: "/settlement/new",
-                        params: {
-                          type: "group",
-                          id: group.id,
-                          canonicalCurrency: group.currency,
-                          settlementId: item.record.id,
-                        },
-                      })
-                    }
+                    {...(item.record.canEdit
+                      ? {
+                          onPress: () =>
+                            router.push({
+                              pathname: "/settlement/new",
+                              params: {
+                                type: "group",
+                                id: group.id,
+                                canonicalCurrency: group.currency,
+                                settlementId: item.record.id,
+                              },
+                            }),
+                        }
+                      : {})}
                   />
                 );
               }

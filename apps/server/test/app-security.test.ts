@@ -86,6 +86,20 @@ describe("HTTP security boundary", () => {
     });
   });
 
+  it("rejects account deletion posts without a matching CSRF token", async () => {
+    const response = await testApp().request("/account/delete", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        origin: env.APP_PUBLIC_URL,
+      },
+      body: "confirmation=DELETE",
+    });
+
+    expect(response.status).toBe(403);
+    expect(await response.text()).toContain("Invalid security token");
+  });
+
   it("publishes no Android association while Android is unreleased", async () => {
     const response = await testApp().request("/.well-known/assetlinks.json");
     await expect(response.json()).resolves.toEqual([]);

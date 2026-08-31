@@ -42,6 +42,8 @@ Better Auth.
 
 See **[Development and deployment setup](docs/SETUP.md)** to run Splidly,
 configure identity providers and notifications, or deploy your own instance.
+Before making a fork or release public, follow the
+**[publication checklist](docs/PUBLICATION.md)**.
 For vulnerability reporting and production controls, see the
 **[security policy](SECURITY.md)** and
 **[security operations runbook](docs/SECURITY_OPERATIONS.md)**.
@@ -49,6 +51,7 @@ Production server and store configuration is covered in the
 **[deployment section](docs/SETUP.md#production)**.
 
 ```sh
+pnpm publication:check
 pnpm typecheck
 pnpm test
 pnpm build
@@ -56,4 +59,6 @@ pnpm build
 
 ## License
 
-Splidly is available under the [MIT License](LICENSE).
+Original Splidly source code is available under the [MIT License](LICENSE).
+Third-party software, store badges, names, and trademarks remain subject to
+their respective terms; see [Third-party notices](THIRD_PARTY_NOTICES.md).

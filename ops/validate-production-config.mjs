@@ -16,6 +16,7 @@ const placeholder = /replace|changeme|example|configure-me|placeholder/i;
 const requiredKeys = [
   "APP_DOMAIN",
   "POSTGRES_PASSWORD",
+  "POSTGRES_RUNTIME_PASSWORD",
   "BETTER_AUTH_SECRET",
   "APPLE_SIGN_IN_CLIENT_ID",
   "APPLE_SIGN_IN_KEY_ID",
@@ -59,6 +60,32 @@ if (process.env.LOG_FORMAT && process.env.LOG_FORMAT !== "json") {
 }
 if ((process.env.POSTGRES_PASSWORD?.length ?? 0) < 24) {
   errors.push("POSTGRES_PASSWORD must contain at least 24 characters");
+}
+if (!/^[A-Za-z0-9_-]{24,}$/.test(process.env.POSTGRES_PASSWORD ?? "")) {
+  errors.push("POSTGRES_PASSWORD must use URL-safe base64 characters");
+}
+if ((process.env.POSTGRES_RUNTIME_PASSWORD?.length ?? 0) < 24) {
+  errors.push("POSTGRES_RUNTIME_PASSWORD must contain at least 24 characters");
+}
+if (
+  !/^[A-Za-z0-9_-]{24,}$/.test(
+    process.env.POSTGRES_RUNTIME_PASSWORD ?? "",
+  )
+) {
+  errors.push("POSTGRES_RUNTIME_PASSWORD must use URL-safe base64 characters");
+}
+if (
+  process.env.POSTGRES_RUNTIME_PASSWORD &&
+  process.env.POSTGRES_RUNTIME_PASSWORD === process.env.POSTGRES_PASSWORD
+) {
+  errors.push("POSTGRES_RUNTIME_PASSWORD must differ from POSTGRES_PASSWORD");
+}
+if (
+  !/^[a-z_][a-z0-9_]{0,62}$/.test(
+    process.env.POSTGRES_RUNTIME_USER ?? "splidly_app",
+  )
+) {
+  errors.push("POSTGRES_RUNTIME_USER is not a safe PostgreSQL role name");
 }
 const authSecret = process.env.BETTER_AUTH_SECRET ?? "";
 if (authSecret.length < 43 || new Set(authSecret).size < 12) {

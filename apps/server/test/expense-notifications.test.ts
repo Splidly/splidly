@@ -83,9 +83,8 @@ describe("expense notification payloads", () => {
       expenseId: "expense-id",
       expenseVersion: 3,
       groupId: "group-id",
-      groupName: "Lisbon",
-      title: "Ada deleted “Dinner”",
-      body: "Total was 72.00 EUR in Lisbon · You were owed 54.00 EUR",
+      title: "Splidly group activity",
+      body: "Open Splidly to review recent activity.",
     });
   });
 
@@ -111,10 +110,9 @@ describe("expense notification payloads", () => {
     ).toEqual({
       eventType: "expense.summary",
       groupId: "group-id",
-      groupName: "Lisbon",
       eventCount: 3,
-      title: "3 expense updates in Lisbon",
-      body: "Recent activity was grouped to keep notifications manageable.",
+      title: "Splidly group activity",
+      body: "Open Splidly to review recent activity.",
     });
   });
 });

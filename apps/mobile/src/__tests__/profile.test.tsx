@@ -165,7 +165,7 @@ describe("ProfileScreen account deletion", () => {
     await fireEvent.press(view.getByText("Delete account"));
     expect(alert).toHaveBeenCalledWith(
       "Permanently delete account?",
-      expect.stringContaining("Shared expenses and settlements remain"),
+      expect.stringContaining("Shared financial amounts and dates remain"),
       expect.any(Array),
     );
     pressAlertButton(0, "Delete permanently");

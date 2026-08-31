@@ -1,4 +1,4 @@
-FROM node:24-alpine AS build
+FROM node:24.19.0-alpine3.24 AS build
 RUN corepack enable
 WORKDIR /app
 
@@ -23,7 +23,7 @@ FROM build AS production-dependencies
 WORKDIR /app
 RUN pnpm --filter @splidly/server deploy --prod --legacy /prod/server
 
-FROM node:24-alpine AS runtime
+FROM node:24.19.0-alpine3.24 AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=production-dependencies --chown=node:node /prod/server ./apps/server

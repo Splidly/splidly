@@ -28,7 +28,7 @@ services:
       NODE_ENV: ${NODE_ENV:-production}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       PORT: "4000"
-      DATABASE_URL: postgresql://${POSTGRES_USER:-splidly}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-splidly}
+      DATABASE_URL: postgresql://${POSTGRES_RUNTIME_USER:-splidly_app}:${POSTGRES_RUNTIME_PASSWORD:?Set POSTGRES_RUNTIME_PASSWORD}@postgres:5432/${POSTGRES_DB:-splidly}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET}
       API_PUBLIC_URL: https://${APP_DOMAIN}
       APP_PUBLIC_URL: https://${APP_DOMAIN}
@@ -74,7 +74,8 @@ services:
       - -c
       - >-
         ./packages/db/node_modules/.bin/tsx packages/db/src/migrate.ts &&
-        ./apps/server/node_modules/.bin/tsx apps/server/src/encrypt-oauth-tokens.ts
+        ./apps/server/node_modules/.bin/tsx apps/server/src/encrypt-oauth-tokens.ts &&
+        ./apps/server/node_modules/.bin/tsx apps/server/src/configure-runtime-database.ts
     restart: "no"
     pids_limit: 100
     read_only: true
@@ -87,6 +88,8 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-splidly}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-splidly}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET}
+      POSTGRES_RUNTIME_USER: ${POSTGRES_RUNTIME_USER:-splidly_app}
+      POSTGRES_RUNTIME_PASSWORD: ${POSTGRES_RUNTIME_PASSWORD:?Set POSTGRES_RUNTIME_PASSWORD}
     depends_on:
       postgres:
         condition: service_healthy

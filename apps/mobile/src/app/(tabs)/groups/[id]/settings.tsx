@@ -101,6 +101,7 @@ export default function GroupSettingsScreen() {
     balanceMembers.find((member) => member.isViewer)?.userId ??
     me.data?.userId ??
     "";
+  const isOwner = group.createdBy === viewerUserId;
   function requestMemberRemoval(member: GroupBalanceMember) {
     const hasOpenBalance =
       BigInt(member.owes.minor) > 0n || BigInt(member.lent.minor) > 0n;
@@ -147,7 +148,11 @@ export default function GroupSettingsScreen() {
               tone: "muted",
             },
           ]}
-          onEdit={() => router.push(`/groups/${group.id}/edit` as Href)}
+          onEdit={
+            isOwner
+              ? () => router.push(`/groups/${group.id}/edit` as Href)
+              : undefined
+          }
         />
         <Section
           title="Balances"
@@ -159,7 +164,7 @@ export default function GroupSettingsScreen() {
               <Switch
                 accessibilityLabel="Simplify debts"
                 style={{ alignSelf: "center" }}
-                disabled={updateSimplification.isPending}
+                disabled={!isOwner || updateSimplification.isPending}
                 value={simplifyDebts}
                 onValueChange={(nextValue) => {
                   setSimplifyDebts(nextValue);
@@ -179,25 +184,31 @@ export default function GroupSettingsScreen() {
         </Section>
         <Section
           title="Members & balances"
-          footer="Tap a member for details. Swipe left to remove a member after their balance is settled."
+          footer={
+            isOwner
+              ? "Tap a member for details. As owner, swipe left to remove a member after their balance is settled."
+              : "Tap a member for details. Only the group owner can invite or remove members."
+          }
         >
-          <ListRow
-            title={
-              createInvite.isPending
-                ? "Creating invitation…"
-                : "Invite people"
-            }
-            titleColor={
-              process.env.EXPO_OS === "ios"
-                ? PlatformColor("systemBlue")
-                : "#007AFF"
-            }
-            subtitle="Share a link to join this group"
-            showsDisclosureIndicator
-            onPress={() =>
-              createInvite.mutate({ kind: "group", groupId: id })
-            }
-          />
+          {isOwner ? (
+            <ListRow
+              title={
+                createInvite.isPending
+                  ? "Creating invitation…"
+                  : "Invite people"
+              }
+              titleColor={
+                process.env.EXPO_OS === "ios"
+                  ? PlatformColor("systemBlue")
+                  : "#007AFF"
+              }
+              subtitle="Share a one-time link valid for 7 days"
+              showsDisclosureIndicator
+              onPress={() =>
+                createInvite.mutate({ kind: "group", groupId: id })
+              }
+            />
+          ) : null}
           {balanceMembers.map((member) => (
             <View key={member.userId}>
               <RowDivider />
@@ -206,6 +217,7 @@ export default function GroupSettingsScreen() {
                 viewerUserId={viewerUserId}
                 expanded={expandedUserIds.has(member.userId)}
                 removalPending={removeMember.isPending}
+                canRemove={isOwner}
                 onToggle={() =>
                   setExpandedUserIds((current) => {
                     const next = new Set(current);
@@ -235,33 +247,32 @@ export default function GroupSettingsScreen() {
             ])
           }
         />
-        <RowDivider inset={16} />
-        <ListRow
-          title="Archive group"
-          destructive
-          showsDisclosureIndicator={false}
-          onPress={() =>
-            group &&
-            Alert.alert(
-              "Archive group?",
-              "The group will be removed from the active list.",
-              [
-                { text: "Cancel", style: "cancel" },
-                {
-                  text: "Archive",
-                  style: "destructive",
-                  onPress: () =>
-                    archive.mutate({
-                      groupId: id,
-                      expectedVersion: group.version,
-                    }),
-                },
-              ],
-            )
-          }
-        />
-        {group?.createdBy === me.data?.userId ? (
+        {isOwner ? (
           <>
+            <RowDivider inset={16} />
+            <ListRow
+              title="Archive group"
+              destructive
+              showsDisclosureIndicator={false}
+              onPress={() =>
+                Alert.alert(
+                  "Archive group?",
+                  "The group will be removed from the active list.",
+                  [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: "Archive",
+                      style: "destructive",
+                      onPress: () =>
+                        archive.mutate({
+                          groupId: id,
+                          expectedVersion: group.version,
+                        }),
+                    },
+                  ],
+                )
+              }
+            />
             <RowDivider inset={16} />
             <ListRow
               title="Delete group permanently"

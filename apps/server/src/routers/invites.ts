@@ -11,7 +11,11 @@ import {
 import { TRPCError } from "@trpc/server";
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
-import { orderedPair, requireActiveGroupMember } from "../domain/helpers";
+import {
+  orderedPair,
+  requireActiveGroupMember,
+  requireGroupOwner,
+} from "../domain/helpers";
 import { protectedProcedure, publicProcedure, router } from "../trpc";
 
 export function hashInviteToken(token: string): string {
@@ -31,7 +35,7 @@ async function readInvite(
     !invite ||
     invite.revokedAt ||
     invite.expiresAt.getTime() <= Date.now() ||
-    (invite.kind === "friend" && invite.usedAt)
+    invite.usedAt
   ) {
     throw new TRPCError({
       code: "NOT_FOUND",
@@ -90,7 +94,7 @@ export const invitesRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       if (input.kind === "group") {
-        await requireActiveGroupMember(
+        await requireGroupOwner(
           ctx.db,
           input.groupId,
           ctx.session.user.id,
@@ -98,7 +102,7 @@ export const invitesRouter = router({
       }
       const token = randomBytes(32).toString("base64url");
       const expiresAt = new Date(
-        Date.now() + (input.kind === "group" ? 30 : 7) * 24 * 60 * 60 * 1_000,
+        Date.now() + 7 * 24 * 60 * 60 * 1_000,
       );
       const [invite] = await ctx.db
         .insert(invites)
@@ -162,7 +166,7 @@ export const invitesRouter = router({
         .limit(1);
       if (!invite) throw new TRPCError({ code: "NOT_FOUND" });
       if (invite.groupId) {
-        await requireActiveGroupMember(
+        await requireGroupOwner(
           ctx.db,
           invite.groupId,
           ctx.session.user.id,
@@ -190,24 +194,24 @@ export const invitesRouter = router({
       }
 
       return ctx.db.transaction(async (tx) => {
+        const [claimed] = await tx
+          .update(invites)
+          .set({ usedAt: new Date(), updatedAt: new Date() })
+          .where(
+            and(
+              eq(invites.id, invite.id),
+              isNull(invites.usedAt),
+              isNull(invites.revokedAt),
+            ),
+          )
+          .returning({ id: invites.id });
+        if (!claimed) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "This invite was already used",
+          });
+        }
         if (invite.kind === "friend") {
-          const [claimed] = await tx
-            .update(invites)
-            .set({ usedAt: new Date(), updatedAt: new Date() })
-            .where(
-              and(
-                eq(invites.id, invite.id),
-                isNull(invites.usedAt),
-                isNull(invites.revokedAt),
-              ),
-            )
-            .returning({ id: invites.id });
-          if (!claimed) {
-            throw new TRPCError({
-              code: "CONFLICT",
-              message: "This friend invite was already used",
-            });
-          }
           const [low, high] = orderedPair(invite.inviterId, acceptingId);
           const [friendship] = await tx
             .insert(friendships)

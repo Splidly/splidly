@@ -129,7 +129,7 @@ export default function ProfileScreen() {
       if (result.manualAppleRevocationRequired) {
         Alert.alert(
           "Account deleted",
-          "Splidly had no Apple token it could revoke. You can remove Splidly manually in your Apple Account's Sign in with Apple settings.",
+          "Splidly could not automatically revoke its Apple authorization. Remove Splidly manually in your Apple Account's Sign in with Apple settings.",
         );
       }
     },
@@ -180,7 +180,7 @@ export default function ProfileScreen() {
   function confirmDelete() {
     Alert.alert(
       "Permanently delete account?",
-      "Your profile, sign-in connections, sessions, invitations, notifications, and private app data will be removed. Shared expenses and settlements remain under “Deleted user” so other participants' balances stay correct. This cannot be undone.",
+      "Your profile, sign-in connections, sessions, invitations, notifications, and private app data will be removed. Shared financial amounts and dates remain under “Deleted user” so other participants' balances stay correct; descriptions and notes you authored are erased. This cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         {

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { Env } from "../src/env";
-import { invitePage, landingPage, privacyPage } from "../src/pages";
+import {
+  deletionPage,
+  invitePage,
+  landingPage,
+  privacyPage,
+} from "../src/pages";
 
 const env = {
   APP_SCHEME: "splidly",
@@ -100,5 +105,17 @@ describe("privacy page", () => {
     expect(privacyPage()).not.toContain(
       "export or delete your account from Settings",
     );
+  });
+});
+
+describe("account deletion page", () => {
+  it("embeds the server-issued CSRF token only in the signed-in form", () => {
+    const html = deletionPage(true, undefined, "csrf-token");
+    expect(html).toContain('name="csrfToken" value="csrf-token"');
+    expect(html).toContain('name="confirmation"');
+  });
+
+  it("requires a CSRF token when rendering a destructive form", () => {
+    expect(() => deletionPage(true)).toThrow("CSRF token");
   });
 });

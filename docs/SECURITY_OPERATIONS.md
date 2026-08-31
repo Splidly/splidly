@@ -9,6 +9,9 @@ security review.
 - Generate independent, high-entropy database and Better Auth secrets. The
   server rejects placeholder or low-diversity production authentication
   secrets and non-HTTPS public URLs.
+- Generate a separate `POSTGRES_RUNTIME_PASSWORD`. The migration container
+  creates a least-privilege login for the API; never reuse the database-owner
+  password for it.
 - Keep Apple and APNs private keys outside the repository with owner-only read
   permissions. Mount them through Compose secrets.
 - Use the supplied Nginx configuration or equivalent TLS termination, request
@@ -59,10 +62,19 @@ care; it contains production secrets. Plaintext legacy dumps require the
 explicit `ALLOW_PLAINTEXT_RESTORE=1` override and must be securely removed
 immediately afterward.
 
+Run `ops/verify-production-backup.sh` as root on the production host to verify
+the latest snapshot by restoring it into a temporary, network-isolated
+PostgreSQL container. The script refuses to reuse an existing container and
+always removes its temporary database after the verification.
+
 ## Monitoring and response
 
-- Collect JSON server and reverse-proxy logs in access-controlled storage with
-  a defined retention period. Alert on repeated 401, 403, 413, and 429 responses,
+- Collect sanitized JSON application logs and edge security events in
+  access-controlled storage with a defined retention period. The supplied
+  Nginx configuration disables raw access logs because invitation paths contain
+  bearer credentials. Configure Cloudflare logging and analytics to avoid or
+  redact full invitation URLs and keep only the shortest operational retention.
+  Alert on repeated 401, 403, 413, and 429 responses,
   authentication failures, unexpected 5xx spikes, and repeated provider-token
   failures.
 - Monitor certificate expiry, database capacity, backup completion and restore
@@ -78,6 +90,7 @@ Run before every release:
 
 ```sh
 pnpm install --frozen-lockfile
+pnpm publication:check
 pnpm production:check
 pnpm audit --prod
 pnpm typecheck
@@ -86,12 +99,10 @@ pnpm build
 docker compose config --quiet
 ```
 
-As of 2026-08-18, `pnpm audit --prod` reports two high-severity denial-of-service
-advisories for `image-size` 2.0.2, reached only through Expo/Metro build tooling.
-The audit lists 2.0.3 as fixed, but npm has not published that version yet. Do
-not pass untrusted image files to Metro, and remove this exception as soon as a
-patched release is available. All other advisories reported on that date are
-resolved by the workspace overrides.
+The repository's CI repeats publication validation, dependency auditing,
+typechecking, tests, and builds on every pull request. CodeQL and dependency
+review activate for the public repository. Keep `main` protected and require
+the CI `Verify` check plus a code-owner review before merging.
 
 Also verify response security headers, rate-limit behavior, an encrypted backup
 and restore, social sign-in, immediate sign-out/session revocation, account

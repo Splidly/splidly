@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app";
 import type { Auth } from "../src/auth";
 import type { Env } from "../src/env";
-import { Logger, withLogContext } from "../src/logger";
+import { Logger, sanitizeHttpPath, withLogContext } from "../src/logger";
 
 function captureLogger(level: "debug" | "info" = "debug") {
   const lines: string[] = [];
@@ -19,6 +19,14 @@ function captureLogger(level: "debug" | "info" = "debug") {
 }
 
 describe("structured logger", () => {
+  it("redacts bearer credentials embedded in invite paths", () => {
+    expect(sanitizeHttpPath("/invite/highly-secret-token")).toBe(
+      "/invite/[REDACTED]",
+    );
+    expect(sanitizeHttpPath("/trpc/invites.preview")).toBe(
+      "/trpc/invites.preview",
+    );
+  });
   it("writes JSON, preserves useful values, and serializes errors", () => {
     const capture = captureLogger();
     capture.logger.child({ requestId: "request-1" }).error("example.failed", {
@@ -146,6 +154,21 @@ describe("HTTP observability", () => {
         status: 404,
       }),
     );
+  });
+
+  it("never writes a raw invite token to request logs", async () => {
+    const capture = captureLogger();
+    const app = createApp({
+      auth,
+      db: {} as Database,
+      env,
+      logger: capture.logger,
+    });
+    await app.request("/invite/abcdefghijklmnopqrstuvwxyz123456");
+
+    const output = capture.lines.join("");
+    expect(output).toContain("/invite/[REDACTED]");
+    expect(output).not.toContain("abcdefghijklmnopqrstuvwxyz123456");
   });
 
   it("logs unexpected failures with the same generated request ID", async () => {

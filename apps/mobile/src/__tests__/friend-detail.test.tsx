@@ -14,6 +14,7 @@ let mockFriendExpenses: Array<{
 }> = [];
 let mockFriendSettlements: Array<{
   id: string;
+  canEdit: boolean;
   occurredAt: Date;
   createdAt: Date;
   canonicalCurrency: string;
@@ -132,6 +133,7 @@ describe("FriendDetailScreen", () => {
     mockFriendSettlements = [
       {
         id: "settlement-1",
+        canEdit: true,
         occurredAt,
         createdAt: new Date("2026-07-20T15:00:00.000Z"),
         canonicalCurrency: "EUR",

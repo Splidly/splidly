@@ -159,10 +159,16 @@ The API binds to `127.0.0.1:${API_BIND_PORT:-4000}` for a host reverse proxy.
 An Nginx example is available at `ops/nginx-splidly.conf`. PostgreSQL and the
 private Frankfurter service remain on the internal Docker network, and
 migrations must complete before the server starts. The migration job also
-encrypts existing OAuth tokens; new tokens are encrypted when written. Keep
+encrypts existing OAuth tokens and creates a restricted runtime database role;
+new tokens are encrypted when written. Set independent 24+ character URL-safe
+Base64 values for `POSTGRES_PASSWORD` and `POSTGRES_RUNTIME_PASSWORD` (and
+optionally set `POSTGRES_RUNTIME_USER`) in the
+production environment. The API uses this role for data access and cannot
+create schemas, databases, or roles. Keep
 `BETTER_AUTH_SECRET` available to both the migration and server containers.
-The Nginx configuration expects a certificate at
-`/etc/letsencrypt/live/splidly.site/`; obtain or restore that certificate before
+The supplied production-host Nginx configuration uses the existing SAN
+certificate in `/etc/letsencrypt/live/2807.eu/`. If deploying to another host,
+replace those two certificate paths with that host's Certbot lineage before
 enabling the HTTPS server block.
 
 Install production keys outside the repository:
@@ -225,8 +231,22 @@ Copy encrypted backups and the age identity to separate, access-controlled
 off-host locations when a second storage location becomes available. Without
 that, these backups do not protect against loss of the server or its disk.
 
+For an off-site macOS copy, `ops/sync-offsite-backups.sh` copies only encrypted
+snapshot files over a configured SSH host alias, validates every copied
+snapshot, and never writes plaintext data. Copy
+`ops/macos/com.splidly.offsite-backups.plist.example` outside the repository,
+replace every `USERNAME` and `SSH_HOST_ALIAS` placeholder, and point its script
+path at an installed copy of `ops/sync-offsite-backups.sh` before loading it
+with `launchctl`. The launch agent runs at 03:00 local time and once after
+login. Keep the separately copied age identity in an access-controlled recovery
+location; it is deliberately excluded from the scheduled snapshot sync.
+
 Review [Security operations](SECURITY_OPERATIONS.md) before exposing a
 production instance.
+
+Publishing the source repository is a separate operation. Follow
+[the publication checklist](PUBLICATION.md) before changing repository
+visibility; never use the example environment as production configuration.
 
 ## Verification and store delivery
 

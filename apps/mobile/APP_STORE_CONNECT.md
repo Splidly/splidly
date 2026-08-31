@@ -49,6 +49,7 @@ functionality:
 | Other Financial Info  | Expenses, balances, splits, settlements, currencies, and exchange-rate snapshots |
 | Other User Content    | Group names, expense descriptions, and notes                                     |
 | User ID               | Splidly, Apple, and Google account identifiers                                   |
+| Device ID             | Random installation identifier and APNs device token for push notifications      |
 | Other Diagnostic Data | IP address and user agent retained with authenticated sessions for security      |
 
 The Google Sign-In iOS SDK's privacy manifest additionally declares the
@@ -90,8 +91,10 @@ shows one explicit irreversible-action confirmation.
 Deletion revokes an available Sign in with Apple token, removes authentication
 connections, sessions, invitations, push registrations, cached currency
 requests, notification preferences, identifying profile data, and protected
-Splidly data on the device. Shared financial history remains pseudonymized as
-“Deleted user” because removing it would alter other participants' balances.
+Splidly data on the device. It also erases group images owned by the account and
+financial descriptions and notes the account authored or most recently edited.
+Shared financial amounts, currencies, and dates remain pseudonymized as
+“Deleted user” because removing them would alter other participants' balances.
 The public fallback deletion page is `https://splidly.site/account/delete`.
 
 Before submission, verify this path with fresh Apple and Google test accounts,
@@ -102,8 +105,9 @@ ledger history must be retained.
 
 ## External TestFlight review
 
-A reusable group invitation is a suitable reviewer path because group invites
-remain valid for 30 days and can be accepted by more than one account. Keep the
+A one-time group invitation is a suitable reviewer path. It expires after seven
+days and is consumed by the first account that accepts it, so create a fresh
+link immediately before each review submission and never reuse it. Keep the
 review group free of real personal or financial data.
 
 Prepare the group with:

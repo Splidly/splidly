@@ -11,6 +11,7 @@
     "dev": "LOG_FORMAT=${LOG_FORMAT:-pretty} node --env-file-if-exists=../../.env --import tsx --watch src/index.ts",
     "start": "node dist/index.js",
     "security:encrypt-oauth-tokens": "tsx --env-file-if-exists=../../.env src/encrypt-oauth-tokens.ts",
+    "security:configure-runtime-database": "tsx --env-file-if-exists=../../.env src/configure-runtime-database.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
@@ -30,6 +31,7 @@
   },
   "devDependencies": {
     "@types/node": "26.2.0",
+    "@types/pg": "8.21.0",
     "tsdown": "0.22.14",
     "tsx": "4.23.12",
     "typescript": "5.9.3",
