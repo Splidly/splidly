@@ -1,7 +1,7 @@
 # Splidly
 
 <p align="center">
-  <img src="apps/server/assets/og.png" alt="Splidly — Split the cost. Keep the good part." width="100%" />
+  <img src="apps/server/assets/og.png" alt="Splidly - Split the cost. Keep the good part." width="100%" />
 </p>
 
 <p align="center"><strong>Split the cost. Keep the good part.</strong></p>
@@ -17,7 +17,7 @@ settle up without turning the plan into a spreadsheet.
 - Flexible expense splitting
 - Multiple currencies with frozen conversion rates
 - Clear balances, statistics, and settlements
-- No ads — fully open source
+- No ads - fully open source
 
 ## Built in the open
 
@@ -35,10 +35,10 @@ Splidly is developed by
 Splidly is an Expo and Hono monorepo backed by PostgreSQL, Drizzle, tRPC, and
 Better Auth.
 
-- `apps/mobile` — iOS and Android app
-- `apps/server` — API and public website
-- `packages/db` — database schema and migrations
-- `packages/shared` — shared contracts and money utilities
+- `apps/mobile` - iOS and Android app
+- `apps/server` - API and public website
+- `packages/db` - database schema and migrations
+- `packages/shared` - shared contracts and money utilities
 
 See **[Development and deployment setup](docs/SETUP.md)** to run Splidly,
 configure identity providers and notifications, or deploy your own instance.

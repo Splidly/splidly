@@ -65,15 +65,15 @@ export function landingPage(env: Env): string {
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="description" content="Splidly makes shared expenses simple for trips, homes, and everyday plans." />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Splidly — Split the cost. Keep the good part." />
+    <meta property="og:title" content="Splidly - Split the cost. Keep the good part." />
     <meta property="og:description" content="A calm, clear way to track shared expenses and settle up." />
     <meta property="og:url" content="https://splidly.site/" />
     <meta property="og:image" content="https://splidly.site/og.png" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Splidly — Split the cost. Keep the good part." />
+    <meta name="twitter:title" content="Splidly - Split the cost. Keep the good part." />
     <meta name="twitter:description" content="A calm, clear way to track shared expenses and settle up." />
     <meta name="twitter:image" content="https://splidly.site/og.png" />
-    <title>Splidly — Shared expenses, made simple</title>
+    <title>Splidly - Shared expenses, made simple</title>
     <style>
       :root {
         color-scheme: light;
@@ -265,7 +265,7 @@ export function landingPage(env: Env): string {
         <div class="hero-copy">
           <div class="eyebrow"><span class="eyebrow-dot" aria-hidden="true">&#10003;</span> Shared plans, sorted</div>
           <h1>Split the cost.<br />Keep the good part.</h1>
-          <p>Splidly makes shared expenses feel effortless — from weekend trips to the everyday stuff at home.</p>
+          <p>Splidly makes shared expenses feel effortless - from weekend trips to the everyday stuff at home.</p>
           ${stores}
           <div class="hero-note">Free to start · No ads · Built for iPhone &amp; iPad</div>
         </div>

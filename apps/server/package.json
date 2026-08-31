@@ -16,25 +16,25 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@better-auth/expo": "1.7.2",
-    "@hono/node-server": "2.1.0",
+    "@better-auth/expo": "1.6.27",
+    "@hono/node-server": "2.1.1",
     "@splidly/db": "workspace:*",
     "@splidly/shared": "workspace:*",
     "@trpc/server": "11.18.0",
     "better-auth": "1.7.2",
     "drizzle-orm": "0.45.2",
-    "hono": "4.13.1",
-    "jose": "6.2.8",
+    "hono": "4.13.5",
+    "jose": "6.2.10",
     "pg": "8.23.0",
     "superjson": "2.2.6",
     "zod": "4.4.3"
   },
   "devDependencies": {
-    "@types/node": "26.2.0",
-    "@types/pg": "8.21.0",
+    "@types/node": "26.4.0",
+    "@types/pg": "8.23.1",
     "tsdown": "0.22.14",
     "tsx": "4.23.12",
     "typescript": "5.9.3",
-    "vitest": "4.1.10"
+    "vitest": "4.1.11"
   }
 }
