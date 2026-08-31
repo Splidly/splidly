@@ -1,5 +1,10 @@
 # Agent Instructions
 
+## Use hyphens instead of em dashes
+
+Always use the ASCII hyphen (`-`) instead of the Unicode U+2014 em dash in
+prose, UI copy, documentation, comments, commit messages, and agent responses.
+
 ## Never allow text selection
 
 This requirement applies only to the React Native app in `apps/mobile`. Text
