@@ -18,7 +18,7 @@
     "submit:ios": "pnpm dlx eas-cli@22.0.0 env:exec production 'pnpm dlx eas-cli@22.0.0 submit --platform ios --profile production --latest'"
   },
   "dependencies": {
-    "@better-auth/expo": "1.6.27",
+    "@better-auth/expo": "1.7.2",
     "@expo/material-symbols": "^0.1.1",
     "@expo/ui": "~57.0.14",
     "@react-native-google-signin/google-signin": "16.1.4",
@@ -27,7 +27,7 @@
     "@tanstack/react-query": "5.101.4",
     "@trpc/client": "11.18.0",
     "@trpc/react-query": "11.18.0",
-    "better-auth": "1.6.27",
+    "better-auth": "1.7.2",
     "expo": "~57.0.18",
     "expo-apple-authentication": "~57.0.1",
     "expo-application": "~57.0.2",
