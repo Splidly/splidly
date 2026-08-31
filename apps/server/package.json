@@ -17,14 +17,14 @@
   },
   "dependencies": {
     "@better-auth/expo": "1.6.27",
-    "@hono/node-server": "2.1.0",
+    "@hono/node-server": "2.1.1",
     "@splidly/db": "workspace:*",
     "@splidly/shared": "workspace:*",
     "@trpc/server": "11.18.0",
     "better-auth": "1.6.27",
     "drizzle-orm": "0.45.2",
-    "hono": "4.13.1",
-    "jose": "6.2.8",
+    "hono": "4.13.5",
+    "jose": "6.2.10",
     "pg": "8.23.0",
     "superjson": "2.2.6",
     "zod": "4.4.3"
