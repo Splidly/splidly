@@ -16,7 +16,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@better-auth/expo": "1.6.27",
+    "@better-auth/expo": "1.7.2",
     "@hono/node-server": "2.1.1",
     "@splidly/db": "workspace:*",
     "@splidly/shared": "workspace:*",
