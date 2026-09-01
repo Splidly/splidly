@@ -9,9 +9,15 @@ import {
 
 describe("friendlyFetch", () => {
   const originalFetch = global.fetch;
+  let consoleError: jest.SpyInstance;
+
+  beforeEach(() => {
+    consoleError = jest.spyOn(console, "error").mockImplementation();
+  });
 
   afterEach(() => {
     global.fetch = originalFetch;
+    consoleError.mockRestore();
   });
 
   it("replaces native transport details with an actionable message", async () => {
@@ -26,6 +32,15 @@ describe("friendlyFetch", () => {
         cause,
       },
     );
+    expect(consoleError).toHaveBeenCalledWith(
+      "Splidly network request failed",
+      expect.objectContaining({
+        cause,
+        timedOut: false,
+        upstreamAborted: false,
+        url: "https://splidly.site/trpc",
+      }),
+    );
   });
 
   it("passes successful responses through unchanged", async () => {
@@ -35,6 +50,25 @@ describe("friendlyFetch", () => {
     await expect(
       friendlyFetch("https://splidly.site/health/ready"),
     ).resolves.toBe(response);
+  });
+
+  it("normalizes object headers for Expo's native fetch bridge", async () => {
+    const response = new Response(null, { status: 204 });
+    global.fetch = jest.fn().mockResolvedValue(response);
+
+    await friendlyFetch("https://splidly.site/trpc/profile.me", {
+      headers: { Cookie: "session=test", "x-client": "mobile" },
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://splidly.site/trpc/profile.me",
+      expect.objectContaining({
+        headers: [
+          ["cookie", "session=test"],
+          ["x-client", "mobile"],
+        ],
+      }),
+    );
   });
 
   it("replaces an HTML gateway failure with a service availability error", async () => {
@@ -106,5 +140,6 @@ describe("friendlyFetch", () => {
         signal: controller.signal,
       }),
     ).rejects.toBe(cause);
+    expect(consoleError).not.toHaveBeenCalled();
   });
 });

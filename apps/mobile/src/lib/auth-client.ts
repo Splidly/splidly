@@ -54,5 +54,5 @@ export async function signInAsDemo() {
 }
 
 export const authClient = client as typeof client & {
-  getCookie(): string;
+  getCookie(): Promise<string>;
 };

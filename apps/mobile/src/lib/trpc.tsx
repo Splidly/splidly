@@ -43,8 +43,8 @@ export function ApiProvider({ children }: PropsWithChildren) {
           url: `${API_URL}/trpc`,
           fetch: (input, init) =>
             friendlyFetch(input, init as RequestInit | undefined),
-          headers() {
-            const cookie = authClient.getCookie();
+          async headers() {
+            const cookie = await authClient.getCookie();
             return cookie ? { Cookie: cookie } : {};
           },
         }),

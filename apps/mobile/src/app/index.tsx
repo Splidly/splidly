@@ -1,9 +1,11 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useRef } from "react";
-import { LoadingState, Screen } from "../components/ui";
+import { useCallback, useEffect, useRef } from "react";
+import { ErrorState, LoadingState, Screen } from "../components/ui";
 import { authClient } from "../lib/auth-client";
 import { useConnectivity } from "../lib/connectivity";
+import { friendlyErrorMessage } from "../lib/network";
+import { profileNavigationState } from "../lib/profile-navigation";
 import { api } from "../lib/trpc";
 
 export default function IndexScreen() {
@@ -15,6 +17,14 @@ export default function IndexScreen() {
   });
   const cancel = api.profile.deleteAccount.useMutation();
   const cancelling = useRef(false);
+  const profileState = profileNavigationState(profile);
+  const startupError = session.error ?? profile.error;
+
+  useEffect(() => {
+    if (__DEV__ && startupError) {
+      console.error("Splidly startup request failed", startupError);
+    }
+  }, [startupError]);
 
   useFocusEffect(
     useCallback(() => {
@@ -23,8 +33,8 @@ export default function IndexScreen() {
         router.replace("/sign-in");
         return;
       }
-      if (profile.isPending) return;
-      if (!profile.data?.onboardedAt) {
+      if (profileState === "pending" || profileState === "error") return;
+      if (profileState === "onboarding") {
         if (cancelling.current) return;
         cancelling.current = true;
         void cancel
@@ -42,8 +52,7 @@ export default function IndexScreen() {
       }
       router.replace("/(tabs)/friends");
     }, [
-      profile.data?.onboardedAt,
-      profile.isPending,
+      profileState,
       cancel,
       queryClient,
       session.data?.user,
@@ -55,7 +64,17 @@ export default function IndexScreen() {
 
   return (
     <Screen>
-      <LoadingState />
+      {startupError ? (
+        <ErrorState
+          message={friendlyErrorMessage(startupError)}
+          onRetry={() => {
+            if (session.error) void session.refetch();
+            if (profile.error) void profile.refetch();
+          }}
+        />
+      ) : (
+        <LoadingState />
+      )}
     </Screen>
   );
 }

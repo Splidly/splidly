@@ -6,6 +6,27 @@ const REQUEST_ERROR_MESSAGE =
   "Splidly couldn’t complete that request. Please try again.";
 const NETWORK_TIMEOUT_MS = 15_000;
 
+function requestDescription(input: Parameters<typeof fetch>[0]) {
+  const rawUrl =
+    typeof input === "string"
+      ? input
+      : input instanceof URL
+        ? input.toString()
+        : input.url;
+  try {
+    const url = new URL(rawUrl);
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return "[unparseable request URL]";
+  }
+}
+
+function nativeHeaderPairs(headers: HeadersInit): [string, string][] {
+  const pairs: [string, string][] = [];
+  new Headers(headers).forEach((value, key) => pairs.push([key, value]));
+  return pairs;
+}
+
 const networkMessagePatterns = [
   "failed to fetch",
   "fetch failed",
@@ -74,8 +95,23 @@ export const friendlyFetch: typeof fetch = async (input, init) => {
   const timeout = setTimeout(() => controller.abort(), NETWORK_TIMEOUT_MS);
   let response: Response;
   try {
-    response = await fetch(input, { ...init, signal: controller.signal });
+    response = await fetch(input, {
+      ...init,
+      ...(init?.headers
+        ? { headers: nativeHeaderPairs(init.headers) }
+        : {}),
+      signal: controller.signal,
+    });
   } catch (cause) {
+    if (__DEV__ && !upstreamSignal?.aborted) {
+      console.error("Splidly network request failed", {
+        cause,
+        method: init?.method ?? (input instanceof Request ? input.method : "GET"),
+        timedOut: controller.signal.aborted && !upstreamSignal?.aborted,
+        upstreamAborted: upstreamSignal?.aborted ?? false,
+        url: requestDescription(input),
+      });
+    }
     if (upstreamSignal?.aborted) throw cause;
     throw new Error(NETWORK_ERROR_MESSAGE, { cause });
   } finally {

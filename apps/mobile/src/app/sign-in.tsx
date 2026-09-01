@@ -17,6 +17,7 @@ import { authClient, signInAsDemo } from "../lib/auth-client";
 import { isAppleSignInCancellation } from "../lib/auth-errors";
 import { friendlyErrorMessage } from "../lib/network";
 import { pendingInvite } from "../lib/pending-invite";
+import { profileNavigationState } from "../lib/profile-navigation";
 import { api } from "../lib/trpc";
 import { useTheme } from "../theme";
 
@@ -41,6 +42,10 @@ export default function SignInScreen() {
   const handledUserId = useRef<string | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+  const profileState = profileNavigationState(profile);
+  const profileError = profile.error
+    ? friendlyErrorMessage(profile.error, "Could not load your profile")
+    : undefined;
 
   useEffect(() => {
     const userId = session.data?.user.id;
@@ -48,9 +53,15 @@ export default function SignInScreen() {
       handledUserId.current = undefined;
       return;
     }
-    if (profile.isPending || handledUserId.current === userId) return;
+    if (
+      profileState === "pending" ||
+      profileState === "error" ||
+      handledUserId.current === userId
+    ) {
+      return;
+    }
     handledUserId.current = userId;
-    if (!profile.data?.onboardedAt) {
+    if (profileState === "onboarding") {
       router.push("/onboarding");
       return;
     }
@@ -58,8 +69,7 @@ export default function SignInScreen() {
       router.replace(token ? `/invite/${token}` : "/(tabs)/friends");
     });
   }, [
-    profile.data?.onboardedAt,
-    profile.isPending,
+    profileState,
     session.data?.user?.id,
   ]);
 
@@ -223,7 +233,16 @@ export default function SignInScreen() {
             />
           </View>
         ) : null}
-        {error ? <View style={{ width: "100%" }}><ErrorState message={error} /></View> : null}
+        {error || profileError ? (
+          <View style={{ width: "100%" }}>
+            <ErrorState
+              message={error ?? profileError ?? "Could not load your profile"}
+              {...(!error && profile.error
+                ? { onRetry: () => void profile.refetch() }
+                : {})}
+            />
+          </View>
+        ) : null}
         <Text
           style={{
             color: theme.muted,
