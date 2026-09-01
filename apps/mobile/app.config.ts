@@ -76,6 +76,7 @@ const config: ExpoConfig = {
   },
   android: {
     package: buildConfig.androidPackage,
+    softwareKeyboardLayoutMode: "resize",
     icon: "./assets/icons/android-legacy.png",
     adaptiveIcon: {
       foregroundImage: "./assets/icons/android-foreground.png",

@@ -14,7 +14,6 @@ import {
   fillMaxWidth,
   height,
   paddingAll,
-  width,
 } from "@expo/ui/jetpack-compose/modifiers";
 import { useState } from "react";
 import { StyleSheet } from "react-native";
@@ -65,7 +64,7 @@ export function CustomGroupColorPicker({
           <BasicAlertDialog onDismissRequest={() => setOpen(false)}>
             <Surface
               shape={roundedDialog}
-              modifiers={[width(320), paddingAll(24)]}
+              modifiers={[fillMaxWidth(), paddingAll(24)]}
             >
               <Column verticalArrangement={{ spacedBy: 14 }}>
                 <Text style={{ typography: "headlineSmall" }}>

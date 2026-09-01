@@ -315,6 +315,7 @@ function ScreenBottomOverlay({
         bottom: 0,
         left: 0,
         height: height + insets.bottom,
+        paddingHorizontal: spacing.md,
         paddingBottom: insets.bottom,
         alignItems: "center",
         justifyContent: "center",

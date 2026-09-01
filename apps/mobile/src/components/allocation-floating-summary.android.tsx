@@ -1,4 +1,4 @@
-import { Text, useWindowDimensions, View } from "react-native";
+import { Text, View } from "react-native";
 import { useTheme } from "../theme";
 
 export function AllocationFloatingSummary({
@@ -11,7 +11,6 @@ export function AllocationFloatingSummary({
   complete: boolean;
 }) {
   const theme = useTheme();
-  const { width: windowWidth } = useWindowDimensions();
   const progressWidth =
     `${Math.max(0, Math.min(1, progress)) * 100}%` as const;
   return (
@@ -28,7 +27,7 @@ export function AllocationFloatingSummary({
         now: Math.round(Math.max(0, Math.min(1, progress)) * 100),
       }}
       style={{
-        width: windowWidth - 32,
+        width: "100%",
         height: 76,
         paddingHorizontal: 16,
         paddingVertical: 13,

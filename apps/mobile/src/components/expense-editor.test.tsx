@@ -223,10 +223,10 @@ function renderEditor() {
 }
 
 describe("ExpenseEditor", () => {
-  it("auto-focuses the description for a new expense", async () => {
+  it("opens a new expense sheet without moving it to the focused field", async () => {
     const view = await renderEditor();
 
-    expect(view.getByLabelText("Description").props.autoFocus).toBe(true);
+    expect(view.getByLabelText("Description").props.autoFocus).toBe(false);
   });
 
   beforeEach(() => {

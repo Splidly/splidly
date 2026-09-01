@@ -339,6 +339,7 @@ describe("Screen", () => {
     expect(shortStyle.minHeight).toBe(780);
     expect(shortStyle.paddingBottom).toBe(88);
     expect(overlayStyle.height).toBe(108);
+    expect(overlayStyle.paddingHorizontal).toBe(16);
     expect(overlayStyle.paddingBottom).toBe(20);
 
     if (!resizedScrollView) throw new Error("ScrollView was not resized");

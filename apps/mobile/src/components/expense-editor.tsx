@@ -744,7 +744,6 @@ export function ExpenseEditor({
         contentContainerStyle={{ paddingTop: 16, gap: 22 }}
       >
         <ExpenseEntryCard
-          autoFocusDescription={!editing}
           icon={
             <ExpenseIconPicker
               value={iconKey}
