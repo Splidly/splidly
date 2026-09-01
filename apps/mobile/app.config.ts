@@ -57,6 +57,27 @@ const config: ExpoConfig = {
     supportsTablet: true,
     usesAppleSignIn: true,
     associatedDomains: [`applinks:${host}`],
+    privacyManifests: {
+      NSPrivacyTracking: false,
+      NSPrivacyTrackingDomains: [],
+      NSPrivacyCollectedDataTypes: [
+        "NSPrivacyCollectedDataTypeName",
+        "NSPrivacyCollectedDataTypeEmailAddress",
+        "NSPrivacyCollectedDataTypePhotosorVideos",
+        "NSPrivacyCollectedDataTypeOtherFinancialInfo",
+        "NSPrivacyCollectedDataTypeOtherUserContent",
+        "NSPrivacyCollectedDataTypeUserID",
+        "NSPrivacyCollectedDataTypeDeviceID",
+        "NSPrivacyCollectedDataTypeOtherDiagnosticData",
+      ].map((NSPrivacyCollectedDataType) => ({
+        NSPrivacyCollectedDataType,
+        NSPrivacyCollectedDataTypeLinked: true,
+        NSPrivacyCollectedDataTypeTracking: false,
+        NSPrivacyCollectedDataTypePurposes: [
+          "NSPrivacyCollectedDataTypePurposeAppFunctionality",
+        ],
+      })),
+    },
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
       UIApplicationSceneManifest: {

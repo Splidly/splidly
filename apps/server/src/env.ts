@@ -78,6 +78,35 @@ const envSchema = z
       (value) => value || undefined,
       z.string().url().optional(),
     ),
+    LEGAL_NAME: optionalCredential,
+    LEGAL_STREET_ADDRESS: optionalCredential,
+    LEGAL_POSTAL_CODE: optionalCredential,
+    LEGAL_LOCALITY: optionalCredential,
+    LEGAL_COUNTRY: optionalCredential,
+    LEGAL_EMAIL: z.preprocess(
+      (value) => value || undefined,
+      z.email().optional(),
+    ),
+    PRIVACY_EMAIL: z.preprocess(
+      (value) => value || undefined,
+      z.email().optional(),
+    ),
+    ABUSE_EMAIL: z.preprocess(
+      (value) => value || undefined,
+      z.email().optional(),
+    ),
+    BACKUPS_ENABLED: environmentBoolean.default(false),
+    OFFSITE_BACKUP_PROVIDER: optionalCredential,
+    OFFSITE_BACKUP_COUNTRY: optionalCredential,
+    EDGE_LOG_RETENTION_DAYS: z.preprocess(
+      (value) => value === "" || value === undefined ? undefined : value,
+      z.coerce.number().int().min(0).max(30).optional(),
+    ),
+    LEGAL_PHONE: optionalCredential,
+    LEGAL_REPRESENTATIVE: optionalCredential,
+    LEGAL_REGISTRY_NAME: optionalCredential,
+    LEGAL_REGISTRY_NUMBER: optionalCredential,
+    LEGAL_VAT_ID: optionalCredential,
   })
   .superRefine((env, ctx) => {
     const configuredCount = appleCredentialKeys.filter(
@@ -129,6 +158,56 @@ const envSchema = z
       }
     }
     if (env.NODE_ENV !== "production") return;
+
+    for (const key of [
+      "LEGAL_NAME",
+      "LEGAL_STREET_ADDRESS",
+      "LEGAL_POSTAL_CODE",
+      "LEGAL_LOCALITY",
+      "LEGAL_COUNTRY",
+      "LEGAL_EMAIL",
+      "LEGAL_PHONE",
+      "PRIVACY_EMAIL",
+      "ABUSE_EMAIL",
+    ] as const) {
+      if (!env[key] || looksLikePlaceholder(env[key])) {
+        ctx.addIssue({
+          code: "custom",
+          message: `${key} must contain the operator's final public legal details in production`,
+          path: [key],
+        });
+      }
+    }
+    if (env.BACKUPS_ENABLED) {
+      for (const key of [
+        "OFFSITE_BACKUP_PROVIDER",
+        "OFFSITE_BACKUP_COUNTRY",
+      ] as const) {
+        if (!env[key] || looksLikePlaceholder(env[key])) {
+          ctx.addIssue({
+            code: "custom",
+            message: `${key} must describe the actual backup destination when backups are enabled`,
+            path: [key],
+          });
+        }
+      }
+    }
+    if (env.EDGE_LOG_RETENTION_DAYS === undefined) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "EDGE_LOG_RETENTION_DAYS must be set to the actual retention from 0 to 30 in production",
+        path: ["EDGE_LOG_RETENTION_DAYS"],
+      });
+    }
+    if (Boolean(env.LEGAL_REGISTRY_NAME) !== Boolean(env.LEGAL_REGISTRY_NUMBER)) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "LEGAL_REGISTRY_NAME and LEGAL_REGISTRY_NUMBER must be configured together",
+        path: ["LEGAL_REGISTRY_NAME"],
+      });
+    }
 
     for (const [label, keys] of [
       ["Sign in with Apple", appleCredentialKeys],

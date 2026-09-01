@@ -28,6 +28,17 @@ const requiredKeys = [
   "IOS_APP_ID",
   "IOS_TEAM_ID",
   "IOS_STORE_URL",
+  "LEGAL_NAME",
+  "LEGAL_STREET_ADDRESS",
+  "LEGAL_POSTAL_CODE",
+  "LEGAL_LOCALITY",
+  "LEGAL_COUNTRY",
+  "LEGAL_EMAIL",
+  "LEGAL_PHONE",
+  "PRIVACY_EMAIL",
+  "ABUSE_EMAIL",
+  "BACKUPS_ENABLED",
+  "EDGE_LOG_RETENTION_DAYS",
   "EXPO_PUBLIC_API_URL",
   "EXPO_PUBLIC_APP_URL",
   "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID",
@@ -38,6 +49,13 @@ const requiredKeys = [
 const androidEnabled = process.env.ANDROID_ENABLED === "true";
 if (!["true", "false"].includes(process.env.ANDROID_ENABLED ?? "")) {
   errors.push("ANDROID_ENABLED must be true or false");
+}
+const backupsEnabled = process.env.BACKUPS_ENABLED === "true";
+if (!["true", "false"].includes(process.env.BACKUPS_ENABLED ?? "")) {
+  errors.push("BACKUPS_ENABLED must be true or false");
+}
+if (backupsEnabled) {
+  requiredKeys.push("OFFSITE_BACKUP_PROVIDER", "OFFSITE_BACKUP_COUNTRY");
 }
 if (androidEnabled) {
   requiredKeys.push(
@@ -50,6 +68,19 @@ if (androidEnabled) {
 for (const key of requiredKeys) {
   const value = process.env[key]?.trim();
   if (!value || placeholder.test(value)) errors.push(`${key} is not configured`);
+}
+if (!/^\d+$/.test(process.env.EDGE_LOG_RETENTION_DAYS ?? "")) {
+  errors.push("EDGE_LOG_RETENTION_DAYS must be an integer from 0 to 30");
+} else if (Number(process.env.EDGE_LOG_RETENTION_DAYS) > 30) {
+  errors.push("EDGE_LOG_RETENTION_DAYS must not exceed 30");
+}
+if (
+  Boolean(process.env.LEGAL_REGISTRY_NAME?.trim()) !==
+  Boolean(process.env.LEGAL_REGISTRY_NUMBER?.trim())
+) {
+  errors.push(
+    "LEGAL_REGISTRY_NAME and LEGAL_REGISTRY_NUMBER must be configured together",
+  );
 }
 
 if (process.env.NODE_ENV !== "production") {

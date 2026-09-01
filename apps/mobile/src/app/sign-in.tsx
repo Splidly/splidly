@@ -6,7 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, Linking, Pressable, Text, View } from "react-native";
 import { AppIcon } from "../components/app-icon";
 import {
   ErrorState,
@@ -15,6 +15,7 @@ import {
 } from "../components/ui";
 import { authClient, signInAsDemo } from "../lib/auth-client";
 import { isAppleSignInCancellation } from "../lib/auth-errors";
+import { APP_URL } from "../lib/env";
 import { friendlyErrorMessage } from "../lib/network";
 import { pendingInvite } from "../lib/pending-invite";
 import { profileNavigationState } from "../lib/profile-navigation";
@@ -169,6 +170,7 @@ export default function SignInScreen() {
         <AppIcon size={68} />
         <View style={{ gap: 12 }}>
           <Text
+            selectable={false}
             style={{
               color: theme.text,
               fontSize: 40,
@@ -180,6 +182,7 @@ export default function SignInScreen() {
             Split the cost.{`\n`}Keep the friendship.
           </Text>
           <Text
+            selectable={false}
             style={{ color: theme.muted, fontSize: 17, lineHeight: 24 }}
           >
             A private, precise ledger for trips, homes, and everything friends
@@ -190,6 +193,19 @@ export default function SignInScreen() {
 
       <View style={{ gap: 12, alignItems: "center" }}>
         {busy ? <ActivityIndicator color={theme.primary} /> : null}
+        <Text
+          selectable={false}
+          style={{
+            color: theme.muted,
+            textAlign: "center",
+            fontSize: 12,
+            lineHeight: 17,
+            paddingHorizontal: 16,
+          }}
+        >
+          By continuing, you agree to the Terms of Service and acknowledge the
+          Privacy Notice.
+        </Text>
         <GoogleSigninButton
           size={GoogleSigninButton.Size.Wide}
           color={
@@ -244,6 +260,7 @@ export default function SignInScreen() {
           </View>
         ) : null}
         <Text
+          selectable={false}
           style={{
             color: theme.muted,
             textAlign: "center",
@@ -254,6 +271,43 @@ export default function SignInScreen() {
         >
           Splidly records shared accounting. It never moves your money.
         </Text>
+        <View
+          style={{ flexDirection: "row", flexWrap: "wrap", gap: 16 }}
+        >
+          <Pressable
+            accessibilityRole="link"
+            onPress={() => void Linking.openURL(`${APP_URL}/terms`)}
+          >
+            <Text
+              selectable={false}
+              style={{ color: theme.primary, fontSize: 12 }}
+            >
+              Terms of Service
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="link"
+            onPress={() => void Linking.openURL(`${APP_URL}/privacy`)}
+          >
+            <Text
+              selectable={false}
+              style={{ color: theme.primary, fontSize: 12 }}
+            >
+              Privacy notice
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="link"
+            onPress={() => void Linking.openURL(`${APP_URL}/legal`)}
+          >
+            <Text
+              selectable={false}
+              style={{ color: theme.primary, fontSize: 12 }}
+            >
+              Legal notice
+            </Text>
+          </Pressable>
+        </View>
       </View>
     </Screen>
   );

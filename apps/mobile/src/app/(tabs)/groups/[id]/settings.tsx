@@ -1,7 +1,7 @@
 import type { CurrencyCode } from "@splidly/shared";
 import { router, useLocalSearchParams, type Href } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, PlatformColor, Switch, View } from "react-native";
+import { Alert, Linking, PlatformColor, Switch, View } from "react-native";
 import type { GroupBalanceMember } from "../../../../components/group-balances";
 import { normalizeGroupIconKey } from "../../../../components/group-icon";
 import { GroupSummaryHeader } from "../../../../components/group-summary-header";
@@ -18,6 +18,7 @@ import { shareInvite } from "../../../../lib/share-invite";
 import { normalizeGroupColor } from "../../../../lib/group-colors";
 import { currencySymbolWithCode } from "../../../../lib/money-display";
 import { api } from "../../../../lib/trpc";
+import { APP_URL } from "../../../../lib/env";
 
 export default function GroupSettingsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -232,6 +233,17 @@ export default function GroupSettingsScreen() {
           ))}
         </Section>
         <Section title="Group actions">
+        <ListRow
+          title="Report this group"
+          subtitle="Report content or abusive behavior"
+          showsDisclosureIndicator={false}
+          onPress={() =>
+            void Linking.openURL(
+              `${APP_URL}/report?type=group&id=${encodeURIComponent(group.id)}`,
+            )
+          }
+        />
+        <RowDivider inset={16} />
         <ListRow
           title="Leave group"
           destructive

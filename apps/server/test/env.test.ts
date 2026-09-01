@@ -37,6 +37,19 @@ const productionEnv = {
   ANDROID_SHA256_FINGERPRINT: "",
   IOS_STORE_URL: "https://apps.apple.com/app/splidly/id6795323135",
   ANDROID_STORE_URL: "",
+  LEGAL_NAME: "Splidly Operator",
+  LEGAL_STREET_ADDRESS: "Main Street 1",
+  LEGAL_POSTAL_CODE: "10115",
+  LEGAL_LOCALITY: "Berlin",
+  LEGAL_COUNTRY: "Germany",
+  LEGAL_EMAIL: "operator@splidly.site",
+  LEGAL_PHONE: "+49 30 123456",
+  PRIVACY_EMAIL: "privacy@splidly.site",
+  ABUSE_EMAIL: "abuse@splidly.site",
+  BACKUPS_ENABLED: "false",
+  OFFSITE_BACKUP_PROVIDER: "",
+  OFFSITE_BACKUP_COUNTRY: "",
+  EDGE_LOG_RETENTION_DAYS: "0",
 };
 
 describe("server environment", () => {
@@ -119,6 +132,16 @@ describe("server environment", () => {
         APNS_ENVIRONMENT: "development",
       }),
     ).toThrow(/Google Sign-In|APNS_ENVIRONMENT/);
+  });
+
+  it("rejects missing or placeholder legal details in production", () => {
+    expect(() =>
+      readEnv({
+        ...productionEnv,
+        LEGAL_NAME: "replace-with-operator-name",
+        LEGAL_PHONE: "",
+      }),
+    ).toThrow(/LEGAL_NAME|LEGAL_PHONE/);
   });
 
   it("requires final Android identity and store data when Android is enabled", () => {

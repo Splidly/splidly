@@ -232,10 +232,31 @@ export default function ProfileScreen() {
       </Section>
       <Section title="Privacy">
         <ListRow
+          title="Terms of Service"
+          subtitle="Eligibility, acceptable use, and service rules"
+          showsDisclosureIndicator
+          onPress={() => void Linking.openURL(`${APP_URL}/terms`)}
+        />
+        <RowDivider inset={16} />
+        <ListRow
           title="Privacy policy"
           subtitle="How Splidly collects, uses, and retains your data"
           showsDisclosureIndicator
           onPress={() => void Linking.openURL(`${APP_URL}/privacy`)}
+        />
+        <RowDivider inset={16} />
+        <ListRow
+          title="Legal notice"
+          subtitle="Operator and contact information"
+          showsDisclosureIndicator
+          onPress={() => void Linking.openURL(`${APP_URL}/legal`)}
+        />
+        <RowDivider inset={16} />
+        <ListRow
+          title="Report content or abuse"
+          subtitle="Contact the moderation channel"
+          showsDisclosureIndicator
+          onPress={() => void Linking.openURL(`${APP_URL}/report`)}
         />
       </Section>
       <Section title="Account">

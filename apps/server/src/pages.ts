@@ -38,6 +38,28 @@ function documentLayout(title: string, body: string): string {
 </html>`;
 }
 
+function operatorDetails(env: Env): string {
+  const name = escapeHtml(env.LEGAL_NAME ?? "Splidly development operator");
+  const street = escapeHtml(
+    env.LEGAL_STREET_ADDRESS ?? "Legal address not configured",
+  );
+  const postalCode = escapeHtml(env.LEGAL_POSTAL_CODE ?? "");
+  const locality = escapeHtml(env.LEGAL_LOCALITY ?? "");
+  const country = escapeHtml(env.LEGAL_COUNTRY ?? "");
+  const email = escapeHtml(env.LEGAL_EMAIL ?? "privacy@splidly.site");
+  const phone = escapeHtml(env.LEGAL_PHONE ?? "Not configured");
+  return `<p><strong>${name}</strong><br />${street}<br />${postalCode} ${locality}<br />${country}</p>
+     <p>Email: <a href="mailto:${email}">${email}</a><br />Phone: ${phone}</p>`;
+}
+
+function privacyEmail(env: Env): string {
+  return escapeHtml(env.PRIVACY_EMAIL ?? env.LEGAL_EMAIL ?? "privacy@splidly.site");
+}
+
+function abuseEmail(env: Env): string {
+  return escapeHtml(env.ABUSE_EMAIL ?? env.LEGAL_EMAIL ?? "abuse@splidly.site");
+}
+
 function appStoreLinks(env: Env): string {
   const androidLink =
     env.ANDROID_ENABLED && env.ANDROID_STORE_URL
@@ -301,7 +323,7 @@ export function landingPage(env: Env): string {
       </section>
       <section class="shell cta"><div class="cta-inner"><h2>Ready to make it easy?</h2><p>Start your first group in a minute.</p>${stores}</div></section>
     </main>
-    <footer><div class="shell footer-inner"><span>© 2026 Splidly</span><div class="footer-links"><a href="https://github.com/Splidly/splidly" target="_blank" rel="noreferrer">GitHub</a><a href="/privacy">Privacy</a><a href="/account/delete">Delete account</a><a href="mailto:info@splidly.site">Contact</a></div></div></footer>
+    <footer><div class="shell footer-inner"><span>© 2026 Splidly</span><div class="footer-links"><a href="https://github.com/Splidly/splidly" target="_blank" rel="noreferrer">GitHub</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/legal">Legal notice</a><a href="/report">Report abuse</a><a href="/account/delete">Delete account</a><a href="mailto:${escapeHtml(env.LEGAL_EMAIL ?? "info@splidly.site")}">Contact</a></div></div></footer>
   </body>
 </html>`;
 }
@@ -323,48 +345,172 @@ export function invitePage(token: string, env: Env): string {
   );
 }
 
-export function privacyPage(): string {
+export function legalPage(env: Env): string {
+  const representative = env.LEGAL_REPRESENTATIVE
+    ? `<h2>Represented by</h2><p>${escapeHtml(env.LEGAL_REPRESENTATIVE)}</p>`
+    : "";
+  const registry =
+    env.LEGAL_REGISTRY_NAME && env.LEGAL_REGISTRY_NUMBER
+      ? `<h2>Register</h2><p>${escapeHtml(env.LEGAL_REGISTRY_NAME)}: ${escapeHtml(env.LEGAL_REGISTRY_NUMBER)}</p>`
+      : "";
+  const vat = env.LEGAL_VAT_ID
+    ? `<h2>VAT identification number</h2><p>${escapeHtml(env.LEGAL_VAT_ID)}</p>`
+    : "";
+  return documentLayout(
+    "Legal notice · Splidly",
+    `<h1>Legal notice</h1>
+     <p><small>Information under section 5 of the German Digital Services Act (DDG)</small></p>
+     ${operatorDetails(env)}
+     ${representative}
+     ${registry}
+     ${vat}
+     <h2>Service information</h2>
+     <p>Splidly is a record-keeping service for shared expenses. It does not provide payment services, transfer money, or give financial advice.</p>
+     <p><a href="/">Home</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy notice</a> · <a href="/report">Report abuse</a></p>`,
+  );
+}
+
+export function termsPage(env: Env): string {
+  const contact = escapeHtml(env.LEGAL_EMAIL ?? "info@splidly.site");
+  return documentLayout(
+    "Terms of Service · Splidly",
+    `<h1>Terms of Service</h1>
+     <p><small>Effective September 1, 2026</small></p>
+     <p>These terms govern your use of the Splidly app, website, and online service. By creating an account or continuing to use Splidly, you agree to these terms.</p>
+
+     <h2>Eligibility</h2>
+     <p>You must be at least 16 years old to use Splidly. If you are under 18, you may use the service only with any permission required from a parent or legal guardian. You must provide accurate account information and keep access to your account secure.</p>
+
+     <h2>What Splidly provides</h2>
+     <p>Splidly is a record-keeping tool for shared expenses. It calculates balances from information entered by users. Splidly does not hold or transfer money, operate a payment account, collect debts, or provide financial, tax, accounting, or legal advice. Users remain responsible for checking entries and arranging payments themselves.</p>
+
+     <h2>Your content and shared groups</h2>
+     <p>You retain your rights in names, pictures, descriptions, notes, and other content you provide. You give Splidly a non-exclusive license to host, copy, process, and display that content only as needed to operate, secure, and improve the service and make it available to the people you deliberately share it with.</p>
+     <p>You must have the rights and permissions needed to upload content, including pictures and information about other people. Group members can see content and financial records shared in that group. Do not use Splidly for secrets or material that should not be shared with every current group member.</p>
+
+     <h2>Acceptable use</h2>
+     <p>You must not upload, share, or use Splidly to facilitate content or conduct that is illegal, threatening, abusive, hateful, sexually exploitative, defamatory, fraudulent, privacy-invasive, malicious, or infringing; that exposes another person's highly sensitive information without authority; or that contains malware or attempts to compromise the service. Child sexual abuse material, non-consensual intimate material, credible threats, and content that exploits or endangers minors are strictly prohibited.</p>
+     <p>Do not misuse invitations, impersonate another person, scrape the service, interfere with security controls, access another person's account, or use automated requests beyond ordinary app operation.</p>
+
+     <h2>Reports and enforcement</h2>
+     <p>Report prohibited or allegedly illegal content at <a href="/report">the reporting page</a> or by emailing <a href="mailto:${abuseEmail(env)}">${abuseEmail(env)}</a>. Include enough information to identify the content and explain the concern. Splidly may restrict visibility, remove content, preserve evidence, suspend or terminate accounts, and contact authorities where reasonably necessary. Users may be notified of a moderation decision and its reason unless doing so would be unlawful or create a safety risk.</p>
+
+     <h2>Account deletion and ledger integrity</h2>
+     <p>You can delete your account from Profile or the public account-deletion page. Identifying profile data and the content described in the privacy notice are removed. Shared amounts, dates, currencies, membership records, and minimized audit history may remain under “Deleted user” where removal would corrupt another participant's ledger, prevent dispute resolution, or conflict with a legal obligation.</p>
+
+     <h2>Availability and changes</h2>
+     <p>Splidly may change, suspend, or discontinue features and may perform maintenance without advance notice. No uninterrupted or error-free operation is promised. Material changes to these terms will be published with a new effective date. Continued use after a change takes effect constitutes acceptance where permitted by law.</p>
+
+     <h2>Responsibility and mandatory rights</h2>
+     <p>You are responsible for the accuracy of entries you create and for resolving financial disputes with other participants. To the extent permitted by law, Splidly is not responsible for payments, debts, tax treatment, decisions made from user-entered data, or content supplied by users. Nothing in these terms excludes liability that cannot legally be excluded or limits mandatory consumer rights.</p>
+
+     <h2>Contact and applicable law</h2>
+     ${operatorDetails(env)}
+     <p>Questions about these terms can be sent to <a href="mailto:${contact}">${contact}</a>. German law applies to the extent permitted by mandatory rules. If you are a consumer, mandatory protections and legally available courts at your place of residence remain unaffected.</p>
+     <p><a href="/">Home</a> · <a href="/privacy">Privacy notice</a> · <a href="/legal">Legal notice</a> · <a href="/report">Report abuse</a></p>`,
+  );
+}
+
+export function reportPage(
+  env: Env,
+  context?: { type?: string; id?: string },
+): string {
+  const email = abuseEmail(env);
+  const type = context?.type?.slice(0, 40) ?? "content or user";
+  const id = context?.id?.slice(0, 200) ?? "not provided";
+  const subject = encodeURIComponent(`Splidly ${type} report`);
+  const body = encodeURIComponent(
+    `Content type: ${type}\nContent or user ID: ${id}\n\nReason for report:\n\nRelevant facts or URLs:\n\nI believe this report is accurate and made in good faith.`,
+  );
+  return documentLayout(
+    "Report content or abuse · Splidly",
+    `<h1>Report content or abuse</h1>
+     <p>Use this channel for allegedly illegal content, abusive behavior, privacy violations, impersonation, threats, exploitation, or other violations of the Splidly Terms of Service. Splidly does not prohibit lawful adult language or images merely because someone may find them offensive.</p>
+     <h2>What to include</h2>
+     <ul>
+       <li>The group, expense, settlement, or user involved.</li>
+       <li>Why the content or behavior is allegedly illegal, abusive, or otherwise violates the Terms.</li>
+       <li>Your name and an email address where Splidly can respond.</li>
+       <li>Any urgent safety concern. Contact local emergency services first if someone is in immediate danger.</li>
+     </ul>
+     <p>Do not send passwords, authentication tokens, full payment-card details, or unrelated sensitive information. Reports are reviewed as promptly as reasonably possible. Content may be restricted or removed and accounts may be suspended while a report is investigated.</p>
+     <a class="button" href="mailto:${email}?subject=${subject}&amp;body=${body}">Email a report</a>
+     <p><small>Reporting address: <a href="mailto:${email}">${email}</a><br />Context: ${escapeHtml(type)} - ${escapeHtml(id)}</small></p>
+     <p><a href="/">Home</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy notice</a></p>`,
+  );
+}
+
+export function privacyPage(env: Env): string {
+  const contact = privacyEmail(env);
+  const backupRecipient = env.BACKUPS_ENABLED
+    ? `<li><strong>Backups:</strong> encrypted recovery copies are stored with ${escapeHtml(env.OFFSITE_BACKUP_PROVIDER ?? "the configured backup provider")} in ${escapeHtml(env.OFFSITE_BACKUP_COUNTRY ?? "the configured backup country")}.</li>`
+    : "";
+  const backupRetention = env.BACKUPS_ENABLED
+    ? " Protected backups use a seven-day retention schedule, so deleted data may remain in a backup until that backup expires."
+    : " Splidly does not currently create database or off-site backups.";
   return documentLayout(
     "Privacy · Splidly",
-    `<h1>Privacy Policy</h1>
-     <p><small>Effective August 20, 2026</small></p>
+    `<h1>Privacy notice</h1>
+     <p><small>Effective September 1, 2026</small></p>
      <p>Splidly is a shared-expense ledger. It records who paid, how a cost was split, and the settlements people record themselves. Splidly does not move money, show advertising, sell personal data, or use personal data for advertising tracking.</p>
+
+     <h2>Controller</h2>
+     ${operatorDetails(env)}
+     <p>The controller is responsible for the Splidly app, website, and server. Privacy requests can be sent to <a href="mailto:${contact}">${contact}</a>.</p>
 
      <h2>Data Splidly collects</h2>
      <ul>
        <li><strong>Account and profile data:</strong> the account identifier, name, email address, and profile-image URL provided by Apple or Google; your display name, home currency, and profile picture you choose; and authentication tokens needed to keep you signed in.</li>
        <li><strong>Shared-ledger data:</strong> friendships, groups and memberships, group pictures, invitations, expense descriptions and notes, dates, amounts, currencies, payers, splits, exchange-rate snapshots, settlements, and the resulting ledger history.</li>
-       <li><strong>Security and session data:</strong> session identifiers and expiry times, IP address, and user-agent information used to authenticate requests and protect the service.</li>
+       <li><strong>Security, session, and operations data:</strong> session identifiers and expiry times, IP address, user-agent information, internal user and request identifiers, requested API operation, response status, timing, and error details used to authenticate requests, diagnose faults, and protect the service. Request bodies, authorization headers, cookies, provider tokens, and invitation credentials are excluded or redacted from application logs.</li>
        <li><strong>Notification data:</strong> a random installation identifier, Apple Push Notification service device token, delivery status, and the group or expense identifier needed to open the correct screen. Lock-screen notification text is deliberately generic and does not contain names, group names, expense descriptions, notes, balances, or amounts.</li>
        <li><strong>On-device data:</strong> the app stores session credentials, pending invitation details, and recently selected currencies in protected device storage.</li>
+       <li><strong>Communications:</strong> the content and contact details you provide when you send a support, privacy, security, or legal request.</li>
      </ul>
-     <p>Names, profile and group pictures, expense details, notes, balances, and settlements are visible to the other people who participate in the applicable friendship or group.</p>
+     <p>Data comes from you, your Apple or Google sign-in provider, your device when you enable notifications, and other Splidly users who add or edit records in a friendship or group you join. Names, profile and group pictures, expense details, notes, balances, and settlements are visible to the other people who participate in the applicable friendship or group.</p>
 
-     <h2>How the data is used</h2>
-     <p>Splidly uses this data only to create and secure accounts, synchronize shared ledgers, calculate balances and currency conversions, process invitations, provide account support, and maintain the reliability and security of the service.</p>
+     <h2>Purposes and legal bases</h2>
+     <ul>
+       <li><strong>Providing the service - Article 6(1)(b) GDPR:</strong> account, profile, shared-ledger, invitation, currency, and session data is processed to create your account, synchronize records, calculate balances, and provide features you request. Optional pictures and notifications are processed only when you choose those features.</li>
+       <li><strong>Security and reliability - Article 6(1)(f) GDPR:</strong> limited network, request, session, and error data is processed for the legitimate interests of preventing abuse, securing accounts, diagnosing faults, and keeping the service available. These interests are balanced against the limited scope, redaction, access controls, and rotation of the logs.</li>
+       <li><strong>Shared-ledger integrity after deletion - Article 6(1)(f) GDPR:</strong> minimized records are retained for the legitimate interests of the other participants and Splidly in preserving correct shared balances and resolving disputes. Direct identifiers, pictures, descriptions, and notes are removed as described below.</li>
+       <li><strong>Legal obligations - Article 6(1)(c) GDPR:</strong> information may be processed where necessary to comply with binding legal duties or lawful requests.</li>
+     </ul>
+     <p>The app stores session credentials, invitation state, installation identifiers, and recent currency choices on your device because this is strictly necessary to provide the service you request. The account-deletion website uses strictly necessary authentication and security cookies. These operations do not require consent under section 25(2)(2) TDDDG. Splidly does not use advertising or analytics cookies.</p>
 
      <h2>Service providers</h2>
      <ul>
-       <li><strong>Apple and Google:</strong> if you choose one of these sign-in methods, that provider processes the sign-in and gives Splidly the account information described above. Apple also processes the device token and generic notification payload when Splidly sends a push notification through APNs. <a href="https://www.apple.com/legal/privacy/">Apple’s privacy policy</a> or <a href="https://policies.google.com/privacy">Google’s privacy policy</a> applies to the provider’s processing. The Google Sign-In software may also process coarse location, device and user identifiers, phone number, and usage data for app functionality and analytics; it declares that this data is not used for tracking.</li>
-       <li><strong>Currency-rate service:</strong> Splidly uses a private Frankfurter service for reference exchange rates. It receives requested currency pairs and dates, not your identity, group names, expense descriptions, or notes.</li>
-       <li><strong>Hosting and delivery infrastructure:</strong> Cloudflare processes network requests, IP addresses, security signals, and invitation URLs as Splidly’s delivery and abuse-protection provider. The server, database, logs, and encrypted backups are processed by hosting infrastructure only as needed to operate and protect Splidly. Providers are required to protect data consistently with this policy.</li>
+       <li><strong>Other group participants:</strong> users in the applicable friendship or group receive the shared profile and ledger information needed for that shared space.</li>
+       <li><strong>Apple and Google:</strong> if you choose one of these sign-in methods, that provider processes the sign-in and gives Splidly the account information described above. Apple also processes the device token and generic notification payload when Splidly sends a push notification through APNs. <a href="https://www.apple.com/legal/privacy/">Apple's privacy policy</a> or <a href="https://policies.google.com/privacy">Google's privacy policy</a> applies to the provider's own processing. The Google Sign-In software declares that it may also process coarse location, device and user identifiers, phone number, and usage data for app functionality and analytics, without tracking.</li>
+       <li><strong>Cloudflare:</strong> Cloudflare, Inc. operates the reverse proxy and DDoS protection in front of Splidly and processes network requests, IP addresses, security signals, and requested URLs for that purpose.</li>
+       <li><strong>netcup:</strong> netcup GmbH hosts the Splidly server, database, and local operational data on infrastructure located in Germany and acts as a hosting processor.</li>
+       ${backupRecipient}
+       <li><strong>Currency rates:</strong> a self-hosted Frankfurter service supplies reference exchange rates. It receives requested currency pairs and dates, not your identity, group names, expense descriptions, or notes.</li>
      </ul>
+     <p>Processors are contractually required to protect personal data and may use it only to provide their services to Splidly. Independent providers are responsible for their own processing under their published terms and privacy notices.</p>
+     <p>Apple, Google, and Cloudflare operate internationally and data may be processed in the United States or other countries outside the European Economic Area. Depending on the provider and processing, transfers are protected by an adequacy decision, including the EU-US Data Privacy Framework where applicable, or the European Commission's Standard Contractual Clauses and supplementary safeguards. You may request information about the applicable safeguard from the privacy contact above.</p>
 
      <h2>Retention and deletion</h2>
-     <p>Account and ledger data is retained while your account is active. You can permanently delete your account from Profile at any time, including while you have open balances or active groups. For security, Splidly may ask you to sign in again. Deletion removes provider connections and tokens, active sessions, invitations you created, push-notification registrations, cached currency requests, notification preferences, your name, email address, profile image, group images on groups you created, and the descriptions and notes on financial records you authored or most recently edited. Splidly also clears its protected account data from the device used for deletion.</p>
-     <p>Shared financial records cannot always be removed without changing other participants’ ledgers. Splidly therefore retains a <strong>pseudonymized</strong> internal account identifier and the shared group memberships, financial amounts, dates, currencies, exchange-rate snapshots, and minimized audit revisions needed to preserve those ledgers. Other participants see “Deleted user” instead of your identity. This retained data is not anonymous because Splidly may still be able to associate the internal records with their prior account through operational records or other ledger participants. If backups are enabled, they use a seven-day retention schedule, so deleted data may remain in a protected backup until that backup expires.</p>
+     <p>Account and ledger data is retained while your account is active. You can permanently delete your account from Profile at any time, including while you have open balances or active groups. For security, Splidly may ask you to sign in again. Deletion removes provider connections and tokens, active sessions, invitations you created, push-notification registrations, cached currency requests, notification preferences, your name, email address, profile image, group images on groups you created, and the descriptions and notes on financial records you authored or most recently edited. When deletion is performed in the app, Splidly also clears its protected account data from that device.</p>
+     <p>Shared financial records cannot always be removed without changing other participants' ledgers. Splidly therefore retains a <strong>pseudonymized</strong> internal account identifier and the shared group records and memberships, financial amounts, dates, currencies, exchange-rate snapshots, and minimized audit revisions needed to preserve those ledgers. Other participants see “Deleted user” instead of your identity. This retained data is not anonymous because Splidly may still be able to associate the internal records with their prior account through operational records or other ledger participants.${backupRetention}</p>
      <p>If you used Sign in with Apple, Splidly attempts to revoke the Apple token before removing the provider connection. A missing token or temporary Apple failure never prevents account deletion; Splidly tells you when manual removal in your Apple Account’s Sign in with Apple settings is still required.</p>
-     <p>Expired sessions, verification requests, currency quotes, and invitations are removed by a daily retention job. Completed or permanently failed notification jobs are retained for up to 30 days for delivery troubleshooting. Push installations that have not contacted Splidly for 180 days are removed. Friend invitations are one-time credentials, while group invitations can be used by multiple people. All invitations expire after seven days, are stored only as cryptographic hashes, and are removed after expiry.</p>
+     <p>Expired sessions, verification requests, currency quotes, and invitations are removed by a daily retention job. Completed or permanently failed notification jobs are retained for up to 30 days for delivery troubleshooting. Push installations that have not contacted Splidly for 180 days are removed. Friend invitations are one-time credentials, while group invitations can be used by multiple people. All invitations expire after seven days, are stored only as cryptographic hashes, and are removed after expiry. Application logs are size-rotated and retained only for the shortest period needed for security and fault diagnosis. Splidly-configured raw edge logs are retained for up to ${env.EDGE_LOG_RETENTION_DAYS ?? 0} days unless a specific security incident requires longer preservation.</p>
      <p>Splidly may retain limited information for longer when required by law or reasonably necessary to resolve abuse, fraud, security, or legal issues.</p>
+     <p>Support and rights-request correspondence is kept until the request is resolved, and longer only where needed to document compliance or establish, exercise, or defend legal claims.</p>
 
-     <h2>Your choices</h2>
-     <p>You can edit or remove your profile picture, display name, and home currency; edit or remove a group picture while you own the group; sign out; or start account deletion from Profile. You can also revoke Splidly’s access through your Apple or Google account settings. For access, correction, a portable copy of your data, or another privacy request, email <a href="mailto:privacy@splidly.site">privacy@splidly.site</a>.</p>
+     <h2>Your rights</h2>
+     <p>Subject to the conditions in the GDPR, you may request access, correction, deletion, restriction, or a portable copy of your data, and object to processing based on legitimate interests. You may also complain to a data-protection supervisory authority, particularly in the EU country of your habitual residence, place of work, or the alleged infringement. Splidly does not rely on consent for the processing described above. Device permissions can be changed in system settings.</p>
+     <p>You can edit or remove your profile picture, display name, and home currency; edit or remove a group picture while you own the group; sign out; or start account deletion from Profile. You can also revoke Splidly's access through your Apple or Google account settings. For a rights request, email <a href="mailto:${contact}">${contact}</a>. Splidly may need to verify your identity before fulfilling a request.</p>
+
+     <h2>Required data and automated decisions</h2>
+     <p>You are not legally required to provide personal data. An account identifier and the core profile and ledger fields are necessary to enter into and perform the Splidly service; without them, an account and shared ledgers cannot be provided. Pictures and push notifications are optional. Splidly automatically calculates balances and currency conversions, but it does not make decisions that produce legal or similarly significant effects about you.</p>
 
      <h2>Security</h2>
-     <p>Splidly uses HTTPS in transit, protected device storage for session credentials, and access controls for servers, databases, and backups. No internet service can guarantee absolute security.</p>
+     <p>Splidly uses HTTPS in transit, protected device storage for session credentials, and access controls for servers and databases. If backups are enabled later, they must also be encrypted and access-controlled. No internet service can guarantee absolute security.</p>
 
-     <h2>Changes and contact</h2>
-     <p>This policy may be updated when Splidly’s features or providers change. Material changes will be reflected here with a new effective date. Splidly is operated by the developer identified on its App Store listing. Privacy questions can be sent to <a href="mailto:privacy@splidly.site">privacy@splidly.site</a>.</p>`,
+     <h2>Changes</h2>
+     <p>This notice may be updated when Splidly's features or providers change. Material changes will be reflected here with a new effective date.</p>
+     <p><a href="/">Home</a> · <a href="/terms">Terms</a> · <a href="/legal">Legal notice</a> · <a href="/report">Report abuse</a> · <a href="/account/delete">Delete account</a></p>`,
   );
 }
 

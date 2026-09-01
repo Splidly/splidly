@@ -1,6 +1,6 @@
 import type { CurrencyCode } from "@splidly/shared";
 import { Stack, router, useLocalSearchParams, type Href } from "expo-router";
-import { Text, View } from "react-native";
+import { Linking, Text, View } from "react-native";
 import { ActivityTimeline } from "../../../components/activity-timeline";
 import {
   Avatar,
@@ -19,6 +19,7 @@ import { ExpenseIcon } from "../../../components/expense-icon";
 import { SettlementActivityRow } from "../../../components/settlement-activity-row";
 import { groupActivityByDate } from "../../../lib/activity-dates";
 import { api } from "../../../lib/trpc";
+import { APP_URL } from "../../../lib/env";
 import { formatMoney } from "../../../lib/money-display";
 import { useTheme } from "../../../theme";
 
@@ -221,6 +222,18 @@ export default function FriendDetailScreen() {
             }}
           />
         )}
+        <Section>
+          <ListRow
+            title="Report this user"
+            subtitle="Report abusive behavior or illegal content"
+            showsDisclosureIndicator={false}
+            onPress={() =>
+              void Linking.openURL(
+                `${APP_URL}/report?type=user&id=${encodeURIComponent(detail.data.friend?.userId ?? id)}`,
+              )
+            }
+          />
+        </Section>
       </Screen>
       <Stack.Screen options={{ title: name }} />
     </>

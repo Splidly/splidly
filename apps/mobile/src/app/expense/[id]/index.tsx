@@ -1,6 +1,6 @@
 import type { CurrencyCode } from "@splidly/shared";
 import { router, Stack, useLocalSearchParams, type Href } from "expo-router";
-import { Alert, Text, View } from "react-native";
+import { Alert, Linking, Text, View } from "react-native";
 import { ExpenseDetailHero } from "../../../components/expense-detail-hero";
 import { ExpenseParticipantAmount } from "../../../components/expense-participant-amount";
 import {
@@ -21,6 +21,7 @@ import {
 import { expenseTotalInCurrency } from "../../../lib/expense-detail";
 import { formatExchangeRate } from "../../../lib/money-display";
 import { api } from "../../../lib/trpc";
+import { APP_URL } from "../../../lib/env";
 import { useTheme } from "../../../theme";
 
 export default function ExpenseDetailScreen() {
@@ -253,6 +254,18 @@ export default function ExpenseDetailScreen() {
             />
           </Section>
         ) : null}
+        <Section>
+          <ListRow
+            title="Report this expense"
+            subtitle="Report illegal content or abusive behavior"
+            showsDisclosureIndicator={false}
+            onPress={() =>
+              void Linking.openURL(
+                `${APP_URL}/report?type=expense&id=${encodeURIComponent(expense.id)}`,
+              )
+            }
+          />
+        </Section>
         {profile.error ? <ErrorState message={profile.error.message} /> : null}
         {remove.error ? <ErrorState message={remove.error.message} /> : null}
       </Screen>

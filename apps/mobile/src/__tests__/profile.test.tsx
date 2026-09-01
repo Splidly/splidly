@@ -233,6 +233,6 @@ describe("ProfileScreen account deletion", () => {
     expect(view.queryByText("Changes save automatically")).toBeNull();
     expect(
       view.getAllByText("›", { includeHiddenElements: true }),
-    ).toHaveLength(2);
+    ).toHaveLength(5);
   });
 });

@@ -21,7 +21,10 @@ import {
   deletionResultPage,
   invitePage,
   landingPage,
+  legalPage,
   privacyPage,
+  reportPage,
+  termsPage,
 } from "./pages";
 import { appRouter } from "./router";
 import { createTrpcContext } from "./trpc";
@@ -292,7 +295,20 @@ export function createApp(input: {
     if (!/^[A-Za-z0-9_-]{20,200}$/.test(token)) return c.notFound();
     return c.html(invitePage(token, input.env));
   });
-  app.get("/privacy", (c) => c.html(privacyPage()));
+  app.get("/privacy", (c) => c.html(privacyPage(input.env)));
+  app.get("/legal", (c) => c.html(legalPage(input.env)));
+  app.get("/terms", (c) => c.html(termsPage(input.env)));
+  app.get("/report", (c) => {
+    c.header("cache-control", "no-store");
+    const type = c.req.query("type");
+    const id = c.req.query("id");
+    return c.html(
+      reportPage(input.env, {
+        ...(type ? { type } : {}),
+        ...(id ? { id } : {}),
+      }),
+    );
+  });
   app.get("/account/delete", async (c) => {
     c.header("cache-control", "no-store");
     const session = await input.auth.api.getSession({
