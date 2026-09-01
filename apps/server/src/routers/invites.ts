@@ -4,6 +4,7 @@ import {
   friendships,
   groupMembers,
   groups,
+  gt,
   invites,
   isNull,
   profiles,
@@ -22,6 +23,22 @@ export function hashInviteToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
+export function isInviteActive(
+  invite: {
+    kind: string;
+    expiresAt: Date;
+    usedAt: Date | null;
+    revokedAt: Date | null;
+  },
+  now = new Date(),
+): boolean {
+  return (
+    !invite.revokedAt &&
+    invite.expiresAt.getTime() > now.getTime() &&
+    (invite.kind === "group" || !invite.usedAt)
+  );
+}
+
 async function readInvite(
   db: Parameters<typeof requireActiveGroupMember>[0],
   token: string,
@@ -31,12 +48,7 @@ async function readInvite(
     .from(invites)
     .where(eq(invites.tokenHash, hashInviteToken(token)))
     .limit(1);
-  if (
-    !invite ||
-    invite.revokedAt ||
-    invite.expiresAt.getTime() <= Date.now() ||
-    invite.usedAt
-  ) {
+  if (!invite || !isInviteActive(invite)) {
     throw new TRPCError({
       code: "NOT_FOUND",
       message: "This invite is invalid or expired",
@@ -194,21 +206,30 @@ export const invitesRouter = router({
       }
 
       return ctx.db.transaction(async (tx) => {
+        const acceptedAt = new Date();
         const [claimed] = await tx
           .update(invites)
-          .set({ usedAt: new Date(), updatedAt: new Date() })
+          .set(
+            invite.kind === "group"
+              ? { updatedAt: acceptedAt }
+              : { usedAt: acceptedAt, updatedAt: acceptedAt },
+          )
           .where(
             and(
               eq(invites.id, invite.id),
-              isNull(invites.usedAt),
               isNull(invites.revokedAt),
+              gt(invites.expiresAt, acceptedAt),
+              invite.kind === "group" ? undefined : isNull(invites.usedAt),
             ),
           )
           .returning({ id: invites.id });
         if (!claimed) {
           throw new TRPCError({
             code: "CONFLICT",
-            message: "This invite was already used",
+            message:
+              invite.kind === "group"
+                ? "This invite is invalid or expired"
+                : "This invite was already used",
           });
         }
         if (invite.kind === "friend") {

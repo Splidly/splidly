@@ -237,6 +237,9 @@ describe("GroupSettingsScreen", () => {
 
     expect(view.getByText("Lisbon")).toBeTruthy();
     expect(view.getByText("€ · EUR")).toBeTruthy();
+    expect(
+      view.getByText("Share a reusable link valid for 7 days"),
+    ).toBeTruthy();
     let editAncestor = view.getByTestId("edit-group").parent;
     let usesGroupColor = false;
     while (editAncestor) {

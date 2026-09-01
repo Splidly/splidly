@@ -202,7 +202,7 @@ export default function GroupSettingsScreen() {
                   ? PlatformColor("systemBlue")
                   : "#007AFF"
               }
-              subtitle="Share a one-time link valid for 7 days"
+              subtitle="Share a reusable link valid for 7 days"
               showsDisclosureIndicator
               onPress={() =>
                 createInvite.mutate({ kind: "group", groupId: id })

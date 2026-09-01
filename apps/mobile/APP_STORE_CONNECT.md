@@ -105,10 +105,9 @@ ledger history must be retained.
 
 ## External TestFlight review
 
-A one-time group invitation is a suitable reviewer path. It expires after seven
-days and is consumed by the first account that accepts it, so create a fresh
-link immediately before each review submission and never reuse it. Keep the
-review group free of real personal or financial data.
+A group invitation is a suitable reviewer path. It can be accepted by multiple
+accounts for seven days, unless the group owner revokes it. Keep the review
+group free of real personal or financial data.
 
 Prepare the group with:
 
@@ -116,7 +115,7 @@ Prepare the group with:
 - several expenses in different currencies;
 - at least one settlement and one remaining balance;
 - descriptions that make the test data obviously fictional; and
-- a fresh group invite that will remain valid throughout review.
+- a group invite that will remain valid throughout review.
 
 After the reviewer joins, existing transactions demonstrate group history but
 do not give the new reviewer a balance. In the review notes, ask the reviewer
