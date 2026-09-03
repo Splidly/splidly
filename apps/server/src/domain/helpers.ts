@@ -4,7 +4,6 @@ import {
   eq,
   friendships,
   groupMembers,
-  groups,
   isNull,
   profiles,
 } from "@splidly/db";
@@ -75,50 +74,6 @@ export async function requireActiveGroupMember(
     throw new TRPCError({ code: "FORBIDDEN", message: "Not a group member" });
   }
   return member;
-}
-
-export function assertGroupOwner(createdBy: string, userId: string) {
-  if (createdBy === userId) return;
-  throw new TRPCError({
-    code: "FORBIDDEN",
-    message: "Only the group owner can manage this group",
-  });
-}
-
-export function assertRecordCreator(
-  createdBy: string,
-  userId: string,
-  recordType: "expense" | "settlement",
-) {
-  if (createdBy === userId) return;
-  throw new TRPCError({
-    code: "FORBIDDEN",
-    message: `Only the person who created this ${recordType} can change it`,
-  });
-}
-
-export async function requireGroupOwner(
-  db: Database,
-  groupId: string,
-  userId: string,
-) {
-  const [membership] = await db
-    .select({ group: groups })
-    .from(groupMembers)
-    .innerJoin(groups, eq(groups.id, groupMembers.groupId))
-    .where(
-      and(
-        eq(groupMembers.groupId, groupId),
-        eq(groupMembers.userId, userId),
-        isNull(groupMembers.removedAt),
-      ),
-    )
-    .limit(1);
-  if (!membership) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "Not a group member" });
-  }
-  assertGroupOwner(membership.group.createdBy, userId);
-  return membership.group;
 }
 
 export async function requireFriendshipParticipant(

@@ -179,23 +179,19 @@ export default function FriendDetailScreen() {
                 return (
                   <SettlementActivityRow
                     settlement={item.record}
-                    {...(item.record.canEdit
-                      ? {
-                          onPress: () =>
-                            router.push({
-                              pathname: "/settlement/new",
-                              params: {
-                                type: "friend",
-                                id,
-                                friendshipId: id,
-                                friendId: detail.data.friend?.userId,
-                                canonicalCurrency:
-                                  item.record.canonicalCurrency,
-                                settlementId: item.record.id,
-                              },
-                            }),
-                        }
-                      : {})}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/settlement/new",
+                        params: {
+                          type: "friend",
+                          id,
+                          friendshipId: id,
+                          friendId: detail.data.friend?.userId,
+                          canonicalCurrency: item.record.canonicalCurrency,
+                          settlementId: item.record.id,
+                        },
+                      })
+                    }
                   />
                 );
               }

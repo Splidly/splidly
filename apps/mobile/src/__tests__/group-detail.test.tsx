@@ -75,7 +75,6 @@ jest.mock("../lib/trpc", () => ({
             settlements: [
               {
                 id: "settlement-1",
-                canEdit: true,
                 occurredAt: new Date("2026-07-21T12:00:00.000Z"),
                 notes: "",
                 amount: { currency: "EUR", minor: "600" },

@@ -301,7 +301,6 @@ export const friendsRouter = router({
         })),
         settlements: settlementRecords.map((settlement) => ({
           id: settlement.id,
-          canEdit: settlement.createdBy === ctx.session.user.id,
           occurredAt: settlement.occurredAt,
           createdAt: settlement.createdAt,
           version: settlement.version,

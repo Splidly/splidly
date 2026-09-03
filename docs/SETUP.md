@@ -166,9 +166,8 @@ optionally set `POSTGRES_RUNTIME_USER`) in the
 production environment. The API uses this role for data access and cannot
 create schemas, databases, or roles. Keep
 `BETTER_AUTH_SECRET` available to both the migration and server containers.
-The supplied production-host Nginx configuration uses the existing SAN
-certificate in `/etc/letsencrypt/live/2807.eu/`. If deploying to another host,
-replace those two certificate paths with that host's Certbot lineage before
+The Nginx configuration expects the certificate in
+`/etc/letsencrypt/live/splidly.site/`; obtain or restore that certificate before
 enabling the HTTPS server block.
 
 Install production keys outside the repository:
@@ -217,29 +216,18 @@ sudo systemctl start splidly-backup.service
 sudo systemctl status splidly-backup.timer
 ```
 
-Each root-only snapshot contains a validated encrypted PostgreSQL dump and an
-encrypted configuration archive. Frankfurter is excluded because its public
-exchange-rate cache can be rebuilt. To restore the database after testing the
-procedure in an isolated environment:
+Each root-only snapshot contains one validated encrypted PostgreSQL dump.
+Frankfurter is excluded because its public exchange-rate cache can be rebuilt.
+To restore the database:
 
 ```sh
 sudo env BACKUP_AGE_IDENTITY=/etc/splidly/backup.agekey \
   ./ops/restore.sh /var/backups/splidly/splidly-TIMESTAMP
 ```
 
-Copy encrypted backups and the age identity to separate, access-controlled
-off-host locations when a second storage location becomes available. Without
-that, these backups do not protect against loss of the server or its disk.
-
-For an off-site macOS copy, `ops/sync-offsite-backups.sh` copies only encrypted
-snapshot files over a configured SSH host alias, validates every copied
-snapshot, and never writes plaintext data. Copy
-`ops/macos/com.splidly.offsite-backups.plist.example` outside the repository,
-replace every `USERNAME` and `SSH_HOST_ALIAS` placeholder, and point its script
-path at an installed copy of `ops/sync-offsite-backups.sh` before loading it
-with `launchctl`. The launch agent runs at 03:00 local time and once after
-login. Keep the separately copied age identity in an access-controlled recovery
-location; it is deliberately excluded from the scheduled snapshot sync.
+Backups are stored on the production server for seven days. They protect
+against accidental deletion and bad deployments, but not loss of the server or
+its disk.
 
 Review [Security operations](SECURITY_OPERATIONS.md) before exposing a
 production instance.

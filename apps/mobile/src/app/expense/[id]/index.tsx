@@ -71,7 +71,6 @@ export default function ExpenseDetailScreen() {
   }
 
   const { expense, payers, rates, split, splits } = detail.data;
-  const canEdit = expense.createdBy === profile.data?.userId;
   const sourceCurrency = expense.sourceCurrency as CurrencyCode;
   const homeCurrency = profile.data?.homeCurrency as CurrencyCode | undefined;
   const homeAmountMinor = homeCurrency
@@ -244,7 +243,6 @@ export default function ExpenseDetailScreen() {
           </Section>
         ) : null}
 
-        {canEdit ? (
           <Section>
             <ListRow
               title={remove.isPending ? "Deleting…" : "Delete expense"}
@@ -253,7 +251,6 @@ export default function ExpenseDetailScreen() {
               {...(remove.isPending ? {} : { onPress: confirmDelete })}
             />
           </Section>
-        ) : null}
         <Section>
           <ListRow
             title="Report this expense"
@@ -280,15 +277,13 @@ export default function ExpenseDetailScreen() {
                 onPress={() => router.back()}
               />
             ),
-            ...(canEdit && {
-              headerRight: () => (
-                <HeaderButton
-                  label="Edit expense"
-                  glyph="Edit"
-                  onPress={editExpense}
-                />
-              ),
-            }),
+            headerRight: () => (
+              <HeaderButton
+                label="Edit expense"
+                glyph="Edit"
+                onPress={editExpense}
+              />
+            ),
           }),
         }}
       />
@@ -299,15 +294,13 @@ export default function ExpenseDetailScreen() {
           onPress={() => router.back()}
         />
       </Stack.Toolbar>
-      {canEdit ? (
-        <Stack.Toolbar placement="right">
-          <Stack.Toolbar.Button
-            icon="pencil"
-            accessibilityLabel="Edit expense"
-            onPress={editExpense}
-          />
-        </Stack.Toolbar>
-      ) : null}
+      <Stack.Toolbar placement="right">
+        <Stack.Toolbar.Button
+          icon="pencil"
+          accessibilityLabel="Edit expense"
+          onPress={editExpense}
+        />
+      </Stack.Toolbar>
     </>
   );
 }

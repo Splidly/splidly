@@ -102,7 +102,6 @@ export default function GroupSettingsScreen() {
     balanceMembers.find((member) => member.isViewer)?.userId ??
     me.data?.userId ??
     "";
-  const isOwner = group.createdBy === viewerUserId;
   function requestMemberRemoval(member: GroupBalanceMember) {
     const hasOpenBalance =
       BigInt(member.owes.minor) > 0n || BigInt(member.lent.minor) > 0n;
@@ -149,11 +148,7 @@ export default function GroupSettingsScreen() {
               tone: "muted",
             },
           ]}
-          onEdit={
-            isOwner
-              ? () => router.push(`/groups/${group.id}/edit` as Href)
-              : undefined
-          }
+          onEdit={() => router.push(`/groups/${group.id}/edit` as Href)}
         />
         <Section
           title="Balances"
@@ -165,7 +160,7 @@ export default function GroupSettingsScreen() {
               <Switch
                 accessibilityLabel="Simplify debts"
                 style={{ alignSelf: "center" }}
-                disabled={!isOwner || updateSimplification.isPending}
+                disabled={updateSimplification.isPending}
                 value={simplifyDebts}
                 onValueChange={(nextValue) => {
                   setSimplifyDebts(nextValue);
@@ -185,31 +180,23 @@ export default function GroupSettingsScreen() {
         </Section>
         <Section
           title="Members & balances"
-          footer={
-            isOwner
-              ? "Tap a member for details. As owner, swipe left to remove a member after their balance is settled."
-              : "Tap a member for details. Only the group owner can invite or remove members."
-          }
+          footer="Tap a member for details. Swipe left to remove a member after their balance is settled."
         >
-          {isOwner ? (
-            <ListRow
-              title={
-                createInvite.isPending
-                  ? "Creating invitation…"
-                  : "Invite people"
-              }
-              titleColor={
-                process.env.EXPO_OS === "ios"
-                  ? PlatformColor("systemBlue")
-                  : "#007AFF"
-              }
-              subtitle="Share a reusable link valid for 7 days"
-              showsDisclosureIndicator
-              onPress={() =>
-                createInvite.mutate({ kind: "group", groupId: id })
-              }
-            />
-          ) : null}
+          <ListRow
+            title={
+              createInvite.isPending ? "Creating invitation…" : "Invite people"
+            }
+            titleColor={
+              process.env.EXPO_OS === "ios"
+                ? PlatformColor("systemBlue")
+                : "#007AFF"
+            }
+            subtitle="Share a reusable link valid for 7 days"
+            showsDisclosureIndicator
+            onPress={() =>
+              createInvite.mutate({ kind: "group", groupId: id })
+            }
+          />
           {balanceMembers.map((member) => (
             <View key={member.userId}>
               <RowDivider />
@@ -218,7 +205,6 @@ export default function GroupSettingsScreen() {
                 viewerUserId={viewerUserId}
                 expanded={expandedUserIds.has(member.userId)}
                 removalPending={removeMember.isPending}
-                canRemove={isOwner}
                 onToggle={() =>
                   setExpandedUserIds((current) => {
                     const next = new Set(current);
@@ -259,7 +245,6 @@ export default function GroupSettingsScreen() {
             ])
           }
         />
-        {isOwner ? (
           <>
             <RowDivider inset={16} />
             <ListRow
@@ -310,7 +295,6 @@ export default function GroupSettingsScreen() {
               }
             />
           </>
-        ) : null}
         </Section>
         {updateSimplification.error ? (
           <ErrorState message={updateSimplification.error.message} />

@@ -6,6 +6,7 @@ import {
   expensePayments,
   expenseSplits,
   groupMembers,
+  groups,
   isNull,
   ne,
   notificationOutbox,
@@ -76,6 +77,12 @@ export function buildExpenseNotificationPayload(input: {
   sourceAmountMinor: bigint;
   sourceCurrency: CurrencyCode;
 }): ExpenseEventNotificationPayload {
+  const verb =
+    input.action === "create"
+      ? "added"
+      : input.action === "update"
+        ? "updated"
+        : "deleted";
   return {
     eventType: `expense.${
       input.action === "create"
@@ -87,8 +94,21 @@ export function buildExpenseNotificationPayload(input: {
     expenseId: input.expenseId,
     expenseVersion: input.expenseVersion,
     groupId: input.groupId,
-    title: "Splidly group activity",
-    body: "Open Splidly to review recent activity.",
+    groupName: input.groupName,
+    title: `${input.actorName} ${verb} “${input.description}”`,
+    body: `${input.action === "delete" ? "Total was" : "Total"} ${notificationMoney(
+      input.sourceAmountMinor,
+      input.sourceCurrency,
+    )} in ${input.groupName} · ${expenseNotificationInvolvement({
+      action: input.action,
+      currency: input.sourceCurrency,
+      ...(input.recipientPaymentMinor !== undefined
+        ? { paymentMinor: input.recipientPaymentMinor }
+        : {}),
+      ...(input.recipientShareMinor !== undefined
+        ? { shareMinor: input.recipientShareMinor }
+        : {}),
+    })}`,
   };
 }
 
@@ -105,9 +125,10 @@ export function buildExpenseSummaryNotificationPayload(
   return {
     eventType: "expense.summary",
     groupId: first.groupId,
+    groupName: first.groupName,
     eventCount,
-    title: "Splidly group activity",
-    body: "Open Splidly to review recent activity.",
+    title: `${eventCount} expense updates in ${first.groupName}`,
+    body: "Recent activity was grouped to keep notifications manageable.",
   };
 }
 
@@ -136,6 +157,20 @@ export async function enqueueExpenseNotifications(
     installations?: readonly ExpenseNotificationInstallation[];
   },
 ) {
+  const [group] = input.groupName
+    ? [{ name: input.groupName }]
+    : await tx
+        .select({ name: groups.name })
+        .from(groups)
+        .where(eq(groups.id, input.groupId))
+        .limit(1);
+  const [actor] = input.actorName
+    ? [{ displayName: input.actorName }]
+    : await tx
+        .select({ displayName: profiles.displayName })
+        .from(profiles)
+        .where(eq(profiles.userId, input.actorId))
+        .limit(1);
   const installations =
     input.installations ??
     (await tx
@@ -162,7 +197,7 @@ export async function enqueueExpenseNotifications(
           isNull(groupMembers.removedAt),
         ),
       ));
-  if (installations.length === 0) return;
+  if (!group || installations.length === 0) return;
 
   const payments =
     input.payments ??
@@ -210,12 +245,12 @@ export async function enqueueExpenseNotifications(
     }
     const payload = buildExpenseNotificationPayload({
       action: input.action,
-      actorName: input.actorName ?? "A group member",
+      actorName: actor?.displayName ?? "A group member",
       description: input.description,
       expenseId: input.expenseId,
       expenseVersion: input.expenseVersion,
       groupId: input.groupId,
-      groupName: input.groupName ?? "Group",
+      groupName: group.name,
       sourceAmountMinor: input.sourceAmountMinor,
       sourceCurrency: input.sourceCurrency,
       ...(recipientPaymentMinor !== undefined ? { recipientPaymentMinor } : {}),

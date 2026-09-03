@@ -180,7 +180,7 @@ export default function ProfileScreen() {
   function confirmDelete() {
     Alert.alert(
       "Permanently delete account?",
-      "Your profile, sign-in connections, sessions, invitations, notifications, and private app data will be removed. Shared financial amounts and dates remain under “Deleted user” so other participants' balances stay correct; descriptions and notes you authored are erased. This cannot be undone.",
+      "Your profile, sign-in connections, sessions, invitations, notifications, and private app data will be removed. Shared groups, expenses, settlements, descriptions, notes, amounts, dates, and splits remain unchanged so every participant's balance stays correct. Your name is shown as “Deleted user.” This cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         {

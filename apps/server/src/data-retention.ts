@@ -9,7 +9,6 @@ import {
   or,
   pushInstallations,
   sessions,
-  sql,
   verifications,
   type Database,
 } from "@splidly/db";
@@ -35,19 +34,6 @@ export async function applyDataRetention(
   );
 
   return db.transaction(async (tx) => {
-    const sanitizedNotifications = await tx
-      .update(notificationOutbox)
-      .set({
-        payload: sql`(${notificationOutbox.payload} - 'groupName') || jsonb_build_object('title', 'Splidly group activity', 'body', 'Open Splidly to review recent activity.')`,
-        updatedAt: now,
-      })
-      .where(
-        or(
-          sql<boolean>`${notificationOutbox.payload} ? 'groupName'`,
-          sql<boolean>`${notificationOutbox.payload}->>'title' is distinct from 'Splidly group activity'`,
-          sql<boolean>`${notificationOutbox.payload}->>'body' is distinct from 'Open Splidly to review recent activity.'`,
-        ),
-      );
     const expiredSessions = await tx
       .delete(sessions)
       .where(lt(sessions.expiresAt, now));
@@ -86,7 +72,6 @@ export async function applyDataRetention(
       invites: expiredInvites.rowCount ?? 0,
       notificationOutbox: oldNotifications.rowCount ?? 0,
       pushInstallations: staleInstallations.rowCount ?? 0,
-      sanitizedNotifications: sanitizedNotifications.rowCount ?? 0,
       sessions: expiredSessions.rowCount ?? 0,
       verifications: expiredVerifications.rowCount ?? 0,
     };

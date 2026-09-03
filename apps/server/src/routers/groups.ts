@@ -18,7 +18,6 @@ import {
   profiles,
   rateSnapshots,
   settlements,
-  sql,
 } from "@splidly/db";
 import {
   convertMinor,
@@ -45,12 +44,7 @@ import {
   resolveGroupStatisticsIconKey,
   statisticsBucketForPeriod,
 } from "../domain/group-statistics";
-import {
-  assertGroupOwner,
-  groupBy,
-  requireActiveGroupMember,
-  requireGroupOwner,
-} from "../domain/helpers";
+import { groupBy, requireActiveGroupMember } from "../domain/helpers";
 import { loadGroupedLedgerAmounts } from "../domain/ledger-summary";
 import { protectedProcedure, router } from "../trpc";
 
@@ -72,9 +66,6 @@ async function removeGroupMember(input: {
 }) {
   const { ctx, groupId, userId } = input;
   await requireActiveGroupMember(ctx.db, groupId, ctx.session.user.id);
-  if (userId !== ctx.session.user.id) {
-    await requireGroupOwner(ctx.db, groupId, ctx.session.user.id);
-  }
   const [entries, active]: [
     (typeof ledgerEntries.$inferSelect)[],
     (typeof groupMembers.$inferSelect)[],
@@ -110,28 +101,6 @@ async function removeGroupMember(input: {
       code: "PRECONDITION_FAILED",
       message: "The final member must archive the group",
     });
-  }
-  const [group] = await ctx.db
-    .select()
-    .from(groups)
-    .where(eq(groups.id, groupId))
-    .limit(1);
-  if (!group) throw new TRPCError({ code: "NOT_FOUND" });
-  if (group.createdBy === userId) {
-    const successor = active
-      .filter((member) => member.userId !== userId)
-      .sort(
-        (left, right) => left.joinedAt.getTime() - right.joinedAt.getTime(),
-      )[0];
-    if (!successor) throw new TRPCError({ code: "PRECONDITION_FAILED" });
-    await ctx.db
-      .update(groups)
-      .set({
-        createdBy: successor.userId,
-        updatedAt: new Date(),
-        version: sql`${groups.version} + 1`,
-      })
-      .where(eq(groups.id, groupId));
   }
   await ctx.db
     .update(groupMembers)
@@ -698,7 +667,6 @@ export const groupsRouter = router({
           ctx.db
             .select({
               id: settlements.id,
-              createdBy: settlements.createdBy,
               occurredAt: settlements.occurredAt,
               createdAt: settlements.createdAt,
               version: settlements.version,
@@ -909,7 +877,6 @@ export const groupsRouter = router({
           const toProfile = settlementProfilesById.get(settlement.toUserId);
           return {
             id: settlement.id,
-            canEdit: settlement.createdBy === ctx.session.user.id,
             occurredAt: settlement.occurredAt,
             createdAt: settlement.createdAt,
             version: settlement.version,
@@ -970,7 +937,6 @@ export const groupsRouter = router({
         .limit(1);
       const current = membership?.group;
       if (!current) throw new TRPCError({ code: "NOT_FOUND" });
-      assertGroupOwner(current.createdBy, ctx.session.user.id);
       if (current.version !== input.expectedVersion) {
         throw new TRPCError({ code: "CONFLICT" });
       }
@@ -1010,7 +976,6 @@ export const groupsRouter = router({
           and(
             eq(groups.id, input.groupId),
             eq(groups.version, input.expectedVersion),
-            eq(groups.createdBy, ctx.session.user.id),
           ),
         )
         .returning();
@@ -1041,7 +1006,11 @@ export const groupsRouter = router({
   archive: protectedProcedure
     .input(z.object({ groupId: z.uuid(), expectedVersion: z.number().int() }))
     .mutation(async ({ ctx, input }) => {
-      await requireGroupOwner(ctx.db, input.groupId, ctx.session.user.id);
+      await requireActiveGroupMember(
+        ctx.db,
+        input.groupId,
+        ctx.session.user.id,
+      );
       const entries = await loadGroupedLedgerAmounts(ctx.db, "group", [
         input.groupId,
       ]);
@@ -1065,7 +1034,6 @@ export const groupsRouter = router({
           and(
             eq(groups.id, input.groupId),
             eq(groups.version, input.expectedVersion),
-            eq(groups.createdBy, ctx.session.user.id),
           ),
         )
         .returning();
@@ -1090,12 +1058,6 @@ export const groupsRouter = router({
         .limit(1);
       const group = membership?.group;
       if (!group) throw new TRPCError({ code: "NOT_FOUND" });
-      if (group.createdBy !== ctx.session.user.id) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Only the group creator can delete this group",
-        });
-      }
       if (group.version !== input.expectedVersion) {
         throw new TRPCError({ code: "CONFLICT" });
       }

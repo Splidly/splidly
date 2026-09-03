@@ -27,7 +27,6 @@ import {
   reverseActiveEntries,
 } from "../domain/finance";
 import {
-  assertRecordCreator,
   requireActiveGroupMember,
   requireFriendshipParticipant,
 } from "../domain/helpers";
@@ -177,11 +176,6 @@ export const settlementsRouter = router({
 
       let contextId: string;
       if (input.context.type === "group") {
-        assertSettlementParticipant(
-          ctx.session.user.id,
-          input.fromUserId,
-          input.toUserId,
-        );
         const group = await requireSettlementGroup({
           db: ctx.db,
           groupId: input.context.groupId,
@@ -376,11 +370,6 @@ export const settlementsRouter = router({
       if (!current || current.deletedAt) {
         throw new TRPCError({ code: "NOT_FOUND" });
       }
-      assertRecordCreator(
-        current.createdBy,
-        ctx.session.user.id,
-        "settlement",
-      );
       if (current.version !== input.expectedVersion) {
         throw new TRPCError({ code: "CONFLICT" });
       }
@@ -399,11 +388,6 @@ export const settlementsRouter = router({
 
       let contextId: string;
       if (input.context.type === "group") {
-        assertSettlementParticipant(
-          ctx.session.user.id,
-          input.fromUserId,
-          input.toUserId,
-        );
         const group = await requireSettlementGroup({
           db: ctx.db,
           groupId: input.context.groupId,
@@ -590,11 +574,6 @@ export const settlementsRouter = router({
       if (!current || current.deletedAt) {
         throw new TRPCError({ code: "NOT_FOUND" });
       }
-      assertRecordCreator(
-        current.createdBy,
-        ctx.session.user.id,
-        "settlement",
-      );
       if (current.groupId) {
         await requireActiveGroupMember(
           ctx.db,

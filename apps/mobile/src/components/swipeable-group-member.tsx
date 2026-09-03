@@ -68,7 +68,6 @@ export function SwipeableGroupMember({
   viewerUserId,
   expanded,
   removalPending,
-  canRemove,
   onToggle,
   onRemove,
 }: {
@@ -76,7 +75,6 @@ export function SwipeableGroupMember({
   viewerUserId: string;
   expanded: boolean;
   removalPending: boolean;
-  canRemove: boolean;
   onToggle: () => void;
   onRemove: () => void;
 }) {
@@ -91,7 +89,7 @@ export function SwipeableGroupMember({
 
   return (
     <View>
-      {member.isViewer || !canRemove ? (
+      {member.isViewer ? (
         row
       ) : (
         <ReanimatedSwipeable

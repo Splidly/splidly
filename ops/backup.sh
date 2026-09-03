@@ -8,7 +8,7 @@ identity_file="${BACKUP_AGE_IDENTITY:-/etc/splidly/backup.agekey}"
 lock_file="${BACKUP_LOCK_FILE:-/tmp/splidly-backup.lock}"
 timestamp="${BACKUP_TIMESTAMP:-$(date -u +%Y%m%dT%H%M%SZ)}"
 
-for command in age age-keygen docker flock sha256sum tar; do
+for command in age age-keygen docker flock sha256sum; do
   if ! command -v "$command" >/dev/null 2>&1; then
     echo "$command is required to create backups" >&2
     exit 1
@@ -62,31 +62,18 @@ docker compose exec -T postgres sh -ec \
   'exec pg_dump --format=custom --compress=9 --clean --if-exists --no-owner --no-acl --username="$POSTGRES_USER" --dbname="$POSTGRES_DB"' \
   | age -r "$recipient" -o "$staging_directory/database.dump.age"
 
-create_config_archive() {
-  if [[ -d /etc/splidly/secrets ]]; then
-    tar -C "$project_directory" -cf - .env -C /etc/splidly secrets
-  else
-    tar -C "$project_directory" -cf - .env
-  fi
-}
-create_config_archive \
-  | age -r "$recipient" -o "$staging_directory/config.tar.age"
-
-# A backup is published only after both encrypted streams can be decrypted and
-# parsed. No plaintext database dump or configuration archive touches disk.
+# A backup is published only after the encrypted database dump can be decrypted
+# and parsed. No plaintext database dump touches disk.
 age -d -i "$identity_file" "$staging_directory/database.dump.age" \
   | docker compose exec -T postgres pg_restore --list >/dev/null
-age -d -i "$identity_file" "$staging_directory/config.tar.age" \
-  | tar -tf - >/dev/null
 
 (
   cd "$staging_directory"
-  sha256sum database.dump.age config.tar.age > SHA256SUMS
+  sha256sum database.dump.age > SHA256SUMS
 )
 cat > "$staging_directory/README.txt" <<EOF
 Created: $timestamp
 Database: encrypted PostgreSQL custom-format dump
-Configuration: encrypted .env and /etc/splidly/secrets when present
 Frankfurter: excluded because its public exchange-rate cache is reconstructable
 Restore with: BACKUP_AGE_IDENTITY=$identity_file ./ops/restore.sh $final_directory
 EOF

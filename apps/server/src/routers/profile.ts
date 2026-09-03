@@ -3,21 +3,14 @@ import {
   and,
   currencyQuotes,
   eq,
-  expenses,
-  financialRevisions,
-  groupMembers,
-  groups,
   inArray,
   invites,
   isNull,
   ledgerValuations,
   notificationOutbox,
-  or,
   profiles,
   pushInstallations,
   sessions,
-  settlements,
-  sql,
   users,
   verifications,
 } from "@splidly/db";
@@ -164,129 +157,7 @@ export const profileRouter = router({
         );
 
       return ctx.db.transaction(async (tx) => {
-        const [
-          authoredExpenses,
-          authoredSettlements,
-          latestEditedExpenses,
-          latestEditedSettlements,
-        ] = await Promise.all([
-          tx
-            .select({ id: expenses.id })
-            .from(expenses)
-            .where(eq(expenses.createdBy, userId)),
-          tx
-            .select({ id: settlements.id })
-            .from(settlements)
-            .where(eq(settlements.createdBy, userId)),
-          tx
-            .select({ id: expenses.id })
-            .from(expenses)
-            .innerJoin(
-              financialRevisions,
-              and(
-                eq(financialRevisions.recordType, "expense"),
-                eq(financialRevisions.recordId, expenses.id),
-                eq(financialRevisions.version, expenses.version),
-                eq(financialRevisions.actorId, userId),
-              ),
-            ),
-          tx
-            .select({ id: settlements.id })
-            .from(settlements)
-            .innerJoin(
-              financialRevisions,
-              and(
-                eq(financialRevisions.recordType, "settlement"),
-                eq(financialRevisions.recordId, settlements.id),
-                eq(financialRevisions.version, settlements.version),
-                eq(financialRevisions.actorId, userId),
-              ),
-            ),
-        ]);
-        const activeMemberships = await tx
-          .select({ groupId: groupMembers.groupId })
-          .from(groupMembers)
-          .innerJoin(groups, eq(groups.id, groupMembers.groupId))
-          .where(
-            and(
-              eq(groupMembers.userId, userId),
-              isNull(groupMembers.removedAt),
-              isNull(groups.archivedAt),
-            ),
-          );
         const deletedAt = new Date();
-        await tx
-          .update(groups)
-          .set({ imageUrl: null, updatedAt: deletedAt })
-          .where(eq(groups.createdBy, userId));
-        const activeGroupIds = activeMemberships.map(
-          (membership) => membership.groupId,
-        );
-        if (activeGroupIds.length > 0) {
-          const groupMemberships = await tx
-            .select({
-              groupId: groupMembers.groupId,
-              userId: groupMembers.userId,
-              joinedAt: groupMembers.joinedAt,
-              memberDeletedAt: profiles.deletedAt,
-            })
-            .from(groupMembers)
-            .innerJoin(profiles, eq(profiles.userId, groupMembers.userId))
-            .where(
-              and(
-                inArray(groupMembers.groupId, activeGroupIds),
-                isNull(groupMembers.removedAt),
-              ),
-            );
-          const groupsWithOtherMembers = new Set(
-            groupMemberships
-              .filter(
-                (membership) =>
-                  membership.userId !== userId && !membership.memberDeletedAt,
-              )
-              .map((membership) => membership.groupId),
-          );
-          const groupsToArchive = activeGroupIds.filter(
-            (groupId) => !groupsWithOtherMembers.has(groupId),
-          );
-          const successorByGroup = new Map<string, string>();
-          for (const membership of groupMemberships
-            .filter(
-              (membership) =>
-                membership.userId !== userId && !membership.memberDeletedAt,
-            )
-            .sort(
-              (left, right) =>
-                left.joinedAt.getTime() - right.joinedAt.getTime(),
-            )) {
-            if (!successorByGroup.has(membership.groupId)) {
-              successorByGroup.set(membership.groupId, membership.userId);
-            }
-          }
-          if (groupsToArchive.length > 0) {
-            await tx
-              .update(groups)
-              .set({
-                archivedAt: deletedAt,
-                updatedAt: deletedAt,
-                version: sql`${groups.version} + 1`,
-              })
-              .where(inArray(groups.id, groupsToArchive));
-          }
-          for (const [groupId, successorId] of successorByGroup) {
-            await tx
-              .update(groups)
-              .set({
-                createdBy: successorId,
-                updatedAt: deletedAt,
-                version: sql`${groups.version} + 1`,
-              })
-              .where(
-                and(eq(groups.id, groupId), eq(groups.createdBy, userId)),
-              );
-          }
-        }
-
         await tx.delete(invites).where(eq(invites.inviterId, userId));
         await tx
           .delete(notificationOutbox)
@@ -308,65 +179,6 @@ export const profileRouter = router({
               ctx.session.user.email,
             ]),
           );
-        const expenseIdsToMinimize = [
-          ...new Set(
-            [...authoredExpenses, ...latestEditedExpenses].map(({ id }) => id),
-          ),
-        ];
-        const settlementIdsToMinimize = [
-          ...new Set(
-            [...authoredSettlements, ...latestEditedSettlements].map(
-              ({ id }) => id,
-            ),
-          ),
-        ];
-        if (expenseIdsToMinimize.length > 0) {
-          await tx
-            .update(expenses)
-            .set({
-              description: "Deleted expense",
-              notes: "",
-              updatedAt: deletedAt,
-            })
-            .where(inArray(expenses.id, expenseIdsToMinimize));
-        }
-        if (settlementIdsToMinimize.length > 0) {
-          await tx
-            .update(settlements)
-            .set({ notes: "", updatedAt: deletedAt })
-            .where(inArray(settlements.id, settlementIdsToMinimize));
-        }
-        const revisionRecordFilters = [eq(financialRevisions.actorId, userId)];
-        if (authoredExpenses.length > 0) {
-          revisionRecordFilters.push(
-            and(
-              eq(financialRevisions.recordType, "expense"),
-              inArray(
-                financialRevisions.recordId,
-                authoredExpenses.map(({ id }) => id),
-              ),
-            )!,
-          );
-        }
-        if (authoredSettlements.length > 0) {
-          revisionRecordFilters.push(
-            and(
-              eq(financialRevisions.recordType, "settlement"),
-              inArray(
-                financialRevisions.recordId,
-                authoredSettlements.map(({ id }) => id),
-              ),
-            )!,
-          );
-        }
-        if (revisionRecordFilters.length > 0) {
-          await tx
-            .update(financialRevisions)
-            .set({
-              snapshot: sql`${financialRevisions.snapshot} - 'notes' - 'description'`,
-            })
-            .where(or(...revisionRecordFilters));
-        }
         await tx
           .update(profiles)
           .set({

@@ -15,7 +15,6 @@ import { z } from "zod";
 import {
   orderedPair,
   requireActiveGroupMember,
-  requireGroupOwner,
 } from "../domain/helpers";
 import { protectedProcedure, publicProcedure, router } from "../trpc";
 
@@ -106,7 +105,7 @@ export const invitesRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       if (input.kind === "group") {
-        await requireGroupOwner(
+        await requireActiveGroupMember(
           ctx.db,
           input.groupId,
           ctx.session.user.id,
@@ -178,7 +177,7 @@ export const invitesRouter = router({
         .limit(1);
       if (!invite) throw new TRPCError({ code: "NOT_FOUND" });
       if (invite.groupId) {
-        await requireGroupOwner(
+        await requireActiveGroupMember(
           ctx.db,
           invite.groupId,
           ctx.session.user.id,
