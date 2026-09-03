@@ -50,12 +50,8 @@ const androidEnabled = process.env.ANDROID_ENABLED === "true";
 if (!["true", "false"].includes(process.env.ANDROID_ENABLED ?? "")) {
   errors.push("ANDROID_ENABLED must be true or false");
 }
-const backupsEnabled = process.env.BACKUPS_ENABLED === "true";
 if (!["true", "false"].includes(process.env.BACKUPS_ENABLED ?? "")) {
   errors.push("BACKUPS_ENABLED must be true or false");
-}
-if (backupsEnabled) {
-  requiredKeys.push("OFFSITE_BACKUP_PROVIDER", "OFFSITE_BACKUP_COUNTRY");
 }
 if (androidEnabled) {
   requiredKeys.push(

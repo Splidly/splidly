@@ -229,6 +229,10 @@ Backups are stored on the production server for seven days. They protect
 against accidental deletion and bad deployments, but not loss of the server or
 its disk.
 
+Set `BACKUPS_ENABLED=true` in the production environment only after the timer is
+installed and enabled. Leave it `false` otherwise so the public privacy notice
+accurately describes the deployed service.
+
 Review [Security operations](SECURITY_OPERATIONS.md) before exposing a
 production instance.
 

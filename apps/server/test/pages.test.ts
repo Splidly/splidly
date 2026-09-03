@@ -25,8 +25,6 @@ const env = {
   PRIVACY_EMAIL: "privacy@example.com",
   ABUSE_EMAIL: "abuse@example.com",
   BACKUPS_ENABLED: false,
-  OFFSITE_BACKUP_PROVIDER: "Operator-controlled encrypted device",
-  OFFSITE_BACKUP_COUNTRY: "Germany",
   EDGE_LOG_RETENTION_DAYS: 0,
 } as Env;
 
@@ -120,11 +118,16 @@ describe("privacy page", () => {
     expect(html).toContain("privacy@example.com");
     expect(html).toContain("Example Operator");
     expect(html).toContain("netcup GmbH");
-    expect(html).toContain("does not currently create database or off-site backups");
-    expect(html).not.toContain("Operator-controlled encrypted device");
+    expect(html).toContain("does not currently create database backups");
     expect(html).toContain("raw edge logs are retained for up to 0 days");
     expect(html).toContain("Article 6(1)(b) GDPR");
     expect(html).toContain("supervisory authority");
+  });
+
+  it("describes enabled backups as same-server seven-day copies", () => {
+    const html = privacyPage({ ...env, BACKUPS_ENABLED: true });
+    expect(html).toContain("same netcup production server");
+    expect(html).toContain("seven-day retention schedule");
   });
 
   it("does not claim that data export exists in Settings", () => {

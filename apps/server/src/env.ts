@@ -96,8 +96,6 @@ const envSchema = z
       z.email().optional(),
     ),
     BACKUPS_ENABLED: environmentBoolean.default(false),
-    OFFSITE_BACKUP_PROVIDER: optionalCredential,
-    OFFSITE_BACKUP_COUNTRY: optionalCredential,
     EDGE_LOG_RETENTION_DAYS: z.preprocess(
       (value) => value === "" || value === undefined ? undefined : value,
       z.coerce.number().int().min(0).max(30).optional(),
@@ -176,20 +174,6 @@ const envSchema = z
           message: `${key} must contain the operator's final public legal details in production`,
           path: [key],
         });
-      }
-    }
-    if (env.BACKUPS_ENABLED) {
-      for (const key of [
-        "OFFSITE_BACKUP_PROVIDER",
-        "OFFSITE_BACKUP_COUNTRY",
-      ] as const) {
-        if (!env[key] || looksLikePlaceholder(env[key])) {
-          ctx.addIssue({
-            code: "custom",
-            message: `${key} must describe the actual backup destination when backups are enabled`,
-            path: [key],
-          });
-        }
       }
     }
     if (env.EDGE_LOG_RETENTION_DAYS === undefined) {

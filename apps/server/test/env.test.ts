@@ -47,8 +47,6 @@ const productionEnv = {
   PRIVACY_EMAIL: "privacy@splidly.site",
   ABUSE_EMAIL: "abuse@splidly.site",
   BACKUPS_ENABLED: "false",
-  OFFSITE_BACKUP_PROVIDER: "",
-  OFFSITE_BACKUP_COUNTRY: "",
   EDGE_LOG_RETENTION_DAYS: "0",
 };
 
