@@ -164,7 +164,6 @@ const envSchema = z
       "LEGAL_LOCALITY",
       "LEGAL_COUNTRY",
       "LEGAL_EMAIL",
-      "LEGAL_PHONE",
       "PRIVACY_EMAIL",
       "ABUSE_EMAIL",
     ] as const) {

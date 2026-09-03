@@ -137,9 +137,17 @@ describe("server environment", () => {
       readEnv({
         ...productionEnv,
         LEGAL_NAME: "replace-with-operator-name",
+      }),
+    ).toThrow(/LEGAL_NAME/);
+  });
+
+  it("accepts a production configuration without a public phone number", () => {
+    expect(
+      readEnv({
+        ...productionEnv,
         LEGAL_PHONE: "",
       }),
-    ).toThrow(/LEGAL_NAME|LEGAL_PHONE/);
+    ).toMatchObject({ LEGAL_PHONE: undefined, NODE_ENV: "production" });
   });
 
   it("requires final Android identity and store data when Android is enabled", () => {

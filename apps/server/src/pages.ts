@@ -47,9 +47,11 @@ function operatorDetails(env: Env): string {
   const locality = escapeHtml(env.LEGAL_LOCALITY ?? "");
   const country = escapeHtml(env.LEGAL_COUNTRY ?? "");
   const email = escapeHtml(env.LEGAL_EMAIL ?? "privacy@splidly.site");
-  const phone = escapeHtml(env.LEGAL_PHONE ?? "Not configured");
+  const phone = env.LEGAL_PHONE
+    ? `<br />Phone: ${escapeHtml(env.LEGAL_PHONE)}`
+    : "";
   return `<p><strong>${name}</strong><br />${street}<br />${postalCode} ${locality}<br />${country}</p>
-     <p>Email: <a href="mailto:${email}">${email}</a><br />Phone: ${phone}</p>`;
+     <p>Email: <a href="mailto:${email}">${email}</a>${phone}</p>`;
 }
 
 function privacyEmail(env: Env): string {
@@ -289,7 +291,7 @@ export function landingPage(env: Env): string {
           <h1>Split the cost.<br />Keep the good part.</h1>
           <p>Splidly makes shared expenses feel effortless - from weekend trips to the everyday stuff at home.</p>
           ${stores}
-          <div class="hero-note">Free to start · No ads · Built for iPhone &amp; iPad</div>
+          <div class="hero-note">Free to start · No ads · Built for iPhone</div>
         </div>
         <div class="product-stage" aria-label="Splidly app preview">
           <div class="device hero-device"><img class="app-preview-image" src="/app-group-overview.png" alt="Splidly group screen showing shared expenses for a Lisbon Weekend" /></div>
@@ -339,7 +341,7 @@ export function invitePage(token: string, env: Env): string {
     `<h1>You’ve been invited</h1>
      <p>Open Splidly to preview who invited you and decide whether to accept.</p>
      <a class="button" href="${escapeHtml(env.APP_SCHEME)}://invite/${safeToken}">Open Splidly</a>
-     <a class="button secondary" href="${escapeHtml(env.IOS_STORE_URL)}">Install for iPhone or iPad</a>
+     <a class="button secondary" href="${escapeHtml(env.IOS_STORE_URL)}">Install for iPhone</a>
      ${androidInstall}
      <p><small>If you install the app now, return to this original invite link afterward.</small></p>`,
   );
@@ -482,9 +484,9 @@ export function privacyPage(env: Env): string {
      <ul>
        <li><strong>Other group participants:</strong> users in the applicable friendship or group receive the shared profile and ledger information needed for that shared space.</li>
        <li><strong>Apple and Google:</strong> if you choose one of these sign-in methods, that provider processes the sign-in and gives Splidly the account information described above. Apple also processes the device token and detailed notification payload when Splidly sends a push notification through APNs. <a href="https://www.apple.com/legal/privacy/">Apple's privacy policy</a> or <a href="https://policies.google.com/privacy">Google's privacy policy</a> applies to the provider's own processing. The Google Sign-In software declares that it may also process coarse location, device and user identifiers, phone number, and usage data for app functionality and analytics, without tracking.</li>
-       <li><strong>Cloudflare:</strong> Cloudflare, Inc. operates the reverse proxy and DDoS protection in front of Splidly and processes network requests, IP addresses, security signals, and requested URLs for that purpose.</li>
+       <li><strong>Cloudflare:</strong> all traffic to Splidly's app, website, and API passes through the reverse proxy operated by Cloudflare, Inc. Cloudflare processes each network request, including the IP address, requested URL, request and response metadata, and security signals, to deliver traffic and provide DDoS protection and other network-security functions.</li>
        <li><strong>netcup:</strong> netcup GmbH hosts the Splidly server, database, and local operational data on infrastructure located in Germany and acts as a hosting processor.</li>
-       <li><strong>Email provider:</strong> the provider operating the published contact addresses processes correspondence and delivery metadata.</li>
+       <li><strong>Email delivery:</strong> Cloudflare Email Routing receives messages sent to Splidly's published contact addresses and forwards them to the operator's Apple iCloud Mail inbox. Cloudflare and Apple process the correspondence and delivery metadata for this purpose.</li>
        ${backupRecipient}
        <li><strong>Currency rates:</strong> a self-hosted Frankfurter service supplies reference exchange rates. It receives requested currency pairs and dates, not your identity, group names, expense descriptions, or notes.</li>
      </ul>
@@ -495,7 +497,7 @@ export function privacyPage(env: Env): string {
      <p>Account and ledger data is retained while your account is active. You can permanently delete your account from Profile at any time, including while you have open balances or active groups. For security, Splidly may ask you to sign in again. Deletion removes provider connections and tokens, active sessions, invitations you created, push-notification registrations, cached currency requests, notification preferences, your name, email address, and profile image. When deletion is performed in the app, Splidly also clears its protected account data from that device.</p>
      <p>Shared groups and financial records remain unchanged so deletion cannot alter another participant's ledger or balance. Splidly retains a <strong>pseudonymized</strong> internal account identifier together with group memberships, group images, expenses, settlements, descriptions, notes, amounts, dates, currencies, payers, splits, exchange-rate snapshots, and audit revisions. Other participants see “Deleted user” instead of your identity. This retained data is not anonymous because Splidly may still be able to associate the internal records with their prior account through operational records or other ledger participants. The automatic deletion flow does not set a separate expiry for these shared records. They remain until the shared ledger is deleted or retention is no longer necessary for ledger integrity, dispute resolution, or legal obligations.${backupRetention}</p>
      <p>If you used Sign in with Apple, Splidly attempts to revoke the Apple token before removing the provider connection. A missing token or temporary Apple failure never prevents account deletion; Splidly tells you when manual removal in your Apple Account’s Sign in with Apple settings is still required.</p>
-     <p>Expired sessions, verification requests, currency quotes, and invitations are removed by a daily retention job. Used friend invitations and revoked invitations may remain for up to 30 days before removal. Completed or permanently failed notification jobs are retained for up to 30 days for delivery troubleshooting. Push installations that have not contacted Splidly for 180 days are removed. Friend invitations are one-time credentials, while group invitations can be used by multiple people. All invitations expire after seven days and are stored only as cryptographic hashes. Docker retains at most five application log files of 10 MB per service; older files are removed by size rotation. Splidly-configured raw edge logs are retained for up to ${env.EDGE_LOG_RETENTION_DAYS ?? 0} days unless a specific security incident requires longer preservation.</p>
+     <p>Expired sessions, verification requests, currency quotes, and invitations are removed by a daily retention job. Used friend invitations and revoked invitations may remain for up to 30 days before removal. Completed or permanently failed notification jobs are retained for up to 30 days for delivery troubleshooting. Push installations that have not contacted Splidly for 180 days are removed. Friend invitations are one-time credentials, while group invitations can be used by multiple people. All invitations expire after seven days and are stored only as cryptographic hashes. Docker retains at most five application log files of 10 MB per service; older files are removed by size rotation. Any Cloudflare raw request logs enabled by Splidly are retained for up to ${env.EDGE_LOG_RETENTION_DAYS ?? 0} days unless a specific security incident requires longer preservation.</p>
      <p>Splidly may retain limited information for longer when required by law or reasonably necessary to resolve abuse, fraud, security, or legal issues.</p>
      <p>Support and rights-request correspondence is kept until the request is resolved, and longer only where needed to document compliance or establish, exercise, or defend legal claims.</p>
 

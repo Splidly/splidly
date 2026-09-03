@@ -250,7 +250,7 @@ pnpm dlx expo-doctor@latest apps/mobile
 ```
 
 Verify Apple/Google authentication and universal links on signed physical-device
-builds. Version 1.0.0 is an iPhone/iPad release. Production EAS builds use the
+builds. Version 1.0.0 is an iPhone-only release. Production EAS builds use the
 dedicated `production` environment and fail if final URLs, the iOS bundle ID,
 or Google clients are missing or inconsistent. Configure these public project
 variables in EAS:
@@ -278,7 +278,5 @@ certificate fingerprint, store URL, EAS variable, and submission profile, then
 enable it only after Play Console testing. EAS remotely owns the monotonically
 increasing iOS build number.
 
-The same iOS binary supports iPhone and iPad; no separate iPad app or build is
-needed. Before submission, test the signed build on a physical iPad and upload
-the required iPad screenshots in App Store Connect. See
-`apps/mobile/APP_STORE_CONNECT.md` for the device checklist.
+The initial release supports iPhone only. Enable `supportsTablet` and complete
+physical iPad layout testing before adding iPad support in a later release.

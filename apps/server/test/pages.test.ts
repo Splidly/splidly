@@ -50,7 +50,8 @@ describe("invite page", () => {
 
   it("offers only the iOS app while Android is deferred", () => {
     const html = invitePage("safe_token", iosOnlyEnv);
-    expect(html).toContain("Install for iPhone or iPad");
+    expect(html).toContain("Install for iPhone");
+    expect(html).not.toContain("iPad");
     expect(html).not.toContain("Install for Android");
   });
 });
@@ -93,9 +94,10 @@ describe("landing page", () => {
     expect(landingPage(env)).not.toContain("user-select: none");
   });
 
-  it("advertises iPhone and iPad without an unreleased Android badge", () => {
+  it("advertises iPhone without an unreleased Android badge", () => {
     const html = landingPage(iosOnlyEnv);
-    expect(html).toContain("Built for iPhone &amp; iPad");
+    expect(html).toContain("Built for iPhone");
+    expect(html).not.toContain("iPad");
     expect(html).not.toContain('src="/google-play-badge.png"');
     expect(html).not.toContain("Get Splidly on Google Play");
   });
@@ -106,6 +108,12 @@ describe("privacy page", () => {
     expect(privacyPage(env)).toContain(
       '<link rel="icon" type="image/svg+xml" href="/favicon.svg" />',
     );
+  });
+
+  it("omits the phone field when no public phone number is configured", () => {
+    const html = privacyPage({ ...env, LEGAL_PHONE: undefined });
+    expect(html).not.toContain("Phone:");
+    expect(html).not.toContain("Not configured");
   });
 
   it("describes collected data, retention, deletion, and contact", () => {
@@ -119,7 +127,14 @@ describe("privacy page", () => {
     expect(html).toContain("Example Operator");
     expect(html).toContain("netcup GmbH");
     expect(html).toContain("does not currently create database backups");
-    expect(html).toContain("raw edge logs are retained for up to 0 days");
+    expect(html).toContain(
+      "all traffic to Splidly's app, website, and API passes through",
+    );
+    expect(html).toContain(
+      "Cloudflare raw request logs enabled by Splidly are retained for up to 0 days",
+    );
+    expect(html).toContain("Cloudflare Email Routing");
+    expect(html).toContain("Apple iCloud Mail");
     expect(html).toContain("Article 6(1)(b) GDPR");
     expect(html).toContain("supervisory authority");
   });

@@ -54,7 +54,7 @@ const config: ExpoConfig = {
   ios: {
     icon: "./assets/icons/splidly.icon",
     bundleIdentifier: buildConfig.iosBundleIdentifier,
-    supportsTablet: true,
+    supportsTablet: false,
     usesAppleSignIn: true,
     associatedDomains: [`applinks:${host}`],
     privacyManifests: {
