@@ -10,5 +10,6 @@ export type CurrencyNativeListProps = {
   sections: readonly CurrencySection[];
   value: CurrencyCode;
   query: string;
+  onQueryChange: (query: string) => void;
   onSelect: (currency: CurrencyCode) => void;
 };

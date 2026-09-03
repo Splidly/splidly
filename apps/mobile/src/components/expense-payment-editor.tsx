@@ -10,6 +10,7 @@ import {
   formatMoney,
 } from "../lib/money-display";
 import { useTheme } from "../theme";
+import { toolbarIcons } from "../lib/toolbar-icons";
 import {
   type ExpensePaymentDraft,
   useExpensePaymentSession,
@@ -242,18 +243,21 @@ export function ExpensePaymentEditor() {
       />
       <Stack.Toolbar placement="left">
         <Stack.Toolbar.Button
-          icon="xmark"
+          icon={toolbarIcons.close}
           accessibilityLabel="Cancel payment allocation"
           onPress={cancel}
         />
       </Stack.Toolbar>
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
+          icon={
+            process.env.EXPO_OS === "android" ? toolbarIcons.done : undefined
+          }
           accessibilityLabel="Save payment allocation"
           disabled={!status.valid}
           onPress={done}
         >
-          Done
+          {process.env.EXPO_OS === "ios" ? "Done" : null}
         </Stack.Toolbar.Button>
       </Stack.Toolbar>
     </>

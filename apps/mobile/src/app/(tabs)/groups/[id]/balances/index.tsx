@@ -14,6 +14,7 @@ import {
   Section,
 } from "../../../../../components/ui";
 import { api } from "../../../../../lib/trpc";
+import { toolbarIcons } from "../../../../../lib/toolbar-icons";
 
 export default function GroupBalancesScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -109,7 +110,7 @@ export default function GroupBalancesScreen() {
       />
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
-          icon="banknote"
+          icon={toolbarIcons.settle}
           accessibilityLabel={`Settle up ${balances.data.group.name}`}
           onPress={openSettleUp}
         />

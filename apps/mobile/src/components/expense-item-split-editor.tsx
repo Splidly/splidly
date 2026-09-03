@@ -16,6 +16,7 @@ import {
 } from "../lib/expense-split";
 import { currencySymbol, formatMoney } from "../lib/money-display";
 import { useTheme } from "../theme";
+import { toolbarIcons } from "../lib/toolbar-icons";
 import { AllocationFloatingSummary } from "./allocation-floating-summary";
 import {
   AllocationHeader,
@@ -29,6 +30,7 @@ import {
   HeaderButton,
   PrimaryButton,
   Screen,
+  SheetCaption,
   useKeyboardFocusScroll,
 } from "./ui";
 
@@ -158,6 +160,7 @@ export function ExpenseItemSplitEditor() {
         }
         bottomOverlayHeight={88}
       >
+        <SheetCaption>Customize item</SheetCaption>
         <View style={{ gap: 8 }}>
           <AllocationHeader title="Split this item" />
           <MenuView
@@ -348,18 +351,21 @@ export function ExpenseItemSplitEditor() {
       />
       <Stack.Toolbar placement="left">
         <Stack.Toolbar.Button
-          icon="xmark"
+          icon={toolbarIcons.close}
           accessibilityLabel="Cancel item split"
           onPress={cancel}
         />
       </Stack.Toolbar>
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
+          icon={
+            process.env.EXPO_OS === "android" ? toolbarIcons.done : undefined
+          }
           accessibilityLabel="Save item split"
           disabled={!status.valid}
           onPress={done}
         >
-          Done
+          {process.env.EXPO_OS === "ios" ? "Done" : null}
         </Stack.Toolbar.Button>
       </Stack.Toolbar>
     </>

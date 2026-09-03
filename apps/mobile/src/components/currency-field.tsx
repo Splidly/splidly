@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import { beginCurrencySelection } from "../lib/currency-selection";
 import { getCurrency } from "../lib/currencies";
 import { currencySymbolWithCode } from "../lib/money-display";
+import { useNavigationPressGuard } from "../lib/use-navigation-press-guard";
 import { ListRow } from "./ui";
 
 export function CurrencyField({
@@ -18,8 +19,15 @@ export function CurrencyField({
   recentCurrencies?: CurrencyCode[];
   disabled?: boolean;
 }) {
+  const acceptNavigationPress = useNavigationPressGuard();
+
   function open() {
-    beginCurrencySelection(value, onValueChange, recentCurrencies);
+    if (!acceptNavigationPress()) return;
+    beginCurrencySelection(
+      value,
+      onValueChange,
+      recentCurrencies,
+    );
     router.push("/currency-picker");
   }
 

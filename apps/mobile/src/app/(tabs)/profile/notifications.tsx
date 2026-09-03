@@ -9,8 +9,10 @@ import {
   RowDivider,
   Screen,
   Section,
+  SheetCaption,
 } from "../../../components/ui";
 import { api } from "../../../lib/trpc";
+import { toolbarIcons } from "../../../lib/toolbar-icons";
 
 type NotificationPreferences = {
   onlyWhenInvolved: boolean;
@@ -81,6 +83,7 @@ export default function NotificationSettingsScreen() {
   return (
     <>
       <Screen background="sheet" contentContainerStyle={{ paddingTop: 12 }}>
+        <SheetCaption>Notifications</SheetCaption>
         <Section
           footer="Smart summaries wait up to 5 minutes. One or two updates still arrive separately; three or more from the same group are combined."
         >
@@ -137,7 +140,7 @@ export default function NotificationSettingsScreen() {
       ) : null}
       <Stack.Toolbar placement="left">
         <Stack.Toolbar.Button
-          icon="xmark"
+          icon={toolbarIcons.close}
           accessibilityLabel="Close notification settings"
           onPress={() => router.back()}
         />

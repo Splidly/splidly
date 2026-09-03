@@ -13,6 +13,7 @@ import {
   RowDivider,
   Section,
 } from "../../../components/ui";
+import { toolbarIcons } from "../../../lib/toolbar-icons";
 import { api } from "../../../lib/trpc";
 import { shareInvite } from "../../../lib/share-invite";
 import { useTheme } from "../../../theme";
@@ -125,7 +126,7 @@ export default function FriendsScreen() {
       />
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
-          icon="person.badge.plus"
+          icon={toolbarIcons.invite}
           accessibilityLabel="Invite a friend"
           disabled={createInvite.isPending}
           onPress={() => createInvite.mutate({ kind: "friend" })}

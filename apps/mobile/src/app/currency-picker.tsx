@@ -18,6 +18,7 @@ import {
   rememberCurrency,
   type CurrencyOption,
 } from "../lib/currencies";
+import { toolbarIcons } from "../lib/toolbar-icons";
 
 function mergeRecentCurrencies(
   stored: readonly CurrencyCode[],
@@ -117,6 +118,7 @@ export default function CurrencyPickerScreen() {
         sections={sections}
         value={value}
         query={query}
+        onQueryChange={setQuery}
         onSelect={select}
       />
       <Stack.Screen
@@ -133,17 +135,19 @@ export default function CurrencyPickerScreen() {
           }),
         }}
       />
-      <Stack.SearchBar
-        placeholder="Search currencies"
-        placement="stacked"
-        autoCapitalize="none"
-        hideWhenScrolling={false}
-        onChangeText={(event) => setQuery(event.nativeEvent.text)}
-        onCancelButtonPress={() => setQuery("")}
-      />
+      {process.env.EXPO_OS === "ios" ? (
+        <Stack.SearchBar
+          placeholder="Search currencies"
+          placement="stacked"
+          autoCapitalize="none"
+          hideWhenScrolling={false}
+          onChangeText={(event) => setQuery(event.nativeEvent.text)}
+          onCancelButtonPress={() => setQuery("")}
+        />
+      ) : null}
       <Stack.Toolbar placement="left">
         <Stack.Toolbar.Button
-          icon="xmark"
+          icon={toolbarIcons.close}
           accessibilityLabel="Close currency selector"
           onPress={close}
         />

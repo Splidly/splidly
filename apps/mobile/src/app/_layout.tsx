@@ -123,12 +123,20 @@ function Navigation() {
         />
         <Stack.Screen
           name="currency-picker"
-          options={{
-            title: "Currency",
-            ...formSheetOptions(theme.sheet),
-            sheetAllowedDetents: [1],
-            sheetGrabberVisible: false,
-          }}
+          options={
+            process.env.EXPO_OS === "ios"
+              ? {
+                  title: "Currency",
+                  ...formSheetOptions(theme.sheet),
+                  sheetAllowedDetents: [1],
+                  sheetGrabberVisible: false,
+                }
+              : {
+                  title: "Currency",
+                  presentation: "fullScreenModal",
+                  contentStyle: { backgroundColor: theme.sheet },
+                }
+          }
         />
         <Stack.Screen name="invite/[token]" options={{ title: "Invitation" }} />
       </Stack>

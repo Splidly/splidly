@@ -18,8 +18,10 @@ import {
   View,
 } from "react-native";
 import { beginCurrencySelection } from "../../lib/currency-selection";
+import { useNavigationPressGuard } from "../../lib/use-navigation-press-guard";
 import { formatConvertedMoney } from "../../lib/money-display";
 import { api } from "../../lib/trpc";
+import { toolbarIcons } from "../../lib/toolbar-icons";
 import {
   SettlementAmountCard,
   SettlementDirectionCard,
@@ -34,6 +36,7 @@ import {
   LoadingState,
   Screen,
   Section,
+  SheetCaption,
   useKeyboardFocusScroll,
 } from "../../components/ui";
 import { useTheme } from "../../theme";
@@ -45,6 +48,7 @@ function rateBasis(base: CurrencyCode, targets: CurrencyCode[]) {
 }
 
 export default function NewSettlementScreen() {
+  const acceptCurrencyPickerPress = useNavigationPressGuard();
   const clientMutationId = useRef(Crypto.randomUUID());
   const params = useLocalSearchParams<{
     type: "group" | "friend";
@@ -393,6 +397,7 @@ export default function NewSettlementScreen() {
   }
 
   function openCurrency() {
+    if (!acceptCurrencyPickerPress()) return;
     beginCurrencySelection(
       currency,
       selectCurrency,
@@ -745,6 +750,9 @@ export default function NewSettlementScreen() {
             }
           : {})}
       >
+        <SheetCaption>
+          {editing ? "Edit payment" : "Record payment"}
+        </SheetCaption>
         {content}
       </Screen>
       <Stack.Screen
@@ -767,7 +775,7 @@ export default function NewSettlementScreen() {
       />
       <Stack.Toolbar placement="left">
         <Stack.Toolbar.Button
-          icon="xmark"
+          icon={toolbarIcons.close}
           accessibilityLabel="Cancel payment"
           disabled={create.isPending || update.isPending || remove.isPending}
           onPress={closePayment}

@@ -44,6 +44,103 @@ Use static checks, unit tests, typechecking, and native platform exports
 instead. Leave any visual verification that requires a running iOS app for the
 user to perform on a physical device.
 
+## Android development contract
+
+The developers primarily use Apple hardware and are specialized in iOS
+development. Do not assume that a shared React Native implementation behaves or
+looks correct on Android merely because the iOS version works. When changing
+`apps/mobile`, actively inspect the Android code path and preserve the existing
+iOS behavior unless the user explicitly requests an iOS change.
+
+### Platform boundaries
+
+- Use `process.env.EXPO_OS` for platform-specific behavior.
+- Keep Android-only layout, interaction, and navigation fixes inside explicit
+  Android branches or `.android.tsx` files. Do not alter the iOS presentation as
+  an incidental part of an Android fix.
+- After changing shared mobile code, verify that both Android and iOS bundles
+  still export. A successful Android export proves that code bundles, but it
+  does not prove that native controls respond correctly.
+- Prefer standard Android interaction patterns on Android and standard Apple
+  interaction patterns on iOS. Matching features does not require forcing both
+  platforms to use identical native controls.
+
+### Android icons and toolbar actions
+
+- SF Symbol string names are iOS-only. Every Expo Router toolbar icon that must
+  appear on Android needs an Android `ImageSourcePropType`, normally a Material
+  Symbols XML asset selected through `Icon.select` or the shared
+  `apps/mobile/src/lib/toolbar-icons.ts` mapping.
+- Never consider an Android toolbar complete until all actions are visible and
+  reachable, including Add Group, Group Settings, Statistics, close, edit,
+  save, and similar actions.
+- Use at least a 48 by 48 density-independent-pixel touch target for Android
+  icon-only actions. Test both the center of the glyph and the visible
+  background around it.
+- Native `Host` or `Icon` views can intercept Android touches. When an enclosing
+  control owns the interaction, make decorative icon content ignore pointer
+  events so taps on the glyph reach the actual trigger.
+
+### Android menus and controls
+
+- Keep menu actions as anchored dropdown menus when that is the expected UI.
+  Do not replace a dropdown with an alert or unrelated sheet just to work around
+  a trigger bug.
+- Avoid nesting a React Native `Pressable` inside the Android trigger used by
+  `@expo/ui/community/menu` `MenuView`. The inner pressable can consume the tap
+  before the native dropdown opens. Use a non-pressable trigger view and let
+  `MenuView` own the touch interaction.
+- When a menu trigger contains an Expo UI `Host`, make the Android trigger
+  content pointer-transparent. Verify that tapping directly on the icon opens
+  the menu, not only tapping the surrounding background.
+- Verify every menu by opening it and selecting each action. Unit tests that
+  invoke `onPressAction` directly do not validate the native trigger.
+- Prevent rapid repeated presses from presenting the same route or sheet more
+  than once.
+
+### Android sheets and navigation
+
+- Do not assume a `Stack.Screen` title is visible inside an Android form sheet.
+  Android form-sheet presentation can omit the stack header. Use the shared
+  Android-only `SheetCaption` inside sheet content when a visible heading is
+  required, while keeping the iOS native header unchanged.
+- Every Android modal, picker, and nested allocation screen must provide an
+  obvious way to return, close, cancel, or save. Do not rely on an iOS-only
+  toolbar item or swipe gesture.
+- Check Android system Back behavior in addition to visible navigation
+  controls.
+- Use native inset handling and the shared `Screen` scrolling contract. Do not
+  add guessed status-bar, navigation-bar, or bottom-sheet padding.
+
+### Android lists and performance
+
+- Use virtualized React Native lists such as `FlatList` or `SectionList` for
+  long, searchable datasets. Do not render a large currency or expense dataset
+  as an unvirtualized collection.
+- Keep search input responsive while filtering and scrolling. Verify keyboard
+  dismissal, list selection, empty results, dark mode, and the selected-row
+  indicator.
+- Treat visible jank, delayed taps, clipped rows, and unreachable final content
+  as correctness problems rather than cosmetic differences.
+
+### Required Android verification
+
+For Android UI or navigation changes, do not stop at typechecking and Jest.
+Also export Android and explicitly tell the user which real emulator or device
+checks remain. At minimum, verify or request verification of:
+
+- tapping the center and edges of every changed icon button;
+- opening dropdown menus and choosing every action;
+- opening and closing each affected sheet or modal;
+- Android system Back behavior;
+- rapid double-taps on navigation controls;
+- scrolling to the final row with the keyboard open and closed;
+- light and dark mode.
+
+If an Android emulator is already available and the task permits running it,
+prefer checking the actual interaction there. Never claim that a native touch
+bug is fixed solely because a callback unit test or static export passes.
+
 Every mobile screen must satisfy all of the following:
 
 - Content longer than the viewport scrolls completely above the floating native

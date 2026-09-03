@@ -13,12 +13,14 @@ import {
   RowDivider,
   Screen,
   Section,
+  SheetCaption,
 } from "../../../components/ui";
 import {
   expenseItemAllocationModeLabels,
   expenseSplitModeLabels,
 } from "../../../lib/expense-split";
 import { expenseTotalInCurrency } from "../../../lib/expense-detail";
+import { toolbarIcons } from "../../../lib/toolbar-icons";
 import { formatExchangeRate } from "../../../lib/money-display";
 import { api } from "../../../lib/trpc";
 import { APP_URL } from "../../../lib/env";
@@ -109,6 +111,7 @@ export default function ExpenseDetailScreen() {
         formSheetBottomClearance
         contentContainerStyle={{ paddingTop: 8, gap: 16 }}
       >
+        <SheetCaption>Expense details</SheetCaption>
         <ExpenseDetailHero
           description={expense.description}
           iconKey={expense.iconKey}
@@ -289,14 +292,14 @@ export default function ExpenseDetailScreen() {
       />
       <Stack.Toolbar placement="left">
         <Stack.Toolbar.Button
-          icon="xmark"
+          icon={toolbarIcons.close}
           accessibilityLabel="Close expense details"
           onPress={() => router.back()}
         />
       </Stack.Toolbar>
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
-          icon="pencil"
+          icon={toolbarIcons.edit}
           accessibilityLabel="Edit expense"
           onPress={editExpense}
         />

@@ -408,6 +408,21 @@ export function Intro({ children }: PropsWithChildren) {
   );
 }
 
+export function SheetCaption({ children }: PropsWithChildren) {
+  const theme = useTheme();
+  if (process.env.EXPO_OS !== "android") return null;
+
+  return (
+    <Text
+      selectable={false}
+      accessibilityRole="header"
+      style={[styles.sheetCaption, { color: theme.text }]}
+    >
+      {children}
+    </Text>
+  );
+}
+
 export function Section({
   title,
   footer,
@@ -1054,6 +1069,13 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
   },
   intro: { fontSize: 15, lineHeight: 21, paddingHorizontal: spacing.xs },
+  sheetCaption: {
+    paddingHorizontal: spacing.xs,
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: "700",
+    letterSpacing: -0.3,
+  },
   section: { gap: spacing.sm },
   sectionTitle: {
     paddingHorizontal: spacing.md,

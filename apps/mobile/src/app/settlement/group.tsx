@@ -11,9 +11,11 @@ import {
   ListRow,
   LoadingState,
   Screen,
+  SheetCaption,
 } from "../../components/ui";
 import { formatConvertedMoney } from "../../lib/money-display";
 import { api } from "../../lib/trpc";
+import { toolbarIcons } from "../../lib/toolbar-icons";
 import { useTheme } from "../../theme";
 
 const customPaymentIcon = Icon.select({
@@ -101,6 +103,7 @@ export default function SettleGroupScreen() {
         background="sheet"
         contentContainerStyle={{ paddingTop: 12, gap: 24 }}
       >
+        <SheetCaption>Settle up</SheetCaption>
         <Intro>
           Choose an open balance in {group.name}, or record a different
           payment.
@@ -210,7 +213,7 @@ export default function SettleGroupScreen() {
       />
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
-          icon="xmark"
+          icon={toolbarIcons.close}
           accessibilityLabel="Close settle up"
           onPress={close}
         />

@@ -17,6 +17,7 @@ export function CurrencyNativeList({
   sections,
   value,
   query,
+  onQueryChange: _onQueryChange,
   onSelect,
 }: CurrencyNativeListProps) {
   const theme = useTheme();

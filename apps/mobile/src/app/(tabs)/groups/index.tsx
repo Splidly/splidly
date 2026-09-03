@@ -15,6 +15,7 @@ import {
   RowDivider,
 } from "../../../components/ui";
 import { overallGroupBalanceLines } from "../../../lib/group-balance-summary";
+import { toolbarIcons } from "../../../lib/toolbar-icons";
 import { api } from "../../../lib/trpc";
 
 export default function GroupsScreen() {
@@ -87,7 +88,7 @@ export default function GroupsScreen() {
       />
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
-          icon="plus"
+          icon={toolbarIcons.add}
           accessibilityLabel="Create a group"
           onPress={() => router.push("/groups/new")}
         />

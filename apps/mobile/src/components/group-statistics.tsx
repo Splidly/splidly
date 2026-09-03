@@ -1,6 +1,10 @@
 import type { CurrencyCode, ExpenseIconKey, Money } from "@splidly/shared";
 import { Host, Icon } from "@expo/ui";
-import { MenuView, type MenuAction } from "@expo/ui/community/menu";
+import {
+  MenuView,
+  type MenuAction,
+  type MenuComponentRef,
+} from "@expo/ui/community/menu";
 import SegmentedControl from "@expo/ui/community/segmented-control";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
@@ -1036,17 +1040,56 @@ function MemberSortButton({
   onValueChange: (value: MemberSort) => void;
 }) {
   const theme = useTheme();
+  const menuRef = useRef<MenuComponentRef>(null);
   const actions: MenuAction[] = [
     { id: "share", title: "Share", state: value === "share" ? "on" : "off" },
     { id: "paid", title: "Paid", state: value === "paid" ? "on" : "off" },
     { id: "name", title: "Name", state: value === "name" ? "on" : "off" },
   ];
 
+  const icon = (
+    <Host matchContents ignoreSafeArea="all" style={styles.sortIcon}>
+      <Icon
+        name={memberSortIcon}
+        size={17}
+        color={theme.primary}
+        accessibilityLabel="Sort"
+      />
+    </Host>
+  );
+  const buttonStyle = {
+    backgroundColor: theme.surface,
+    borderColor: theme.border,
+  };
+
+  const iosButton = (
+    <Pressable
+      testID="member-sort-button"
+      accessibilityRole="button"
+      accessibilityLabel={`Sort members, currently by ${value}`}
+      accessibilityHint="Opens sorting options"
+      hitSlop={8}
+      style={({ pressed }) => [
+        styles.sortButton,
+        buttonStyle,
+        { opacity: pressed ? 0.55 : 1 },
+      ]}
+    >
+      {icon}
+    </Pressable>
+  );
+
   return (
     <MenuView
+      ref={menuRef}
       title="Sort members"
       actions={actions}
       testID="member-sort-menu"
+      style={
+        process.env.EXPO_OS === "android"
+          ? styles.sortMenuTouchTarget
+          : undefined
+      }
       onPressAction={({ nativeEvent }) => {
         const next = nativeEvent.event;
         if (next === "share" || next === "paid" || next === "name") {
@@ -1054,34 +1097,27 @@ function MemberSortButton({
         }
       }}
     >
-      <Pressable
-        testID="member-sort-button"
-        accessibilityRole="button"
-        accessibilityLabel={`Sort members, currently by ${value}`}
-        accessibilityHint="Opens sorting options"
-        hitSlop={8}
-        style={({ pressed }) => [
-          styles.sortButton,
-          {
-            backgroundColor: theme.surface,
-            borderColor: theme.border,
-            opacity: pressed ? 0.55 : 1,
-          },
-        ]}
-      >
-        <Host
-          matchContents
-          ignoreSafeArea="all"
-          style={styles.sortIcon}
+      {process.env.EXPO_OS === "android" ? (
+        <View
+          testID="member-sort-button"
+          pointerEvents="none"
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel={`Sort members, currently by ${value}`}
+          accessibilityHint="Opens sorting options"
+          accessibilityActions={[{ name: "activate" }]}
+          onAccessibilityAction={({ nativeEvent }) => {
+            if (nativeEvent.actionName === "activate") {
+              menuRef.current?.show();
+            }
+          }}
+          style={styles.sortMenuTouchTarget}
         >
-          <Icon
-            name={memberSortIcon}
-            size={17}
-            color={theme.primary}
-            accessibilityLabel="Sort"
-          />
-        </Host>
-      </Pressable>
+          <View style={[styles.sortButton, buttonStyle]}>{icon}</View>
+        </View>
+      ) : (
+        iosButton
+      )}
     </MenuView>
   );
 }
@@ -1271,6 +1307,12 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sortMenuTouchTarget: {
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
   },

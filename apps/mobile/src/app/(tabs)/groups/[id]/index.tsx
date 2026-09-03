@@ -26,6 +26,7 @@ import { groupActivityByDate } from "../../../../lib/activity-dates";
 import { expensePaymentSummary } from "../../../../lib/expense-activity";
 import { groupBalanceLines } from "../../../../lib/group-balance-summary";
 import { groupActionColorsFor } from "../../../../lib/group-colors";
+import { toolbarIcons } from "../../../../lib/toolbar-icons";
 import type { CurrencyCode } from "@splidly/shared";
 
 export default function GroupDetailScreen() {
@@ -234,14 +235,14 @@ export default function GroupDetailScreen() {
       />
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
-          icon="chart.bar.xaxis"
+          icon={toolbarIcons.statistics}
           accessibilityLabel={`${group.name} statistics`}
           onPress={() =>
             router.push(`/groups/${group.id}/statistics` as Href)
           }
         />
         <Stack.Toolbar.Button
-          icon="gearshape"
+          icon={toolbarIcons.settings}
           accessibilityLabel={`${group.name} settings`}
           onPress={() => router.push(`/groups/${group.id}/settings`)}
         />

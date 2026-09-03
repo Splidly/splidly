@@ -20,6 +20,7 @@ import {
   View,
 } from "react-native";
 import { beginCurrencySelection } from "../lib/currency-selection";
+import { useNavigationPressGuard } from "../lib/use-navigation-press-guard";
 import { api } from "../lib/trpc";
 import { formatConvertedMoney, formatExchangeRate } from "../lib/money-display";
 import { expensePaymentStatus } from "../lib/expense-payments";
@@ -33,6 +34,7 @@ import {
   type SplitParticipant,
 } from "../lib/expense-split";
 import { useTheme } from "../theme";
+import { toolbarIcons } from "../lib/toolbar-icons";
 import { DateField } from "./date-field";
 import {
   AllocationChoiceCard,
@@ -48,6 +50,7 @@ import {
   HeaderButton,
   LoadingState,
   Screen,
+  SheetCaption,
   useKeyboardFocusScroll,
 } from "./ui";
 
@@ -82,6 +85,7 @@ export function ExpenseEditor({
   expenseId?: string;
   newContext?: ExpenseContext;
 }) {
+  const acceptCurrencyPickerPress = useNavigationPressGuard();
   const clientMutationId = useRef(Crypto.randomUUID());
   const theme = useTheme();
   const paymentSession = useExpensePaymentSession();
@@ -612,6 +616,7 @@ export function ExpenseEditor({
     selectedIds.length === 0 ||
     payerIds.length === 0;
   const openCurrency = () => {
+    if (!acceptCurrencyPickerPress()) return;
     beginCurrencySelection(
       currency,
       setCurrency,
@@ -743,6 +748,9 @@ export function ExpenseEditor({
         bottomOverlayHeight={expenseOverlayHeight}
         contentContainerStyle={{ paddingTop: 16, gap: 22 }}
       >
+        <SheetCaption>
+          {editing ? "Edit expense" : "Add expense"}
+        </SheetCaption>
         <ExpenseEntryCard
           icon={
             <ExpenseIconPicker
@@ -951,7 +959,7 @@ export function ExpenseEditor({
       />
       <Stack.Toolbar placement="left">
         <Stack.Toolbar.Button
-          icon="xmark"
+          icon={toolbarIcons.close}
           accessibilityLabel={
             editing ? "Close expense editor" : "Close new expense"
           }
