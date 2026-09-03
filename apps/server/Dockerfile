@@ -1,5 +1,5 @@
 FROM node:26.8.1-alpine3.24 AS build
-RUN corepack enable
+RUN npm install --global pnpm@11.17.0
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
