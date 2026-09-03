@@ -409,6 +409,8 @@ export function ExpenseSplitEditor() {
                               : ("decimal-pad" as const),
                           placeholder:
                             valueKey === "shares" ? "1" : "0",
+                          onAmountFocus: focusInput,
+                          onAmountBlur: blurInput,
                         }
                       : selected && draft.mode === "equal"
                         ? {

@@ -1,6 +1,6 @@
 import { router, Stack } from "expo-router";
-import { useEffect, useState } from "react";
-import { Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { ScrollView, Text, View } from "react-native";
 import {
   equalPaymentAmounts,
   expensePaymentStatus,
@@ -25,6 +25,7 @@ import {
   HeaderButton,
   PrimaryButton,
   Screen,
+  useKeyboardFocusScroll,
 } from "./ui";
 
 export function ExpensePaymentEditor() {
@@ -34,6 +35,9 @@ export function ExpensePaymentEditor() {
   const [draft, setDraft] = useState<ExpensePaymentDraft | undefined>(
     request?.draft,
   );
+  const screenRef = useRef<ScrollView>(null);
+  const { keyboardClearance, focusInput, blurInput } =
+    useKeyboardFocusScroll(screenRef, 104);
 
   useEffect(() => {
     if (request) setDraft(request.draft);
@@ -101,6 +105,8 @@ export function ExpensePaymentEditor() {
   return (
     <>
       <Screen
+        scrollViewRef={screenRef}
+        transientBottomClearance={keyboardClearance}
         bottomOverlay={
           <AllocationFloatingSummary
             title={progressTitle}
@@ -184,6 +190,8 @@ export function ExpensePaymentEditor() {
                         amountLabel: `${person.displayName} paid amount`,
                         suffix: currencySymbol(request.currency),
                         placeholder: "0.00",
+                        onAmountFocus: focusInput,
+                        onAmountBlur: blurInput,
                       }
                     : selected
                       ? {

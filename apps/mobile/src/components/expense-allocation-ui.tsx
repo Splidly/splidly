@@ -265,6 +265,8 @@ export function AllocationRow({
   keyboardType,
   placeholder,
   selectionLabel,
+  onAmountFocus,
+  onAmountBlur,
 }: {
   userId: string;
   name: string;
@@ -279,6 +281,8 @@ export function AllocationRow({
   keyboardType?: "decimal-pad" | "number-pad";
   placeholder?: string;
   selectionLabel?: string;
+  onAmountFocus?: (input: TextInput | null) => void;
+  onAmountBlur?: (input: TextInput | null) => void;
 }) {
   const theme = useTheme();
   return (
@@ -325,6 +329,8 @@ export function AllocationRow({
           width={suffix === "%" || suffix === "×" ? 88 : 104}
           {...(keyboardType ? { keyboardType } : {})}
           {...(placeholder ? { placeholder } : {})}
+          {...(onAmountFocus ? { onFocus: onAmountFocus } : {})}
+          {...(onAmountBlur ? { onBlur: onAmountBlur } : {})}
         />
       ) : selected && displayValue ? (
         <Text

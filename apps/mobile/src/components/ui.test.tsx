@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { fireEvent, render } from "@testing-library/react-native";
+import { act, fireEvent, render } from "@testing-library/react-native";
 import { HeaderHeightContext } from "expo-router/build/react-navigation/elements/Header/HeaderHeightContext";
-import { StyleSheet, Text } from "react-native";
+import { Keyboard, StyleSheet, Text } from "react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import {
   CollectionScreen,
@@ -106,6 +106,59 @@ describe("Field", () => {
 });
 
 describe("Screen", () => {
+  it("adds keyboard clearance only while the keyboard is visible", async () => {
+    const listeners = new Map<string, (event?: unknown) => void>();
+    const addListener = jest
+      .spyOn(Keyboard, "addListener")
+      .mockImplementation((event, listener) => {
+        listeners.set(event, listener as (event?: unknown) => void);
+        return {
+          remove: jest.fn(),
+        } as unknown as ReturnType<typeof Keyboard.addListener>;
+      });
+    try {
+      const view = await render(
+        <SafeAreaInsetsContext.Provider
+          value={{ top: 0, right: 0, bottom: 20, left: 0 }}
+        >
+          <Screen>
+            <Text>Form content</Text>
+          </Screen>
+        </SafeAreaInsetsContext.Provider>,
+      );
+      const findScrollView = () =>
+        view.container.queryAll(
+          (instance) =>
+            instance.props.contentInsetAdjustmentBehavior === "automatic",
+        )[0];
+      const scrollView = findScrollView();
+      if (!scrollView) throw new Error("ScrollView was not rendered");
+      await fireEvent(scrollView, "layout", {
+        nativeEvent: { layout: { height: 800 } },
+      });
+
+      await act(async () => {
+        listeners.get("keyboardDidShow")?.({
+          endCoordinates: { height: 300 },
+        });
+      });
+      expect(
+        StyleSheet.flatten(findScrollView()?.props.contentContainerStyle)
+          .paddingBottom,
+      ).toBe(300);
+
+      await act(async () => {
+        listeners.get("keyboardDidHide")?.();
+      });
+      expect(
+        StyleSheet.flatten(findScrollView()?.props.contentContainerStyle)
+          .paddingBottom,
+      ).toBeUndefined();
+    } finally {
+      addListener.mockRestore();
+    }
+  });
+
   it("lets the native navigator own insets without flex-created scroll space", async () => {
     const view = await render(
       <SafeAreaInsetsContext.Provider

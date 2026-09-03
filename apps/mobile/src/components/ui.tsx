@@ -127,6 +127,33 @@ function useScrollViewportFill({
   };
 }
 
+function useKeyboardBottomClearance() {
+  const [keyboardClearance, setKeyboardClearance] = useState(
+    () => Keyboard.metrics()?.height ?? 0,
+  );
+
+  useEffect(() => {
+    const updateClearance = (event: {
+      endCoordinates: { height: number };
+    }) => setKeyboardClearance(event.endCoordinates.height);
+    const shown = Keyboard.addListener("keyboardDidShow", updateClearance);
+    const changed = Keyboard.addListener(
+      "keyboardDidChangeFrame",
+      updateClearance,
+    );
+    const hidden = Keyboard.addListener("keyboardDidHide", () => {
+      setKeyboardClearance(0);
+    });
+    return () => {
+      shown.remove();
+      changed.remove();
+      hidden.remove();
+    };
+  }, []);
+
+  return keyboardClearance;
+}
+
 export function useKeyboardFocusScroll(
   scrollViewRef: RefObject<ScrollView | null>,
   additionalOffset = spacing.md,
@@ -229,6 +256,7 @@ export function Screen({
 }>) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const keyboardBottomClearance = useKeyboardBottomClearance();
   const backgroundColor =
     background === "sheet" ? theme.sheet : theme.background;
   const { fillStyle, onLayout, onContentSizeChange } = useScrollViewportFill({
@@ -236,7 +264,10 @@ export function Screen({
     underlapsHeader:
       underlapsHeader ?? (background === "default" && !accountForTopInset),
     reservedBottomHeight: bottomOverlay ? bottomOverlayHeight : 0,
-    transientBottomClearance,
+    transientBottomClearance: Math.max(
+      transientBottomClearance,
+      keyboardBottomClearance,
+    ),
     includeBottomInsetWhenOverflowing: formSheetBottomClearance,
   });
   if (!scroll) {
