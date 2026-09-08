@@ -27,7 +27,7 @@
     "jose": "6.2.10",
     "pg": "8.23.0",
     "superjson": "2.2.6",
-    "zod": "4.4.3"
+    "zod": "4.5.4"
   },
   "devDependencies": {
     "@types/node": "26.4.0",
