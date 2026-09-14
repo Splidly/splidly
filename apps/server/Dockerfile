@@ -1,4 +1,4 @@
-FROM node:26.8.1-alpine3.24 AS build
+FROM node:26.8.2-alpine3.24 AS build
 RUN npm install --global pnpm@11.17.0
 WORKDIR /app
 
@@ -23,7 +23,7 @@ FROM build AS production-dependencies
 WORKDIR /app
 RUN pnpm --filter @splidly/server deploy --prod --legacy /prod/server
 
-FROM node:26.8.1-alpine3.24 AS runtime
+FROM node:26.8.2-alpine3.24 AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=production-dependencies --chown=node:node /prod/server ./apps/server
