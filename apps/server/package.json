@@ -20,14 +20,14 @@
     "@hono/node-server": "2.1.1",
     "@splidly/db": "workspace:*",
     "@splidly/shared": "workspace:*",
-    "@trpc/server": "11.18.0",
+    "@trpc/server": "11.19.0",
     "better-auth": "1.7.2",
     "drizzle-orm": "0.45.2",
-    "hono": "4.13.5",
-    "jose": "6.2.10",
+    "hono": "4.13.8",
+    "jose": "6.2.12",
     "pg": "8.23.0",
     "superjson": "2.2.6",
-    "zod": "4.5.4"
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@types/node": "26.4.1",
