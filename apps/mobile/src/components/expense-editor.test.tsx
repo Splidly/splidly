@@ -210,7 +210,7 @@ function renderEditor() {
   return render(
     <HeaderHeightContext.Provider value={96}>
       <SafeAreaInsetsContext.Provider
-        value={{ top: 0, right: 0, bottom: 0, left: 0 }}
+        value={{ top: 0, right: 0, bottom: 20, left: 0 }}
       >
         <ExpensePaymentSessionProvider>
           <ExpenseSplitSessionProvider>
@@ -308,7 +308,7 @@ describe("ExpenseEditor", () => {
     expect(
       StyleSheet.flatten(resizedScrollView?.props.contentContainerStyle)
         .minHeight,
-    ).toBe(800);
+    ).toBe(780);
 
     if (!resizedScrollView) throw new Error("Expense ScrollView was not resized");
     await fireEvent(resizedScrollView, "contentSizeChange", 400, 1_000);
@@ -319,7 +319,7 @@ describe("ExpenseEditor", () => {
     expect(
       StyleSheet.flatten(overflowingScrollView?.props.contentContainerStyle)
         .paddingBottom,
-    ).toBe(108);
+    ).toBe(128);
   });
 
   it("formats the amount to the currency precision when focus leaves", async () => {

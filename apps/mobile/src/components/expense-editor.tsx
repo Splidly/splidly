@@ -738,6 +738,7 @@ export function ExpenseEditor({
         scrollViewRef={screenRef}
         transientBottomClearance={keyboardClearance}
         underlapsHeader={false}
+        formSheetBottomClearance
         bottomOverlay={
           <ExpenseSaveControl
             label={saveLabel}
