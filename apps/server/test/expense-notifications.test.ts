@@ -84,8 +84,8 @@ describe("expense notification payloads", () => {
       expenseVersion: 3,
       groupId: "group-id",
       groupName: "Lisbon",
-      title: "Ada deleted “Dinner”",
-      body: "Total was 72.00 EUR in Lisbon · You were owed 54.00 EUR",
+      title: "Lisbon",
+      body: "Ada deleted “Dinner” · Total was 72.00 EUR · You were owed 54.00 EUR",
     });
   });
 

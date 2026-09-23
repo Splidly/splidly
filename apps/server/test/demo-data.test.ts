@@ -13,6 +13,14 @@ describe("demo workspace fixture", () => {
       "Bea Chen",
       "Chris Taylor",
     ]);
+    expect(fixture.friendships).toHaveLength(2);
+    expect(
+      fixture.friendships.map((friendship) =>
+        [friendship.userLowId, friendship.userHighId].find(
+          (userId) => userId !== demoUserId,
+        ),
+      ),
+    ).toEqual(["demo-member-alex", "demo-member-sam"]);
     expect(fixture.expenses).toHaveLength(15);
 
     for (const expense of fixture.expenses) {

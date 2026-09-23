@@ -171,6 +171,7 @@ jest.mock("../lib/trpc", () => ({
                 ],
               },
             ],
+            notificationsEnabled: true,
           },
           error: null,
           isPending: false,
@@ -187,6 +188,13 @@ jest.mock("../lib/trpc", () => ({
       removeMember: {
         useMutation: () => ({
           mutate: mockRemoveMutate,
+          error: null,
+          isPending: false,
+        }),
+      },
+      setNotificationPreference: {
+        useMutation: () => ({
+          mutate: jest.fn(),
           error: null,
           isPending: false,
         }),

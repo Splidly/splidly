@@ -3,6 +3,7 @@ import {
   expenses,
   expenseSplits,
   financialRevisions,
+  friendships,
   groups,
   groupMembers,
   ledgerEntries,
@@ -14,6 +15,11 @@ import {
 import type { ExpenseIconKey } from "@splidly/shared";
 
 export const demoGroupId = "10000000-0000-4000-8000-000000000001";
+
+const demoFriendshipIds = [
+  "50000000-0000-4000-8000-000000000001",
+  "50000000-0000-4000-8000-000000000002",
+] as const;
 
 const demoMembers = [
   {
@@ -58,6 +64,12 @@ type DemoExpense = {
 
 export function demoWorkspaceFixture(demoUserId: string): {
   members: typeof demoMembers;
+  friendships: {
+    id: (typeof demoFriendshipIds)[number];
+    userLowId: string;
+    userHighId: string;
+    createdVia: "group";
+  }[];
   expenses: DemoExpense[];
 } {
   const alexId = demoMembers[0].id;
@@ -66,6 +78,16 @@ export function demoWorkspaceFixture(demoUserId: string): {
   const chrisId = demoMembers[3].id;
   const allMemberIds = [demoUserId, alexId, samId, beaId, chrisId];
   let nextTransferSerial = 9;
+
+  const demoFriendships = [alexId, samId].map((friendId, index) => {
+    const [userLowId, userHighId] = [demoUserId, friendId].sort();
+    return {
+      id: demoFriendshipIds[index]!,
+      userLowId: userLowId!,
+      userHighId: userHighId!,
+      createdVia: "group" as const,
+    };
+  });
 
   function fixtureId(namespace: 2 | 3 | 4, serial: number) {
     return `${namespace}0000000-0000-4000-8000-${serial
@@ -112,6 +134,7 @@ export function demoWorkspaceFixture(demoUserId: string): {
 
   return {
     members: demoMembers,
+    friendships: demoFriendships,
     expenses: [
       {
         id: "20000000-0000-4000-8000-000000000001",
@@ -347,6 +370,10 @@ export async function ensureDemoData(
           onboardedAt: now,
         })),
       )
+      .onConflictDoNothing();
+    await tx
+      .insert(friendships)
+      .values(fixture.friendships)
       .onConflictDoNothing();
     await tx
       .insert(groups)

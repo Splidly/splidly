@@ -6,10 +6,12 @@ import {
   expensePayments,
   expenseSplits,
   groupMembers,
+  groupNotificationPreferences,
   groups,
   isNull,
   ne,
   notificationOutbox,
+  or,
   profiles,
   pushInstallations,
 } from "@splidly/db";
@@ -95,11 +97,11 @@ export function buildExpenseNotificationPayload(input: {
     expenseVersion: input.expenseVersion,
     groupId: input.groupId,
     groupName: input.groupName,
-    title: `${input.actorName} ${verb} “${input.description}”`,
-    body: `${input.action === "delete" ? "Total was" : "Total"} ${notificationMoney(
+    title: input.groupName,
+    body: `${input.actorName} ${verb} “${input.description}” · ${input.action === "delete" ? "Total was" : "Total"} ${notificationMoney(
       input.sourceAmountMinor,
       input.sourceCurrency,
-    )} in ${input.groupName} · ${expenseNotificationInvolvement({
+    )} · ${expenseNotificationInvolvement({
       action: input.action,
       currency: input.sourceCurrency,
       ...(input.recipientPaymentMinor !== undefined
@@ -189,12 +191,24 @@ export async function enqueueExpenseNotifications(
         ),
       )
       .innerJoin(profiles, eq(profiles.userId, pushInstallations.userId))
+      .leftJoin(
+        groupNotificationPreferences,
+        and(
+          eq(groupNotificationPreferences.userId, pushInstallations.userId),
+          eq(groupNotificationPreferences.groupId, input.groupId),
+        ),
+      )
       .where(
         and(
           ne(pushInstallations.userId, input.actorId),
           eq(pushInstallations.platform, "ios"),
           isNull(pushInstallations.disabledAt),
           isNull(groupMembers.removedAt),
+          eq(profiles.notificationsEnabled, true),
+          or(
+            isNull(groupNotificationPreferences.enabled),
+            eq(groupNotificationPreferences.enabled, true),
+          ),
         ),
       ));
   if (!group || installations.length === 0) return;

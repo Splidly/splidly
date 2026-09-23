@@ -123,6 +123,9 @@ export const profiles = pgTable("profile", {
   displayName: text("display_name").notNull(),
   avatarUrl: text("avatar_url"),
   homeCurrency: text("home_currency").notNull().default("EUR"),
+  notificationsEnabled: boolean("notifications_enabled")
+    .notNull()
+    .default(true),
   notificationOnlyWhenInvolved: boolean("notification_only_when_involved")
     .notNull()
     .default(false),
@@ -255,6 +258,24 @@ export const groupMembers = pgTable(
     primaryKey({ columns: [table.groupId, table.userId] }),
     index("group_member_user_idx").on(table.userId),
     index("group_member_active_user_idx").on(table.userId, table.removedAt),
+  ],
+);
+
+export const groupNotificationPreferences = pgTable(
+  "group_notification_preference",
+  {
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    enabled: boolean("enabled").notNull().default(true),
+    ...timestamps,
+  },
+  (table) => [
+    primaryKey({ columns: [table.groupId, table.userId] }),
+    index("group_notification_preference_user_idx").on(table.userId),
   ],
 );
 
@@ -555,6 +576,7 @@ export const schema = {
   friendships,
   groups,
   groupMembers,
+  groupNotificationPreferences,
   invites,
   currencyQuotes,
   expenses,

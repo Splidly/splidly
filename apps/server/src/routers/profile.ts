@@ -103,6 +103,7 @@ export const profileRouter = router({
   updateNotificationPreferences: protectedProcedure
     .input(
       z.object({
+        enabled: z.boolean(),
         onlyWhenInvolved: z.boolean(),
         summarizeBursts: z.boolean(),
       }),
@@ -112,6 +113,7 @@ export const profileRouter = router({
       const [profile] = await ctx.db
         .update(profiles)
         .set({
+          notificationsEnabled: input.enabled,
           notificationOnlyWhenInvolved: input.onlyWhenInvolved,
           summarizeNotificationBursts: input.summarizeBursts,
           updatedAt: new Date(),
@@ -128,6 +130,16 @@ export const profileRouter = router({
           code: "NOT_FOUND",
           message: "Profile no longer exists",
         });
+      }
+      if (!input.enabled) {
+        await ctx.db
+          .delete(notificationOutbox)
+          .where(
+            and(
+              eq(notificationOutbox.recipientUserId, ctx.session.user.id),
+              eq(notificationOutbox.status, "pending"),
+            ),
+          );
       }
       return profile;
     }),
@@ -185,6 +197,7 @@ export const profileRouter = router({
             displayName: "Deleted user",
             avatarUrl: null,
             homeCurrency: "EUR",
+            notificationsEnabled: true,
             notificationOnlyWhenInvolved: false,
             summarizeNotificationBursts: false,
             onboardedAt: null,

@@ -6,6 +6,7 @@ import {
   expenseSplits,
   financialRevisions,
   groupMembers,
+  groupNotificationPreferences,
   groups,
   gte,
   inArray,
@@ -18,6 +19,8 @@ import {
   profiles,
   rateSnapshots,
   settlements,
+  sql,
+  notificationOutbox,
 } from "@splidly/db";
 import {
   convertMinor,
@@ -636,6 +639,20 @@ export const groupsRouter = router({
         throw new TRPCError({ code: "NOT_FOUND" });
       }
 
+      const [notificationPreference] = await ctx.db
+        .select({ enabled: groupNotificationPreferences.enabled })
+        .from(groupNotificationPreferences)
+        .where(
+          and(
+            eq(groupNotificationPreferences.groupId, input.groupId),
+            eq(
+              groupNotificationPreferences.userId,
+              ctx.session.user.id,
+            ),
+          ),
+        )
+        .limit(1);
+
       const [members, activity, settlementRecords, groupEntries] =
         await Promise.all([
           ctx.db
@@ -901,12 +918,51 @@ export const groupsRouter = router({
         });
       return {
         group,
+        notificationsEnabled: notificationPreference?.enabled ?? true,
         members,
         memberBalances,
         balanceMembers,
         expenses: expenseActivity,
         settlements: settlementActivity,
       };
+    }),
+
+  setNotificationPreference: protectedProcedure
+    .input(z.object({ groupId: z.uuid(), enabled: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await requireActiveGroupMember(
+        ctx.db,
+        input.groupId,
+        ctx.session.user.id,
+      );
+      const now = new Date();
+      await ctx.db
+        .insert(groupNotificationPreferences)
+        .values({
+          groupId: input.groupId,
+          userId: ctx.session.user.id,
+          enabled: input.enabled,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: [
+            groupNotificationPreferences.groupId,
+            groupNotificationPreferences.userId,
+          ],
+          set: { enabled: input.enabled, updatedAt: now },
+        });
+      if (!input.enabled) {
+        await ctx.db
+          .delete(notificationOutbox)
+          .where(
+            and(
+              eq(notificationOutbox.recipientUserId, ctx.session.user.id),
+              eq(notificationOutbox.status, "pending"),
+              sql`${notificationOutbox.payload}->>'groupId' = ${input.groupId}`,
+            ),
+          );
+      }
+      return input;
     }),
 
   update: protectedProcedure

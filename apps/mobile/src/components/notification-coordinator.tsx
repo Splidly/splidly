@@ -115,7 +115,8 @@ export function NotificationCoordinator() {
     if (
       Platform.OS !== "ios" ||
       !session.data?.user.id ||
-      !profile.data?.onboardedAt
+      !profile.data?.onboardedAt ||
+      profile.data.notificationsEnabled === false
     ) {
       return;
     }
@@ -178,6 +179,7 @@ export function NotificationCoordinator() {
   }, [
     handleResponse,
     profile.data?.onboardedAt,
+    profile.data?.notificationsEnabled,
     registerToken,
     session.data?.user?.id,
   ]);

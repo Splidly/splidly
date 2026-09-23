@@ -34,6 +34,7 @@ jest.mock("../lib/trpc", () => ({
         useQuery: () => ({
           data: {
             userId: "user-1",
+            notificationsEnabled: true,
             notificationOnlyWhenInvolved: false,
             summarizeNotificationBursts: false,
           },
@@ -73,6 +74,7 @@ describe("notification settings", () => {
       true,
     );
     expect(mockUpdate).toHaveBeenLastCalledWith({
+      enabled: true,
       onlyWhenInvolved: true,
       summarizeBursts: false,
     });
@@ -83,6 +85,7 @@ describe("notification settings", () => {
       true,
     );
     expect(mockUpdate).toHaveBeenLastCalledWith({
+      enabled: true,
       onlyWhenInvolved: true,
       summarizeBursts: true,
     });

@@ -15,11 +15,13 @@ import { api } from "../../../lib/trpc";
 import { toolbarIcons } from "../../../lib/toolbar-icons";
 
 type NotificationPreferences = {
+  enabled: boolean;
   onlyWhenInvolved: boolean;
   summarizeBursts: boolean;
 };
 
 const defaultPreferences: NotificationPreferences = {
+  enabled: true,
   onlyWhenInvolved: false,
   summarizeBursts: false,
 };
@@ -36,6 +38,7 @@ export default function NotificationSettingsScreen() {
   useEffect(() => {
     if (!profile.data || initializedUser.current === profile.data.userId) return;
     const initial = {
+      enabled: profile.data.notificationsEnabled ?? true,
       onlyWhenInvolved: profile.data.notificationOnlyWhenInvolved ?? false,
       summarizeBursts: profile.data.summarizeNotificationBursts ?? false,
     };
@@ -48,6 +51,7 @@ export default function NotificationSettingsScreen() {
   const update = api.profile.updateNotificationPreferences.useMutation({
     onSuccess(updated) {
       const next = {
+        enabled: updated.notificationsEnabled,
         onlyWhenInvolved: updated.notificationOnlyWhenInvolved,
         summarizeBursts: updated.summarizeNotificationBursts,
       };
@@ -88,12 +92,25 @@ export default function NotificationSettingsScreen() {
           footer="Smart summaries wait up to 5 minutes. One or two updates still arrive separately; three or more from the same group are combined."
         >
           <ListRow
+            title="Allow notifications"
+            subtitle="Turn all Splidly notifications on or off"
+            trailing={
+              <Switch
+                accessibilityLabel="Allow notifications"
+                disabled={update.isPending}
+                value={preferences.enabled}
+                onValueChange={(value) => savePreference("enabled", value)}
+              />
+            }
+          />
+          <RowDivider inset={16} />
+          <ListRow
             title="Only when involved"
             subtitle="Skip expenses you didn't pay for or share"
             trailing={
               <Switch
                 accessibilityLabel="Only when involved"
-                disabled={update.isPending}
+                disabled={update.isPending || !preferences.enabled}
                 value={preferences.onlyWhenInvolved}
                 onValueChange={(value) =>
                   savePreference("onlyWhenInvolved", value)
@@ -108,7 +125,7 @@ export default function NotificationSettingsScreen() {
             trailing={
               <Switch
                 accessibilityLabel="Smart summaries"
-                disabled={update.isPending}
+                disabled={update.isPending || !preferences.enabled}
                 value={preferences.summarizeBursts}
                 onValueChange={(value) =>
                   savePreference("summarizeBursts", value)

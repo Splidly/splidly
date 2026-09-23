@@ -6,6 +6,7 @@ import {
   expenseSplits,
   financialRevisions,
   groupMembers,
+  groupNotificationPreferences,
   groups,
   inArray,
   isNull,
@@ -127,13 +128,25 @@ async function prepareExpense(
         displayName: profiles.displayName,
         homeCurrency: profiles.homeCurrency,
         userId: groupMembers.userId,
+        notificationsEnabled: profiles.notificationsEnabled,
         notificationOnlyWhenInvolved: profiles.notificationOnlyWhenInvolved,
         summarizeNotificationBursts: profiles.summarizeNotificationBursts,
+        groupNotificationsEnabled: groupNotificationPreferences.enabled,
         installationId: pushInstallations.id,
       })
       .from(groupMembers)
       .innerJoin(groups, eq(groups.id, groupMembers.groupId))
       .innerJoin(profiles, eq(profiles.userId, groupMembers.userId))
+      .leftJoin(
+        groupNotificationPreferences,
+        and(
+          eq(groupNotificationPreferences.userId, groupMembers.userId),
+          eq(
+            groupNotificationPreferences.groupId,
+            input.context.groupId,
+          ),
+        ),
+      )
       .leftJoin(
         pushInstallations,
         and(
@@ -176,7 +189,10 @@ async function prepareExpense(
     groupName = group.name;
     actorName = profilesById.get(userId)?.displayName;
     notificationInstallations = memberRows.flatMap((row) =>
-      row.installationId && row.userId !== userId
+      row.installationId &&
+      row.userId !== userId &&
+      row.notificationsEnabled &&
+      row.groupNotificationsEnabled !== false
         ? [
             {
               id: row.installationId,

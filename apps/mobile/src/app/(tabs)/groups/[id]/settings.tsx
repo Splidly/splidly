@@ -27,6 +27,7 @@ export default function GroupSettingsScreen() {
   const utils = api.useUtils();
   const group = detail.data?.group;
   const [simplifyDebts, setSimplifyDebts] = useState(true);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [expandedUserIds, setExpandedUserIds] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
@@ -34,6 +35,10 @@ export default function GroupSettingsScreen() {
     if (!group) return;
     setSimplifyDebts(group.simplifyDebts);
   }, [group?.id, group?.simplifyDebts, group?.version]);
+  useEffect(() => {
+    if (!detail.data) return;
+    setNotificationsEnabled(detail.data.notificationsEnabled);
+  }, [detail.data?.notificationsEnabled, group?.id]);
   const updateSimplification = api.groups.update.useMutation({
     async onSuccess() {
       await Promise.all([
@@ -54,6 +59,15 @@ export default function GroupSettingsScreen() {
       ]);
     },
   });
+  const updateNotifications =
+    api.groups.setNotificationPreference.useMutation({
+      async onSuccess() {
+        await utils.groups.detail.invalidate({ groupId: id });
+      },
+      onError() {
+        setNotificationsEnabled(detail.data?.notificationsEnabled ?? true);
+      },
+    });
   const createInvite = api.invites.create.useMutation({
     onSuccess: (invite) => void shareInvite(invite.url),
   });
@@ -179,6 +193,34 @@ export default function GroupSettingsScreen() {
           />
         </Section>
         <Section
+          title="Notifications"
+          footer={
+            me.data?.notificationsEnabled === false
+              ? "Notifications are disabled for the whole app. You can enable them in Profile > Notifications."
+              : "This setting only affects notifications from this group."
+          }
+        >
+          <ListRow
+            title="Group notifications"
+            subtitle="Expense changes and activity summaries"
+            trailing={
+              <Switch
+                accessibilityLabel={`Notifications for ${group.name}`}
+                style={{ alignSelf: "center" }}
+                disabled={
+                  updateNotifications.isPending ||
+                  me.data?.notificationsEnabled === false
+                }
+                value={notificationsEnabled}
+                onValueChange={(enabled) => {
+                  setNotificationsEnabled(enabled);
+                  updateNotifications.mutate({ groupId: id, enabled });
+                }}
+              />
+            }
+          />
+        </Section>
+        <Section
           title="Members & balances"
           footer="Tap a member for details. Swipe left to remove a member after their balance is settled."
         >
@@ -298,6 +340,9 @@ export default function GroupSettingsScreen() {
         </Section>
         {updateSimplification.error ? (
           <ErrorState message={updateSimplification.error.message} />
+        ) : null}
+        {updateNotifications.error ? (
+          <ErrorState message={updateNotifications.error.message} />
         ) : null}
         {removeMember.error ? (
           <ErrorState message={removeMember.error.message} />
