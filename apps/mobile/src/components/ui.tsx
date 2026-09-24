@@ -15,7 +15,6 @@ import {
 } from "react";
 import {
   ActivityIndicator,
-  findNodeHandle,
   Keyboard,
   Pressable,
   RefreshControl,
@@ -24,6 +23,7 @@ import {
   Text,
   TextInput,
   useColorScheme,
+  useWindowDimensions,
   View,
   type AccessibilityState,
   type ColorValue,
@@ -159,53 +159,74 @@ export function useKeyboardFocusScroll(
   additionalOffset = spacing.md,
 ) {
   const focusedInputRef = useRef<TextInput | null>(null);
+  const scrollYRef = useRef(0);
+  const keyboardTopRef = useRef<number | null>(null);
   const [keyboardClearance, setKeyboardClearance] = useState(0);
 
   const revealFocusedInput = useCallback(() => {
-    const inputHandle = findNodeHandle(focusedInputRef.current);
-    if (inputHandle === null) return;
+    const input = focusedInputRef.current;
+    const keyboardTop = keyboardTopRef.current;
+    if (!input || keyboardTop === null) return;
     const scrollView = scrollViewRef.current;
     if (!scrollView) return;
-    const reveal = (viewportScreenY: number) => {
-      scrollView.scrollResponderScrollNativeHandleToKeyboard(
-        inputHandle,
-        additionalOffset + viewportScreenY,
-        true,
-      );
-    };
     const nativeScrollView = scrollView.getNativeScrollRef();
-    if (!nativeScrollView) {
-      reveal(0);
-      return;
-    }
-    nativeScrollView.measureInWindow((_x, y) => reveal(y));
+    if (!nativeScrollView) return;
+    nativeScrollView.measureInWindow((_x, viewportY, _width, viewportHeight) => {
+      input.measureInWindow((_inputX, inputY, _inputWidth, inputHeight) => {
+        const visibleTop = viewportY + spacing.md;
+        const visibleBottom = Math.min(
+          viewportY + viewportHeight,
+          keyboardTop,
+        ) - additionalOffset;
+        const inputBottom = inputY + inputHeight;
+        const delta =
+          inputBottom > visibleBottom
+            ? inputBottom - visibleBottom
+            : inputY < visibleTop
+              ? inputY - visibleTop
+              : 0;
+        if (Math.abs(delta) <= 1) return;
+        scrollView.scrollTo({
+          y: Math.max(0, scrollYRef.current + delta),
+          animated: true,
+        });
+      });
+    });
   }, [additionalOffset, scrollViewRef]);
 
   useEffect(() => {
     const shown = Keyboard.addListener("keyboardDidShow", (event) => {
       if (!focusedInputRef.current) return;
+      keyboardTopRef.current = event.endCoordinates.screenY;
+      setKeyboardClearance(event.endCoordinates.height);
+      requestAnimationFrame(revealFocusedInput);
+    });
+    const changed = Keyboard.addListener("keyboardDidChangeFrame", (event) => {
+      if (!focusedInputRef.current) return;
+      keyboardTopRef.current = event.endCoordinates.screenY;
       setKeyboardClearance(event.endCoordinates.height);
       requestAnimationFrame(revealFocusedInput);
     });
     const hidden = Keyboard.addListener("keyboardDidHide", () => {
+      keyboardTopRef.current = null;
       setKeyboardClearance(0);
     });
     return () => {
       shown.remove();
+      changed.remove();
       hidden.remove();
     };
   }, [revealFocusedInput]);
 
-  useEffect(() => {
-    if (keyboardClearance <= 0) return;
-    requestAnimationFrame(revealFocusedInput);
-  }, [keyboardClearance, revealFocusedInput]);
-
   const focusInput = useCallback(
     (input: TextInput | null) => {
       focusedInputRef.current = input;
-      setKeyboardClearance(Keyboard.metrics()?.height ?? 0);
-      requestAnimationFrame(revealFocusedInput);
+      const metrics = Keyboard.metrics();
+      if (metrics?.height) {
+        keyboardTopRef.current = metrics.screenY;
+        setKeyboardClearance(metrics.height);
+        requestAnimationFrame(revealFocusedInput);
+      }
     },
     [revealFocusedInput],
   );
@@ -219,6 +240,9 @@ export function useKeyboardFocusScroll(
     focusInput,
     blurInput,
     revealFocusedInput,
+    onScroll: (event: Parameters<NonNullable<ScrollViewProps["onScroll"]>>[0]) => {
+      scrollYRef.current = event.nativeEvent.contentOffset.y;
+    },
   };
 }
 
@@ -255,6 +279,11 @@ export function Screen({
   onScroll?: ScrollViewProps["onScroll"];
 }>) {
   const theme = useTheme();
+  const { width: windowWidth } = useWindowDimensions();
+  const tabletContentStyle =
+    process.env.EXPO_OS === "ios" && windowWidth >= 700
+      ? styles.tabletContent
+      : null;
   const insets = useSafeAreaInsets();
   const keyboardBottomClearance = useKeyboardBottomClearance();
   const backgroundColor =
@@ -282,6 +311,7 @@ export function Screen({
               ? { paddingBottom: bottomOverlayHeight + insets.bottom }
               : null,
             contentContainerStyle,
+            tabletContentStyle,
           ]}
         >
           {children}
@@ -303,6 +333,7 @@ export function Screen({
           styles.screenContent,
           fillStyle,
           contentContainerStyle,
+          tabletContentStyle,
         ]}
         contentInsetAdjustmentBehavior="automatic"
         keyboardDismissMode="interactive"
@@ -369,6 +400,7 @@ export function CollectionScreen({
   onRefresh?: () => void;
 }>) {
   const theme = useTheme();
+  const { width: windowWidth } = useWindowDimensions();
   const { fillStyle, onLayout, onContentSizeChange } = useScrollViewportFill({
     underlapsHeader: true,
   });
@@ -379,6 +411,9 @@ export function CollectionScreen({
         styles.collectionContent,
         fillStyle,
         isEmpty ? styles.emptyCollectionContent : null,
+        process.env.EXPO_OS === "ios" && windowWidth >= 700
+          ? styles.tabletContent
+          : null,
       ]}
       contentInsetAdjustmentBehavior="automatic"
       alwaysBounceVertical={!isEmpty || Boolean(onRefresh)}
@@ -1055,6 +1090,11 @@ export function SelectionPill({
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  tabletContent: {
+    width: "100%",
+    maxWidth: 800,
+    alignSelf: "center",
+  },
   collectionContent: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.sm,

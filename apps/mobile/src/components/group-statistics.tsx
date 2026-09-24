@@ -564,7 +564,10 @@ function TimelineChart({
   const highlighted = selected ?? latest;
   const columnWidth = Math.max(
     44,
-    Math.floor((width - 80) / Math.max(1, Math.min(chartData.length, 8))),
+    Math.floor(
+      ((process.env.EXPO_OS === "ios" ? Math.min(width, 800) : width) - 80) /
+        Math.max(1, Math.min(chartData.length, 8)),
+    ),
   );
   const timelineKey = `${rangeKey}:${latest?.period ?? "empty"}`;
   const scrollToLatest = useCallback(() => {

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { act, fireEvent, render } from "@testing-library/react-native";
 import { HeaderHeightContext } from "expo-router/build/react-navigation/elements/Header/HeaderHeightContext";
-import { Keyboard, StyleSheet, Text } from "react-native";
+import { Keyboard, StyleSheet, Text, type ScrollView, type TextInput } from "react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import {
   CollectionScreen,
@@ -9,6 +9,7 @@ import {
   ErrorState,
   Field,
   Screen,
+  useKeyboardFocusScroll,
 } from "./ui";
 import { SERVER_UNAVAILABLE_MESSAGE } from "../lib/network";
 
@@ -18,6 +19,51 @@ function ControlledField() {
     <Field label="Description" value={value} onChangeText={setValue} />
   );
 }
+
+describe("useKeyboardFocusScroll", () => {
+  it("scrolls only when the focused input is covered by the keyboard", async () => {
+    const scrollTo = jest.fn();
+    const inputY = { current: 100 };
+    const input = {
+      measureInWindow: (callback: (x: number, y: number, width: number, height: number) => void) =>
+        callback(0, inputY.current, 100, 34),
+    } as unknown as TextInput;
+    const scrollView = {
+      getNativeScrollRef: () => ({
+        measureInWindow: (callback: (x: number, y: number, width: number, height: number) => void) =>
+          callback(0, 0, 400, 700),
+      }),
+      scrollTo,
+    } as unknown as ScrollView;
+    const scrollRef = { current: scrollView };
+    let controls!: ReturnType<typeof useKeyboardFocusScroll>;
+    function Probe() {
+      controls = useKeyboardFocusScroll(scrollRef, 104);
+      return null;
+    }
+    const metrics = jest.spyOn(Keyboard, "metrics").mockReturnValue({
+      screenX: 0,
+      screenY: 500,
+      width: 400,
+      height: 300,
+    });
+    try {
+      await render(<Probe />);
+      await act(async () => {
+        controls.focusInput(input);
+        controls.revealFocusedInput();
+      });
+      expect(scrollTo).not.toHaveBeenCalled();
+
+      inputY.current = 450;
+      controls.onScroll({ nativeEvent: { contentOffset: { y: 20 } } } as Parameters<typeof controls.onScroll>[0]);
+      await act(async () => controls.revealFocusedInput());
+      expect(scrollTo).toHaveBeenCalledWith({ y: 108, animated: true });
+    } finally {
+      metrics.mockRestore();
+    }
+  });
+});
 
 describe("EmptyState", () => {
   it("renders an accessible title and explanation", async () => {

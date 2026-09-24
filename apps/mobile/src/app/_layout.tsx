@@ -6,7 +6,7 @@ import {
   ThemeProvider,
 } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useColorScheme } from "react-native";
+import { Platform, useColorScheme } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
   expenseDetailSheetOptions,
@@ -24,6 +24,7 @@ import { NotificationCoordinator } from "../components/notification-coordinator"
 function Navigation() {
   const theme = useTheme();
   const colorScheme = useColorScheme();
+  const ipad = process.env.EXPO_OS === "ios" && "isPad" in Platform && Platform.isPad;
   return (
     <ThemeProvider
       value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
@@ -117,7 +118,7 @@ function Navigation() {
             title: "Record Payment",
             ...formSheetOptions(theme.sheet),
             sheetAllowedDetents: [0.82, 1],
-            sheetInitialDetentIndex: 0,
+            sheetInitialDetentIndex: ipad ? 1 : 0,
             sheetGrabberVisible: true,
           }}
         />
