@@ -3,12 +3,11 @@ import {
   MenuView,
   type MenuAction,
 } from "@expo/ui/community/menu";
-import { useRef, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import {
   Pressable,
   Text,
   TextInput,
-  useWindowDimensions,
   View,
 } from "react-native";
 import { useTheme } from "../theme";
@@ -30,6 +29,7 @@ function PartyChoice({
   onValueChange,
   disabled,
   testID,
+  width,
 }: {
   label: string;
   value: SettlementMember | undefined;
@@ -38,6 +38,7 @@ function PartyChoice({
   onValueChange: (userId: string) => void;
   disabled: boolean;
   testID: string;
+  width: number;
 }) {
   const theme = useTheme();
   const name = value
@@ -51,7 +52,7 @@ function PartyChoice({
       accessibilityRole={disabled ? undefined : "button"}
       accessibilityLabel={`${label}: ${name}`}
       style={{
-        width: "100%",
+        width: width > 0 ? width : "100%",
         minWidth: 0,
         alignItems: "center",
         gap: 7,
@@ -94,7 +95,7 @@ function PartyChoice({
         </Text>
         <Text
           numberOfLines={1}
-          style={{ color: theme.text, fontSize: 17, fontWeight: "700" }}
+          style={{ color: theme.text, fontSize: 17, fontWeight: "700", textAlign: "center" }}
         >
           {name}
         </Text>
@@ -119,7 +120,7 @@ function PartyChoice({
       title={label}
       actions={actions}
       testID={testID}
-      style={{ width: "100%" }}
+      style={width > 0 ? { width } : { width: "100%" }}
       onPressAction={({ nativeEvent }) => onValueChange(nativeEvent.event)}
     >
       {content}
@@ -145,6 +146,7 @@ export function SettlementDirectionCard({
   locked: boolean;
 }) {
   const theme = useTheme();
+  const [slotWidth, setSlotWidth] = useState(0);
   return (
     <View
       style={{
@@ -160,7 +162,14 @@ export function SettlementDirectionCard({
         gap: 10,
       }}
     >
-      <View testID="settlement-paid-by-slot" style={{ flex: 1, minWidth: 0 }}>
+      <View
+        testID="settlement-paid-by-slot"
+        style={{ flex: 1, minWidth: 0, alignItems: "center" }}
+        onLayout={(event) => {
+          const width = event.nativeEvent.layout.width;
+          setSlotWidth((current) => current === width ? current : width);
+        }}
+      >
         <PartyChoice
           label="Paid by"
           value={from}
@@ -169,6 +178,7 @@ export function SettlementDirectionCard({
           onValueChange={onFromChange}
           disabled={locked}
           testID="settlement-paid-by"
+          width={slotWidth}
         />
       </View>
       <View
@@ -197,7 +207,7 @@ export function SettlementDirectionCard({
           →
         </Text>
       </View>
-      <View testID="settlement-paid-to-slot" style={{ flex: 1, minWidth: 0 }}>
+      <View testID="settlement-paid-to-slot" style={{ flex: 1, minWidth: 0, alignItems: "center" }}>
         <PartyChoice
           label="Paid to"
           value={to}
@@ -206,6 +216,7 @@ export function SettlementDirectionCard({
           onValueChange={onToChange}
           disabled={locked}
           testID="settlement-paid-to"
+          width={slotWidth}
         />
       </View>
     </View>
@@ -326,11 +337,11 @@ export function SettlementSaveControl({
   disabled: boolean;
 }) {
   const theme = useTheme();
-  const { width } = useWindowDimensions();
   return (
     <View
       style={{
-        width: width - 32,
+        width: "100%",
+        maxWidth: 768,
         padding: 6,
         borderRadius: 20,
         borderCurve: "continuous",

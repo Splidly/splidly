@@ -17,7 +17,7 @@ const config: ExpoConfig = {
   slug: "splidly",
   scheme: "splidly",
   version: "1.0.0",
-  orientation: "portrait",
+  orientation: "default",
   userInterfaceStyle: "automatic",
   experiments: { typedRoutes: true },
   extra: {
@@ -54,7 +54,7 @@ const config: ExpoConfig = {
   ios: {
     icon: "./assets/icons/splidly.icon",
     bundleIdentifier: buildConfig.iosBundleIdentifier,
-    supportsTablet: false,
+    supportsTablet: true,
     usesAppleSignIn: true,
     associatedDomains: [`applinks:${host}`],
     privacyManifests: {

@@ -1,5 +1,7 @@
 import type { CurrencyCode } from "@splidly/shared";
 import { Stack, router, useLocalSearchParams, type Href } from "expo-router";
+import { HeaderHeightContext } from "expo-router/build/react-navigation/elements/Header/HeaderHeightContext";
+import { use, useRef, useState } from "react";
 import { Linking, Text, View } from "react-native";
 import { ActivityTimeline } from "../../../components/activity-timeline";
 import {
@@ -7,7 +9,6 @@ import {
   BalanceText,
   EmptyState,
   ErrorState,
-  Intro,
   ListRow,
   LoadingState,
   PrimaryButton,
@@ -26,6 +27,12 @@ import { useTheme } from "../../../theme";
 export default function FriendDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const theme = useTheme();
+  const headerHeight = use(HeaderHeightContext) ?? 0;
+  const [compactTitleVisible, setCompactTitleVisible] = useState(
+    process.env.EXPO_OS !== "ios",
+  );
+  const compactTitleVisibleRef = useRef(process.env.EXPO_OS !== "ios");
+  const identityBottomRef = useRef(0);
   const detail = api.friends.detail.useQuery({ friendshipId: id });
   const list = api.friends.list.useQuery();
   const profile = api.profile.me.useQuery();
@@ -68,8 +75,28 @@ export default function FriendDetailScreen() {
   const activityGroups = groupActivityByDate(activity);
   return (
     <>
-      <Screen>
-        <View style={{ alignItems: "center", gap: 10, paddingVertical: 8 }}>
+      <Screen
+        onScroll={(event) => {
+          if (process.env.EXPO_OS !== "ios") return;
+          const visibleContentTop =
+            event.nativeEvent.contentOffset.y +
+            Math.max(event.nativeEvent.contentInset.top, headerHeight);
+          const nextVisible =
+            identityBottomRef.current > 0 &&
+            visibleContentTop >= identityBottomRef.current;
+          if (nextVisible === compactTitleVisibleRef.current) return;
+          compactTitleVisibleRef.current = nextVisible;
+          setCompactTitleVisible(nextVisible);
+        }}
+      >
+        <View
+          testID="friend-identity-header"
+          onLayout={(event) => {
+            const { y, height } = event.nativeEvent.layout;
+            identityBottomRef.current = y + height;
+          }}
+          style={{ alignItems: "center", gap: 10, paddingVertical: 8 }}
+        >
           <Avatar
             name={name}
             colorKey={detail.data.friend?.userId ?? id}
@@ -116,10 +143,6 @@ export default function FriendDetailScreen() {
             />
           </View>
         </View>
-        <Intro>
-          Direct and group balances stay separated so every amount remains
-          traceable to its original ledger.
-        </Intro>
         {summary?.balances.length ? (
           <Section title="Open balances">
             {summary.balances.map((balance, index) => (
@@ -231,7 +254,7 @@ export default function FriendDetailScreen() {
           />
         </Section>
       </Screen>
-      <Stack.Screen options={{ title: name }} />
+      <Stack.Screen options={{ title: compactTitleVisible ? name : "" }} />
     </>
   );
 }

@@ -30,11 +30,20 @@ let mockFriendSettlements: Array<{
   };
 }> = [];
 
-jest.mock("expo-router", () => ({
-  router: { push: jest.fn() },
-  useLocalSearchParams: () => ({ id: "friendship-1" }),
-  Stack: { Screen: () => null },
-}));
+jest.mock("expo-router", () => {
+  const { Text } = require("react-native") as typeof import("react-native");
+  return {
+    router: { push: jest.fn() },
+    useLocalSearchParams: () => ({ id: "friendship-1" }),
+    Stack: {
+      Screen: ({ options }: { options?: { title?: string } }) => (
+        <Text selectable={false} testID="friend-navigation-title">
+          {options?.title ?? ""}
+        </Text>
+      ),
+    },
+  };
+});
 
 jest.mock("../lib/trpc", () => ({
   api: {
@@ -87,6 +96,40 @@ describe("FriendDetailScreen", () => {
     mockFriendExpenses = [];
     mockFriendSettlements = [];
     jest.clearAllMocks();
+  });
+
+  it("shows the navigation title only after the profile name scrolls away", async () => {
+    const view = await render(
+      <SafeAreaInsetsContext.Provider
+        value={{ top: 0, right: 0, bottom: 0, left: 0 }}
+      >
+        <FriendDetailScreen />
+      </SafeAreaInsetsContext.Provider>,
+    );
+    expect(view.getByTestId("friend-navigation-title").props.children).toBe("");
+    await fireEvent(view.getByTestId("friend-identity-header"), "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 120 } },
+    });
+    const [scrollView] = view.container.queryAll(
+      (instance) => instance.props.contentInsetAdjustmentBehavior === "automatic",
+    );
+    if (!scrollView) throw new Error("Friend ScrollView was not rendered");
+    const scroll = async (y: number) =>
+      fireEvent.scroll(scrollView, {
+        nativeEvent: {
+          contentInset: { top: 0, left: 0, bottom: 0, right: 0 },
+          contentOffset: { x: 0, y },
+          contentSize: { width: 300, height: 900 },
+          layoutMeasurement: { width: 300, height: 700 },
+          zoomScale: 1,
+        },
+      });
+    await scroll(120);
+    expect(view.getByTestId("friend-navigation-title").props.children).toBe(
+      "Demo User",
+    );
+    await scroll(0);
+    expect(view.getByTestId("friend-navigation-title").props.children).toBe("");
   });
 
   it("allows a payment even when there are no open balances", async () => {

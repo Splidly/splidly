@@ -1,4 +1,5 @@
 import { Stack } from "expo-router";
+import { Platform } from "react-native";
 import {
   formSheetOptions,
   inlineLargeTitleOptions,
@@ -8,6 +9,7 @@ import { useTheme } from "../../../theme";
 
 export default function ProfileStackLayout() {
   const theme = useTheme();
+  const tablet = process.env.EXPO_OS === "ios" && "isPad" in Platform && Platform.isPad;
   return (
     <Stack
       screenOptions={{
@@ -20,7 +22,7 @@ export default function ProfileStackLayout() {
       <Stack.Screen
         name="index"
         options={{
-          title: "Profile",
+          title: tablet ? "" : "Profile",
           ...inlineLargeTitleOptions(theme.text),
         }}
       />

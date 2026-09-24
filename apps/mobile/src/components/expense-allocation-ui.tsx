@@ -175,7 +175,9 @@ export function InlineAmountInput({
   const digitCount = value.replace(/\D/g, "").length;
   const fontSize = digitCount > 9 ? 13 : digitCount > 6 ? 14 : 15;
   return (
-    <View
+    <Pressable
+      accessible={false}
+      onPress={() => inputRef.current?.focus()}
       style={{
         width,
         minHeight: 34,
@@ -196,7 +198,6 @@ export function InlineAmountInput({
         onFocus={() => onFocus?.(inputRef.current)}
         onBlur={() => onBlur?.(inputRef.current)}
         keyboardType={keyboardType}
-        returnKeyType="done"
         selectTextOnFocus
         numberOfLines={1}
         placeholder={placeholder}
@@ -221,7 +222,7 @@ export function InlineAmountInput({
       >
         {suffix}
       </Text>
-    </View>
+    </Pressable>
   );
 }
 

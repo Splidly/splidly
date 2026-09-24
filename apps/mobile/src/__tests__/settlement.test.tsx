@@ -257,6 +257,17 @@ describe("NewSettlementScreen group context", () => {
     expect(view.getByLabelText("Paid by: Alex")).toBeTruthy();
     expect(view.getByLabelText("Paid to: You")).toBeTruthy();
     expect(view.getByDisplayValue("12.34")).toBeTruthy();
+    await fireEvent(view.getByTestId("settlement-paid-by-slot"), "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: 220, height: 110 } },
+    });
+    expect(
+      StyleSheet.flatten(view.getByTestId("settlement-paid-by").props.style)
+        .width,
+    ).toBe(220);
+    expect(
+      StyleSheet.flatten(view.getByTestId("settlement-paid-to").props.style)
+        .width,
+    ).toBe(220);
     expect(
       StyleSheet.flatten(view.getByTestId("settlement-paid-by-slot").props.style)
         .flex,
@@ -345,7 +356,7 @@ describe("NewSettlementScreen group context", () => {
     ).toEqual({ disabled: true });
   });
 
-  it("keeps a growing note tied to the focused-input scroll behavior", async () => {
+  it("does not scroll the sheet after every note size change", async () => {
     const view = await render(
       <SafeAreaInsetsContext.Provider
         value={{ top: 0, right: 0, bottom: 0, left: 0 }}
@@ -357,9 +368,7 @@ describe("NewSettlementScreen group context", () => {
 
     await fireEvent.press(view.getByText("Add a note"));
 
-    expect(view.getByLabelText("Notes").props.onContentSizeChange).toEqual(
-      expect.any(Function),
-    );
+    expect(view.getByLabelText("Notes").props.onContentSizeChange).toBeUndefined();
   });
 
   it("can always be cancelled from the native sheet toolbar", async () => {

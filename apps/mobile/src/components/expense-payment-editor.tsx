@@ -37,7 +37,7 @@ export function ExpensePaymentEditor() {
     request?.draft,
   );
   const screenRef = useRef<ScrollView>(null);
-  const { keyboardClearance, focusInput, blurInput } =
+  const { keyboardClearance, focusInput, blurInput, onScroll } =
     useKeyboardFocusScroll(screenRef, 104);
 
   useEffect(() => {
@@ -107,6 +107,7 @@ export function ExpensePaymentEditor() {
     <>
       <Screen
         scrollViewRef={screenRef}
+        onScroll={onScroll}
         transientBottomClearance={keyboardClearance}
         bottomOverlay={
           <AllocationFloatingSummary
@@ -257,7 +258,7 @@ export function ExpensePaymentEditor() {
           disabled={!status.valid}
           onPress={done}
         >
-          {process.env.EXPO_OS === "ios" ? "Done" : null}
+          {process.env.EXPO_OS === "ios" ? "Save" : null}
         </Stack.Toolbar.Button>
       </Stack.Toolbar>
     </>
