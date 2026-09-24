@@ -1,6 +1,6 @@
 import { fireEvent, render } from "@testing-library/react-native";
 import type { ReactNode } from "react";
-import { Text, Pressable } from "react-native";
+import { Text, Pressable, StyleSheet } from "react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import {
   createExpenseSplitDraft,
@@ -120,6 +120,13 @@ describe("ExpenseSplitEditor", () => {
       wrapper: Wrapper,
     });
     await fireEvent.press(view.getByText("Open editor"));
+    await fireEvent(view.getByTestId("split-method-section"), "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: 720, height: 120 } },
+    });
+    expect(
+      StyleSheet.flatten(view.getByTestId("split-method-picker").props.style)
+        .width,
+    ).toBe(720);
     await fireEvent(view.getByTestId("split-method-picker"), "pressAction", {
       nativeEvent: { event: "percentage" },
     });

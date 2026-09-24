@@ -58,13 +58,14 @@ export function ExpenseSplitEditor() {
   const [draft, setDraft] = useState<ExpenseSplitDraft | undefined>(
     request?.draft,
   );
+  const [methodWidth, setMethodWidth] = useState(0);
   const screenRef = useRef<ScrollView>(null);
   const itemInputRefs = useRef(new Map<string, TextInput>());
   const {
     keyboardClearance,
     focusInput,
     blurInput,
-    revealFocusedInput,
+    onScroll,
   } = useKeyboardFocusScroll(screenRef, 104);
   useEffect(() => {
     if (request) setDraft(request.draft);
@@ -267,6 +268,7 @@ export function ExpenseSplitEditor() {
     <>
       <Screen
         scrollViewRef={screenRef}
+        onScroll={onScroll}
         transientBottomClearance={keyboardClearance}
         bottomOverlay={
           <AllocationFloatingSummary
@@ -277,12 +279,20 @@ export function ExpenseSplitEditor() {
         }
         bottomOverlayHeight={88}
       >
-        <View style={{ gap: 8 }}>
+        <View
+          testID="split-method-section"
+          style={{ gap: 8 }}
+          onLayout={(event) => {
+            const width = event.nativeEvent.layout.width;
+            setMethodWidth((current) => current === width ? current : width);
+          }}
+        >
           <AllocationHeader title="Split method" />
           <MenuView
             title="Split method"
             actions={methodActions}
             testID="split-method-picker"
+            style={methodWidth > 0 ? { width: methodWidth } : { width: "100%" }}
             onPressAction={({ nativeEvent }) => {
               const nextMode = nativeEvent.event;
               if (!isExpenseSplitMode(nextMode)) return;
@@ -296,6 +306,7 @@ export function ExpenseSplitEditor() {
             <View
               accessibilityRole="button"
               style={{
+                width: methodWidth > 0 ? methodWidth : "100%",
                 minHeight: 68,
                 paddingHorizontal: 16,
                 paddingVertical: 12,
@@ -589,9 +600,6 @@ export function ExpenseSplitEditor() {
                         blurInput(
                           itemInputRefs.current.get(`${item.id}:name`) ?? null,
                         )
-                      }
-                      onContentSizeChange={() =>
-                        requestAnimationFrame(revealFocusedInput)
                       }
                       placeholder="Item name (optional)"
                       placeholderTextColor={theme.subtle}
@@ -908,7 +916,7 @@ export function ExpenseSplitEditor() {
           disabled={!status.valid}
           onPress={done}
         >
-          {process.env.EXPO_OS === "ios" ? "Done" : null}
+          {process.env.EXPO_OS === "ios" ? "Save" : null}
         </Stack.Toolbar.Button>
       </Stack.Toolbar>
     </>

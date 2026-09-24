@@ -16,7 +16,8 @@ import {
   progressViewStyle,
   tint,
 } from "@expo/ui/swift-ui/modifiers";
-import { useColorScheme, useWindowDimensions, View } from "react-native";
+import { useState } from "react";
+import { useColorScheme, View } from "react-native";
 
 export function AllocationFloatingSummary({
   title,
@@ -28,8 +29,7 @@ export function AllocationFloatingSummary({
   complete: boolean;
 }) {
   const colorScheme = useColorScheme();
-  const { width: windowWidth } = useWindowDimensions();
-  const width = windowWidth - 32;
+  const [width, setWidth] = useState(0);
   const statusColor = complete
     ? colorScheme === "dark"
       ? "#55D6A0"
@@ -56,8 +56,13 @@ export function AllocationFloatingSummary({
         max: 100,
         now: Math.round(Math.max(0, Math.min(1, progress)) * 100),
       }}
+      onLayout={(event) => {
+        const nextWidth = event.nativeEvent.layout.width;
+        setWidth((current) => current === nextWidth ? current : nextWidth);
+      }}
       style={{
-        width,
+        width: "100%",
+        maxWidth: 768,
         height: 76,
         overflow: "hidden",
         borderRadius: 24,
@@ -72,7 +77,7 @@ export function AllocationFloatingSummary({
             : "0 10px 28px rgba(0, 0, 0, 0.18)",
       }}
     >
-      <Host
+      {width > 0 ? <Host
         colorScheme={colorScheme === "dark" ? "dark" : "light"}
         style={{ width, height: 76 }}
       >
@@ -115,7 +120,7 @@ export function AllocationFloatingSummary({
             ]}
           />
         </VStack>
-      </Host>
+      </Host> : null}
     </View>
   );
 }

@@ -232,7 +232,7 @@ export function ExpenseEditor({
     keyboardClearance,
     focusInput: focusBottomInput,
     blurInput: blurBottomInput,
-    revealFocusedInput: revealBottomInput,
+    onScroll: onBottomScroll,
   } = useKeyboardFocusScroll(screenRef, expenseOverlayHeight + 16);
   const detectedIconKey = useMemo(
     () => detectExpenseIconKey(description),
@@ -736,6 +736,7 @@ export function ExpenseEditor({
     <>
       <Screen
         scrollViewRef={screenRef}
+        onScroll={onBottomScroll}
         transientBottomClearance={keyboardClearance}
         underlapsHeader={false}
         formSheetBottomClearance
@@ -772,7 +773,7 @@ export function ExpenseEditor({
           categoryHint={
             manualIconKey
               ? "Custom category · Tap the icon to change"
-              : "Category follows the description · Tap the icon to change"
+              : "Tap the icon to change category"
           }
           metadata={conversionMetadata}
           {...(process.env.EXPO_OS === "ios"
@@ -864,9 +865,6 @@ export function ExpenseEditor({
                   multiline
                   onFocus={() => focusBottomInput(notesInputRef.current)}
                   onBlur={() => blurBottomInput(notesInputRef.current)}
-                  onContentSizeChange={() =>
-                    requestAnimationFrame(revealBottomInput)
-                  }
                   textAlignVertical="top"
                   style={{
                     color: theme.text,

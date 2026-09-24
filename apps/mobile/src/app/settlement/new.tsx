@@ -90,7 +90,7 @@ export default function NewSettlementScreen() {
     keyboardClearance,
     focusInput: focusBottomInput,
     blurInput: blurBottomInput,
-    revealFocusedInput: revealBottomInput,
+    onScroll: onBottomScroll,
   } = useKeyboardFocusScroll(screenRef, settlementOverlayHeight + 16);
 
   let signedCanonicalMinor: bigint | undefined;
@@ -649,9 +649,6 @@ export default function NewSettlementScreen() {
                   multiline
                   onFocus={() => focusBottomInput(notesInputRef.current)}
                   onBlur={() => blurBottomInput(notesInputRef.current)}
-                  onContentSizeChange={() =>
-                    requestAnimationFrame(revealBottomInput)
-                  }
                   textAlignVertical="top"
                   style={{
                     color: theme.text,
@@ -723,6 +720,7 @@ export default function NewSettlementScreen() {
     <>
       <Screen
         scrollViewRef={screenRef}
+        onScroll={onBottomScroll}
         transientBottomClearance={keyboardClearance}
         background="sheet"
         contentContainerStyle={{ paddingTop: 16, gap: 20 }}

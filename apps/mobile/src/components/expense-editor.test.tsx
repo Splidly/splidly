@@ -286,9 +286,7 @@ describe("ExpenseEditor", () => {
 
     await fireEvent.press(view.getByText("Add a note"));
 
-    expect(view.getByLabelText("Notes").props.onContentSizeChange).toEqual(
-      expect.any(Function),
-    );
+    expect(view.getByLabelText("Notes").props.onContentSizeChange).toBeUndefined();
     expect(view.getByTestId("screen-bottom-overlay")).toBeTruthy();
     expect(view.getByText("Save expense")).toBeTruthy();
     expect(view.getAllByText("Add expense")).toHaveLength(2);

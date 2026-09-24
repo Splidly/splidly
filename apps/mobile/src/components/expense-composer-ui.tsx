@@ -3,7 +3,6 @@ import {
   Pressable,
   Text,
   TextInput,
-  useWindowDimensions,
   View,
   type ColorValue,
 } from "react-native";
@@ -339,12 +338,11 @@ export function ExpenseSaveControl({
   foregroundColor?: ColorValue;
 }) {
   const theme = useTheme();
-  const { width } = useWindowDimensions();
-
   return (
     <View
       style={{
-        width: width - 32,
+        width: "100%",
+        maxWidth: 768,
         padding: 6,
         borderRadius: 20,
         borderCurve: "continuous",
