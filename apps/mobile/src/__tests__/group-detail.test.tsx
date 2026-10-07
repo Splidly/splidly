@@ -1,5 +1,4 @@
 import { fireEvent, render } from "@testing-library/react-native";
-import { HeaderHeightContext } from "expo-router/build/react-navigation/elements/Header/HeaderHeightContext";
 import { StyleSheet } from "react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import GroupDetailScreen from "../app/(tabs)/groups/[id]";
@@ -40,11 +39,18 @@ jest.mock("expo-router", () => {
   };
 });
 
+jest.mock("../lib/use-delete-activity-expense", () => ({
+  useDeleteActivityExpense: () => ({
+    confirmDelete: jest.fn(),
+    isPending: false,
+  }),
+}));
+
 jest.mock("../lib/trpc", () => ({
   api: {
     groups: {
       detail: {
-        useQuery: () => ({
+        useQuery: jest.fn(() => ({
           data: {
             group: {
               id: "group-1",
@@ -146,7 +152,7 @@ jest.mock("../lib/trpc", () => ({
           },
           error: null,
           isPending: false,
-        }),
+        })),
       },
     },
   },
@@ -157,30 +163,48 @@ const mockPush = (
     router: { push: jest.Mock };
   }
 ).router.push;
+const mockDetailQuery = (
+  jest.requireMock("../lib/trpc") as {
+    api: { groups: { detail: { useQuery: jest.Mock } } };
+  }
+).api.groups.detail.useQuery;
 
 describe("GroupDetailScreen actions", () => {
   beforeEach(() => {
     mockPush.mockClear();
+    mockDetailQuery.mockClear();
+  });
+
+  it("opens an expense only once on rapid repeated taps", async () => {
+    const view = await render(
+      <SafeAreaInsetsContext.Provider
+        value={{ top: 0, right: 0, bottom: 0, left: 0 }}
+      >
+        <GroupDetailScreen />
+      </SafeAreaInsetsContext.Provider>,
+    );
+    await fireEvent(view.getByTestId("activity-expense-Dinner"), "buttonPress");
+    await fireEvent(view.getByTestId("activity-expense-Dinner"), "buttonPress");
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledWith("/expense/expense-1");
   });
 
   it("opens one settle-up sheet instead of rendering balance actions", async () => {
     const view = await render(
-      <HeaderHeightContext.Provider value={100}>
-        <SafeAreaInsetsContext.Provider
-          value={{ top: 0, right: 0, bottom: 0, left: 0 }}
-        >
-          <GroupDetailScreen />
-        </SafeAreaInsetsContext.Provider>
-      </HeaderHeightContext.Provider>,
+      <SafeAreaInsetsContext.Provider
+        value={{ top: 0, right: 0, bottom: 0, left: 0 }}
+      >
+        <GroupDetailScreen />
+      </SafeAreaInsetsContext.Provider>,
     );
 
     expect(view.getByLabelText("You owe Alex 12.34 €")).toBeTruthy();
-    expect(view.getByText(/Alex paid \$10\.00$/)).toBeTruthy();
-    expect(view.getByText("You owe")).toBeTruthy();
-    expect(view.getByText("3.40 €")).toBeTruthy();
-    expect(view.getByText(/You \+ Alex paid 24\.00 €$/)).toBeTruthy();
-    expect(view.getByText("You lent")).toBeTruthy();
-    expect(view.getByText("10.00 €")).toBeTruthy();
+    expect(nativeText(view, /Alex paid \$10\.00$/)).toBeTruthy();
+    expect(nativeText(view, "You owe")).toBeTruthy();
+    expect(nativeText(view, "3.40 €")).toBeTruthy();
+    expect(nativeText(view, /You \+ Alex paid 24\.00 €$/)).toBeTruthy();
+    expect(nativeText(view, "You lent")).toBeTruthy();
+    expect(nativeText(view, "10.00 €")).toBeTruthy();
     expect(view.getByText("Payment")).toBeTruthy();
     expect(view.getByTestId("settlement-activity-row")).toBeTruthy();
     expect(view.getByLabelText("Payment. Alex paid you 6.00 €")).toBeTruthy();
@@ -201,36 +225,9 @@ describe("GroupDetailScreen actions", () => {
     expect(view.queryByText("Open balances")).toBeNull();
     expect(view.getByLabelText("Lisbon statistics")).toBeTruthy();
     expect(view.getByTestId("group-navigation-title").props.children).toBe("");
-    await fireEvent(view.getByTestId("group-identity-header"), "layout", {
-      nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 58 } },
-    });
-    const [groupScrollView] = view.container.queryAll(
-      (instance) =>
-        instance.props.contentInsetAdjustmentBehavior === "automatic",
-    );
-    if (!groupScrollView) throw new Error("Group ScrollView was not rendered");
-    await fireEvent.scroll(groupScrollView, {
-      nativeEvent: {
-        contentInset: { top: 0, left: 0, bottom: 0, right: 0 },
-        contentOffset: { x: 0, y: -42 },
-        contentSize: { width: 300, height: 900 },
-        layoutMeasurement: { width: 300, height: 700 },
-        zoomScale: 1,
-      },
-    });
-    expect(view.getByTestId("group-navigation-title").props.children).toBe(
-      "Lisbon",
-    );
-    await fireEvent.scroll(groupScrollView, {
-      nativeEvent: {
-        contentInset: { top: 0, left: 0, bottom: 0, right: 0 },
-        contentOffset: { x: 0, y: -100 },
-        contentSize: { width: 300, height: 900 },
-        layoutMeasurement: { width: 300, height: 700 },
-        zoomScale: 1,
-      },
-    });
-    expect(view.getByTestId("group-navigation-title").props.children).toBe("");
+    expect(
+      view.getByTestId("native-activity-list").props.onScroll,
+    ).toBeUndefined();
     await fireEvent.press(view.getByLabelText("Lisbon members and balances"));
     expect(mockPush).toHaveBeenCalledWith("/groups/group-1/settings");
     mockPush.mockClear();
@@ -264,4 +261,61 @@ describe("GroupDetailScreen actions", () => {
       params: { id: "group-1" },
     });
   });
+
+  it("keeps the overview separate from the empty state when activity disappears and returns", async () => {
+    const populated = mockDetailQuery();
+    const empty = {
+      ...populated,
+      data: { ...populated.data, expenses: [], settlements: [] },
+    };
+    const content = () => (
+      <SafeAreaInsetsContext.Provider
+        value={{ top: 0, right: 0, bottom: 0, left: 0 }}
+      >
+        <GroupDetailScreen />
+      </SafeAreaInsetsContext.Provider>
+    );
+    const view = await render(content());
+    const overview = view.getByTestId("native-activity-header-content");
+    await fireEvent(view.getByTestId("native-activity-list"), "hostedLayout", {
+      nativeEvent: { key: "header:overview", width: 320 },
+    });
+    await fireEvent(overview, "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: 320, height: 236 } },
+    });
+    mockDetailQuery.mockReturnValueOnce(empty);
+    await view.rerender(content());
+    expect(view.getByTestId("native-activity-header-content")).toBe(overview);
+    expect(
+      view.getByTestId("native-activity-list").props.sections[0].headerHeight,
+    ).toBe(236);
+    expect(
+      view
+        .getByTestId("native-activity-footer-content")
+        .queryAll((node) => node.props.children === "No activity yet"),
+    ).toHaveLength(1);
+    expect(
+      overview.queryAll((node) => node.props.children === "No activity yet"),
+    ).toHaveLength(0);
+    await view.rerender(content());
+    expect(view.queryByText("No activity yet")).toBeNull();
+    expect(view.getByTestId("native-activity-header-content")).toBe(overview);
+    expect(view.getByTestId("activity-date-2026-07-20")).toBeTruthy();
+    expect(view.getByTestId("group-navigation-title").props.children).toBe("");
+  });
 });
+
+function nativeText(
+  view: Awaited<ReturnType<typeof render>>,
+  text: string | RegExp,
+) {
+  const matches = view.container.queryAll(
+    (node) =>
+      typeof node.props.text === "string" &&
+      (typeof text === "string"
+        ? node.props.text === text
+        : text.test(node.props.text)),
+  );
+  expect(matches).toHaveLength(1);
+  return matches[0];
+}

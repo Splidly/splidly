@@ -45,6 +45,13 @@ jest.mock("expo-router", () => {
   };
 });
 
+jest.mock("../lib/use-delete-activity-expense", () => ({
+  useDeleteActivityExpense: () => ({
+    confirmDelete: jest.fn(),
+    isPending: false,
+  }),
+}));
+
 jest.mock("../lib/trpc", () => ({
   api: {
     profile: {
@@ -110,15 +117,12 @@ describe("FriendDetailScreen", () => {
     await fireEvent(view.getByTestId("friend-identity-header"), "layout", {
       nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 120 } },
     });
-    const [scrollView] = view.container.queryAll(
-      (instance) => instance.props.contentInsetAdjustmentBehavior === "automatic",
-    );
-    if (!scrollView) throw new Error("Friend ScrollView was not rendered");
+    const scrollView = view.getByTestId("native-activity-list");
     const scroll = async (y: number) =>
       fireEvent.scroll(scrollView, {
         nativeEvent: {
-          contentInset: { top: 0, left: 0, bottom: 0, right: 0 },
           contentOffset: { x: 0, y },
+          contentInset: { top: 0, bottom: 0, left: 0, right: 0 },
           contentSize: { width: 300, height: 900 },
           layoutMeasurement: { width: 300, height: 700 },
           zoomScale: 1,
@@ -246,7 +250,11 @@ describe("FriendDetailScreen", () => {
     );
 
     expect(view.getAllByTestId(/^activity-date-\d/)).toHaveLength(1);
-    expect(view.getByText("Lunch")).toBeTruthy();
-    expect(view.getByText("Taxi")).toBeTruthy();
+    expect(
+      view.container.queryAll((node) => node.props.text === "Lunch")[0],
+    ).toBeTruthy();
+    expect(
+      view.container.queryAll((node) => node.props.text === "Taxi")[0],
+    ).toBeTruthy();
   });
 });

@@ -38,11 +38,11 @@ export default function GroupsStackLayout() {
           headerBackButtonMenuEnabled: false,
         }}
       />
-      <Stack.Screen name="[id]/index" options={{ title: "Group" }} />
       <Stack.Screen
-        name="[id]/statistics"
-        options={{ title: "Statistics" }}
+        name="[id]/index"
+        options={{ title: process.env.EXPO_OS === "ios" ? "" : "Group" }}
       />
+      <Stack.Screen name="[id]/statistics" options={{ title: "Statistics" }} />
       <Stack.Screen
         name="[id]/statistics-expenses"
         options={{ title: "Expenses" }}

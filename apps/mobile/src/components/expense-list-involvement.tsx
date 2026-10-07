@@ -3,7 +3,7 @@ import { Text, View } from "react-native";
 import { formatMoney } from "../lib/money-display";
 import { useTheme } from "../theme";
 
-type InvolvementKind =
+export type InvolvementKind =
   | "lent"
   | "borrowed"
   | "paid"
@@ -11,14 +11,10 @@ type InvolvementKind =
   | "settled"
   | "none";
 
-export function ExpenseListInvolvement({
-  kind,
-  amount,
-}: {
-  kind: InvolvementKind;
-  amount: Money;
-}) {
-  const theme = useTheme();
+export function expenseInvolvementPresentation(
+  kind: InvolvementKind,
+  theme: ReturnType<typeof useTheme>,
+) {
   const label =
     kind === "lent"
       ? "You lent"
@@ -42,9 +38,22 @@ export function ExpenseListInvolvement({
             ? theme.positive
             : theme.muted;
 
+  return { label, color };
+}
+
+export function ExpenseListInvolvement({
+  kind,
+  amount,
+}: {
+  kind: InvolvementKind;
+  amount: Money;
+}) {
+  const theme = useTheme();
+  const { label, color } = expenseInvolvementPresentation(kind, theme);
   return (
     <View style={{ maxWidth: "38%", alignItems: "flex-end", gap: 1 }}>
       <Text
+        selectable={false}
         numberOfLines={1}
         style={{
           color,
@@ -59,6 +68,7 @@ export function ExpenseListInvolvement({
       </Text>
       {kind !== "none" ? (
         <Text
+          selectable={false}
           numberOfLines={1}
           style={{
             color,

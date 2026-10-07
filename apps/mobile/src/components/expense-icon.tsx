@@ -4,10 +4,7 @@ import {
   type ExpenseIconKey,
 } from "@splidly/shared";
 import { Host, Icon } from "@expo/ui";
-import {
-  MenuView,
-  type MenuAction,
-} from "@expo/ui/community/menu";
+import { MenuView, type MenuAction } from "@expo/ui/community/menu";
 import { StyleSheet, useColorScheme, View } from "react-native";
 import { semanticIconColorsFor } from "../lib/avatar-colors";
 
@@ -225,6 +222,23 @@ function isExpenseIconKey(value: unknown): value is ExpenseIconKey {
   );
 }
 
+export function expenseIconPresentation(
+  iconKey: unknown,
+  name: string,
+  useNameFallback: boolean,
+  colorScheme: "light" | "dark",
+) {
+  const key = useNameFallback
+    ? normalizeExpenseIconKey(iconKey, name)
+    : isExpenseIconKey(iconKey)
+      ? iconKey
+      : "other";
+  return {
+    option: optionsByKey.get(key) ?? expenseIconOptions[0],
+    colors: semanticIconColorsFor(`expense:${key}`, colorScheme),
+  };
+}
+
 export function ExpenseIcon({
   iconKey,
   name,
@@ -240,15 +254,11 @@ export function ExpenseIcon({
   accessibilityRole?: "button" | "image";
   accessibilityLabel?: string;
 }) {
-  const resolvedIconKey = useNameFallback
-    ? normalizeExpenseIconKey(iconKey, name)
-    : isExpenseIconKey(iconKey)
-      ? iconKey
-      : "other";
-  const option = optionsByKey.get(resolvedIconKey) ?? expenseIconOptions[0];
   const colorScheme = useColorScheme() === "dark" ? "dark" : "light";
-  const colors = semanticIconColorsFor(
-    `expense:${resolvedIconKey}`,
+  const { option, colors } = expenseIconPresentation(
+    iconKey,
+    name,
+    useNameFallback,
     colorScheme,
   );
   const glyphSize = Math.round(size * 0.5);
@@ -257,9 +267,7 @@ export function ExpenseIcon({
     <View
       accessible
       accessibilityRole={accessibilityRole ?? "image"}
-      accessibilityLabel={
-        accessibilityLabel ?? `${option.label} expense icon`
-      }
+      accessibilityLabel={accessibilityLabel ?? `${option.label} expense icon`}
       style={[
         styles.container,
         {
@@ -310,12 +318,14 @@ export function ExpenseIconPicker({
       image: automaticImage,
       state: automatic ? "on" : "off",
     },
-    ...expenseIconOptions.map((option): MenuAction => ({
-      id: option.key,
-      title: option.label,
-      image: option.image,
-      state: !automatic && option.key === value ? "on" : "off",
-    })),
+    ...expenseIconOptions.map(
+      (option): MenuAction => ({
+        id: option.key,
+        title: option.label,
+        image: option.image,
+        state: !automatic && option.key === value ? "on" : "off",
+      }),
+    ),
   ];
   const option = optionsByKey.get(value) ?? expenseIconOptions[0];
 

@@ -1,0 +1,10 @@
+{
+  "platforms": ["apple", "android"],
+  "coreFeatures": ["swiftui", "compose"],
+  "apple": {
+    "modules": ["SplidlySwipeModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.splidlyswipe.SplidlySwipeModule"]
+  }
+}

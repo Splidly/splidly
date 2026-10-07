@@ -37,5 +37,9 @@ describe("GroupsStackLayout", () => {
         }),
       );
     }
+    expect(
+      mockScreens.find((screen) => screen.name === "[id]/index")?.options
+        ?.title,
+    ).toBe("");
   });
 });

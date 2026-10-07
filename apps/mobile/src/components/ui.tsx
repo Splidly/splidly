@@ -31,6 +31,8 @@ import {
   type TextInputProps,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { NativeActivityList } from "./native-activity-list";
+import type { ActivityListSection } from "./native-activity-list.types";
 import { avatarColorsFor } from "../lib/avatar-colors";
 import { useConnectivity } from "../lib/connectivity";
 import {
@@ -262,6 +264,7 @@ export function Screen({
   refreshing,
   onRefresh,
   onScroll,
+  activityList,
 }: PropsWithChildren<{
   scroll?: boolean;
   bounces?: boolean;
@@ -275,8 +278,9 @@ export function Screen({
   bottomOverlayHeight?: number;
   formSheetBottomClearance?: boolean;
   refreshing?: boolean;
-  onRefresh?: () => void;
+  onRefresh?: () => Promise<unknown> | void;
   onScroll?: ScrollViewProps["onScroll"];
+  activityList?: { sections: ActivityListSection[]; footer?: ReactNode };
 }>) {
   const theme = useTheme();
   const { width: windowWidth } = useWindowDimensions();
@@ -299,6 +303,37 @@ export function Screen({
     ),
     includeBottomInsetWhenOverflowing: formSheetBottomClearance,
   });
+  if (activityList) {
+    return (
+      <NativeActivityList
+        sections={activityList.sections}
+        header={children}
+        footer={activityList.footer}
+        scrollProps={{
+          style: [styles.screen, { backgroundColor }],
+          contentContainerStyle: [
+            // SectionList owns row spacing; a container gap adds space between
+            // every virtualized cell, splitting the date-group cards apart.
+            { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
+            fillStyle,
+            contentContainerStyle,
+            tabletContentStyle,
+          ],
+          contentInsetAdjustmentBehavior: "automatic",
+          keyboardDismissMode: "interactive",
+          keyboardShouldPersistTaps: "handled",
+          alwaysBounceVertical: bounces,
+          bounces,
+          onLayout,
+          onContentSizeChange,
+          refreshing,
+          onRefresh,
+          onScroll,
+          scrollEventThrottle: 16,
+        }}
+      />
+    );
+  }
   if (!scroll) {
     return (
       <>

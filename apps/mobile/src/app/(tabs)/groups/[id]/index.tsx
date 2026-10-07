@@ -1,21 +1,19 @@
+import { useNavigationPressGuard } from "../../../../lib/use-navigation-press-guard";
 import { Stack, router, useLocalSearchParams, type Href } from "expo-router";
-import { HeaderHeightContext } from "expo-router/build/react-navigation/elements/Header/HeaderHeightContext";
-import { use, useRef, useState } from "react";
+import { useState } from "react";
 import { View, useColorScheme } from "react-native";
-import { ActivityTimeline } from "../../../../components/activity-timeline";
+import { useDeleteActivityExpense } from "../../../../lib/use-delete-activity-expense";
 import { normalizeGroupIconKey } from "../../../../components/group-icon";
 import {
   GroupBalanceSummary,
   GroupSummaryHeader,
 } from "../../../../components/group-summary-header";
-import { ExpenseIcon } from "../../../../components/expense-icon";
-import { ExpenseListInvolvement } from "../../../../components/expense-list-involvement";
+import { ActivityExpenseRow } from "../../../../components/activity-expense-row";
 import { SettlementActivityRow } from "../../../../components/settlement-activity-row";
 import {
   EmptyState,
   ErrorState,
   HeaderButton,
-  ListRow,
   LoadingState,
   PrimaryButton,
   Screen,
@@ -27,17 +25,17 @@ import { expensePaymentSummary } from "../../../../lib/expense-activity";
 import { groupBalanceLines } from "../../../../lib/group-balance-summary";
 import { groupActionColorsFor } from "../../../../lib/group-colors";
 import { toolbarIcons } from "../../../../lib/toolbar-icons";
+import { spacing } from "../../../../theme";
 import type { CurrencyCode } from "@splidly/shared";
+
+const actionGap = 10;
 
 export default function GroupDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const headerHeight = use(HeaderHeightContext) ?? 0;
-  const [compactTitleVisible, setCompactTitleVisible] = useState(
-    process.env.EXPO_OS !== "ios",
-  );
-  const compactTitleVisibleRef = useRef(process.env.EXPO_OS !== "ios");
-  const groupIdentityBottomRef = useRef(0);
+  const [actionRowWidth, setActionRowWidth] = useState<number>();
   const colorScheme = useColorScheme() === "dark" ? "dark" : "light";
+  const acceptActivityNavigation = useNavigationPressGuard();
+  const deletion = useDeleteActivityExpense();
   const detail = api.groups.detail.useQuery({ groupId: id });
   if (detail.isPending) {
     return (
@@ -78,35 +76,87 @@ export default function GroupDetailScreen() {
     group.currency,
   );
   const actionColors = groupActionColorsFor(group.color, group.id, colorScheme);
+  const actionButtonStyle =
+    process.env.EXPO_OS === "ios" && actionRowWidth !== undefined
+      ? { width: Math.max(0, (actionRowWidth - actionGap) / 2) }
+      : { flex: 1 };
   const outstandingMinor = memberBalances.reduce((total, member) => {
     const minor = BigInt(member.balance.minor);
     return total + (minor < 0n ? -minor : minor);
   }, 0n);
+  function openActivity(destination: Href) {
+    if (acceptActivityNavigation()) router.push(destination);
+  }
+  function renderActivityItem(item: (typeof activity)[number]) {
+    if (item.type === "settlement") {
+      return (
+        <SettlementActivityRow
+          settlement={item.record}
+          onPress={() =>
+            openActivity({
+              pathname: "/settlement/new",
+              params: {
+                type: "group",
+                id: group.id,
+                canonicalCurrency: group.currency,
+                settlementId: item.record.id,
+              },
+            })
+          }
+        />
+      );
+    }
+    const expense = item.record;
+    return (
+      <ActivityExpenseRow
+        title={expense.description}
+        subtitle={expensePaymentSummary(expense.payers, expense.paymentTotal)}
+        involvement={expense.viewerInvolvement}
+        iconKey={expense.iconKey}
+        useNameFallback={!expense.iconManuallySet}
+        onPress={() => openActivity(`/expense/${expense.id}` as Href)}
+      />
+    );
+  }
+  const activitySections = activityGroups.map((dateGroup) => ({
+    key: dateGroup.key,
+    label: dateGroup.label,
+    data: dateGroup.items.map((item) => ({
+      key: `${item.type}:${item.record.id}`,
+      content: renderActivityItem(item),
+      ...(item.type === "expense"
+        ? {
+            onDelete: () => deletion.confirmDelete(item.record),
+            deleteLabel: `Delete ${item.record.description}`,
+            deletionDisabled: deletion.isPending,
+          }
+        : {}),
+    })),
+  }));
+  const emptyActivity =
+    activity.length === 0 ? (
+      <Section>
+        <EmptyState
+          title="No activity yet"
+          message="Add the first shared cost."
+        />
+      </Section>
+    ) : null;
   return (
     <>
       <Screen
-        refreshing={detail.isRefetching}
-        onRefresh={() => void detail.refetch()}
-        onScroll={(event) => {
-          if (process.env.EXPO_OS !== "ios") return;
-          const visibleContentTop =
-            event.nativeEvent.contentOffset.y +
-            Math.max(event.nativeEvent.contentInset.top, headerHeight);
-          const nextVisible =
-            groupIdentityBottomRef.current > 0 &&
-            visibleContentTop >= groupIdentityBottomRef.current;
-          if (nextVisible === compactTitleVisibleRef.current) return;
-          compactTitleVisibleRef.current = nextVisible;
-          setCompactTitleVisible(nextVisible);
+        activityList={{
+          sections: activitySections,
+          ...(process.env.EXPO_OS === "ios" && {
+            footer: emptyActivity ? (
+              <View style={{ paddingTop: spacing.lg }}>{emptyActivity}</View>
+            ) : null,
+          }),
         }}
+        refreshing={detail.isRefetching}
+        onRefresh={() => detail.refetch()}
       >
-        <View
-          testID="group-identity-header"
-          onLayout={(event) => {
-            const { y, height } = event.nativeEvent.layout;
-            groupIdentityBottomRef.current = y + height;
-          }}
-        >
+        <View testID="group-identity-header">
           <GroupSummaryHeader
             iconKey={normalizeGroupIconKey(group.iconKey)}
             name={group.name}
@@ -115,8 +165,22 @@ export default function GroupDetailScreen() {
             imageUrl={group.imageUrl}
           />
         </View>
-        <View style={{ flexDirection: "row", gap: 10 }}>
-          <View style={{ flex: 1 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            gap: actionGap,
+            ...(process.env.EXPO_OS === "ios" && { width: "100%" }),
+          }}
+          onLayout={
+            process.env.EXPO_OS === "ios"
+              ? (event) => {
+                  const { width } = event.nativeEvent.layout;
+                  if (width > 0) setActionRowWidth(width);
+                }
+              : undefined
+          }
+        >
+          <View style={actionButtonStyle}>
             <PrimaryButton
               label="Add expense"
               backgroundColor={actionColors.primaryBackground}
@@ -129,7 +193,7 @@ export default function GroupDetailScreen() {
               }
             />
           </View>
-          <View style={{ flex: 1 }}>
+          <View style={actionButtonStyle}>
             <PrimaryButton
               label="Settle up"
               tone="secondary"
@@ -151,68 +215,11 @@ export default function GroupDetailScreen() {
           accessibilityLabel={`${group.name} members and balances`}
           onPress={() => router.push(`/groups/${group.id}/settings`)}
         />
-        {activity.length === 0 ? (
-          <Section>
-            <EmptyState
-              title="No activity yet"
-              message="Add the first shared cost."
-            />
-          </Section>
-        ) : (
-          <ActivityTimeline
-            groups={activityGroups}
-            getItemKey={(item) => `${item.type}:${item.record.id}`}
-            renderItem={(item) => {
-              if (item.type === "settlement") {
-                return (
-                  <SettlementActivityRow
-                    settlement={item.record}
-                    onPress={() =>
-                      router.push({
-                        pathname: "/settlement/new",
-                        params: {
-                          type: "group",
-                          id: group.id,
-                          canonicalCurrency: group.currency,
-                          settlementId: item.record.id,
-                        },
-                      })
-                    }
-                  />
-                );
-              }
-              const expense = item.record;
-              return (
-                <ListRow
-                  title={expense.description}
-                  subtitle={expensePaymentSummary(
-                    expense.payers,
-                    expense.paymentTotal,
-                  )}
-                  subtitleNumberOfLines={1}
-                  trailing={
-                    <ExpenseListInvolvement
-                      kind={expense.viewerInvolvement.kind}
-                      amount={expense.viewerInvolvement.amount}
-                    />
-                  }
-                  leading={
-                    <ExpenseIcon
-                      iconKey={expense.iconKey}
-                      name={expense.description}
-                      useNameFallback={!expense.iconManuallySet}
-                    />
-                  }
-                  onPress={() => router.push(`/expense/${expense.id}` as Href)}
-                />
-              );
-            }}
-          />
-        )}
+        {process.env.EXPO_OS !== "ios" ? emptyActivity : null}
       </Screen>
       <Stack.Screen
         options={{
-          title: compactTitleVisible ? group.name : "",
+          title: process.env.EXPO_OS === "ios" ? "" : group.name,
           ...(process.env.EXPO_OS !== "ios" && {
             headerRight: () => (
               <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -237,9 +244,7 @@ export default function GroupDetailScreen() {
         <Stack.Toolbar.Button
           icon={toolbarIcons.statistics}
           accessibilityLabel={`${group.name} statistics`}
-          onPress={() =>
-            router.push(`/groups/${group.id}/statistics` as Href)
-          }
+          onPress={() => router.push(`/groups/${group.id}/statistics` as Href)}
         />
         <Stack.Toolbar.Button
           icon={toolbarIcons.settings}

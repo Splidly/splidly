@@ -1,5 +1,12 @@
 # Agent Instructions
 
+## Do not create change-explanation Markdown files
+
+Do not create `.md` files to explain or summarize your changes, document
+implementation details, or provide task-specific verification checklists unless
+the user explicitly requests such a file. Report changes and remaining
+verification steps in the conversation instead.
+
 ## Use hyphens instead of em dashes
 
 Always use the ASCII hyphen (`-`) instead of the Unicode U+2014 em dash in
