@@ -18,14 +18,14 @@
   "dependencies": {
     "@splidly/shared": "workspace:*",
     "dotenv": "17.4.2",
-    "drizzle-orm": "0.45.2",
-    "pg": "8.23.0"
+    "drizzle-orm": "0.45.3",
+    "pg": "8.23.1"
   },
   "devDependencies": {
-    "@types/node": "26.6.1",
+    "@types/node": "26.6.4",
     "@types/pg": "8.23.1",
-    "drizzle-kit": "0.31.10",
-    "tsx": "4.23.13",
+    "drizzle-kit": "0.31.11",
+    "tsx": "4.23.15",
     "typescript": "5.9.3",
     "vitest": "4.1.11"
   }
