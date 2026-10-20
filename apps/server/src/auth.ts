@@ -80,7 +80,7 @@ export async function createAuth(
       schema: authSchema,
     }),
     session: {
-      expiresIn: 7 * 24 * 60 * 60,
+      expiresIn: 180 * 24 * 60 * 60,
       updateAge: 24 * 60 * 60,
       freshAge: 15 * 60,
     },
