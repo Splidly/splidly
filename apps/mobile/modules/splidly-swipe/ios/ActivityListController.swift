@@ -3,6 +3,7 @@ import UIKit
 
 @MainActor
 final class ActivityListController: UICollectionViewController {
+  private let plain: Bool
   private var dataSource: UICollectionViewDiffableDataSource<String, String>!
   private var sections: [ActivitySection] = []
   private var sectionsByKey: [String: ActivitySection] = [:]
@@ -22,7 +23,8 @@ final class ActivityListController: UICollectionViewController {
   private var shouldFinishRefresh = false
   private let refreshControl = UIRefreshControl()
 
-  init() {
+  init(plain: Bool = false) {
+    self.plain = plain
     super.init(collectionViewLayout: UICollectionViewFlowLayout())
     installsStandardGestureForInteractiveMovement = false
   }
@@ -33,8 +35,20 @@ final class ActivityListController: UICollectionViewController {
   override func viewDidLoad() {
     super.viewDidLoad()
     collectionView.dataSource = nil
-    var configuration = UICollectionLayoutListConfiguration(appearance: .insetGrouped)
+    var configuration = UICollectionLayoutListConfiguration(appearance: plain ? .plain : .insetGrouped)
     configuration.backgroundColor = .clear
+    if plain {
+      configuration.separatorConfiguration.topSeparatorInsets = NSDirectionalEdgeInsets(top: 0, leading: 94, bottom: 0, trailing: 16)
+      configuration.separatorConfiguration.bottomSeparatorInsets = NSDirectionalEdgeInsets(top: 0, leading: 94, bottom: 0, trailing: 16)
+      configuration.itemSeparatorHandler = { [weak self] indexPath, separator in
+        var result = separator
+        result.topSeparatorVisibility = .hidden
+        if let model = self?.section(at: indexPath.section), indexPath.item == model.rows.count - 1 {
+          result.bottomSeparatorVisibility = .hidden
+        }
+        return result
+      }
+    }
     configuration.headerMode = .supplementary
     configuration.footerMode = .supplementary
     configuration.trailingSwipeActionsConfigurationProvider = { [weak self] indexPath in
@@ -44,6 +58,9 @@ final class ActivityListController: UICollectionViewController {
       guard let self, let model = self.section(at: index) else { return nil }
       let section = NSCollectionLayoutSection.list(
         using: configuration, layoutEnvironment: environment)
+      if self.plain {
+        section.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: model.isOverview ? 16 : 0, bottom: 0, trailing: model.isOverview ? 16 : 0)
+      }
       let nativeBoundaries = section.boundarySupplementaryItems
       // The layout knows the native section width even before an empty
       // section creates a header view. Start Yoga measurement without needing
@@ -95,7 +112,7 @@ final class ActivityListController: UICollectionViewController {
       // Supplementary views do not inherit a cell's self-sizing behavior.
       // Reserve the actual Yoga height instead of letting the header paint
       // beyond UIKit's estimated frame and overlap the first expense.
-      section.boundarySupplementaryItems = [
+      section.boundarySupplementaryItems = self.plain && model.header.height == 0 ? [] : [
         self.boundary(
           model.header, kind: UICollectionView.elementKindSectionHeader,
           alignment: .top, original: nativeHeader)
@@ -122,6 +139,7 @@ final class ActivityListController: UICollectionViewController {
     let cells = UICollectionView.CellRegistration<UICollectionViewListCell, String> {
       [weak self] cell, _, key in
       guard let row = self?.rows[key] else { return }
+      if self?.plain == true { cell.backgroundConfiguration = .clear() }
       if let hosted = row.hostedContent, let self {
         cell.contentConfiguration = self.hostedConfiguration(hosted)
       } else {
@@ -377,7 +395,7 @@ final class ActivityListController: UICollectionViewController {
       let key = dataSource.itemIdentifier(for: indexPath),
       let row = rows[key], row.canDelete, !row.deletionDisabled
     else { return nil }
-    let delete = UIContextualAction(style: .destructive, title: "Delete") {
+    let delete = UIContextualAction(style: .destructive, title: row.actionTitle) {
       [weak self] _, _, complete in
       guard let self, self.pendingSwipe == nil,
         let row = self.rows[key], !row.deletionDisabled
@@ -391,7 +409,8 @@ final class ActivityListController: UICollectionViewController {
       // UIKit owns the entire swipe animation. Complete only after the dialog
       // and mutation resolve, so Cancel restores the row rather than hiding it.
     }
-    delete.image = UIImage(systemName: "trash")
+    delete.image = UIImage(systemName: row.actionIcon)
+    if let color = row.actionColor { delete.backgroundColor = color }
     let configuration = UISwipeActionsConfiguration(actions: [delete])
     configuration.performsFirstActionWithFullSwipe = true
     return configuration

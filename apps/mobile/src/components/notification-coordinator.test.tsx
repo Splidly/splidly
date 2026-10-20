@@ -85,11 +85,13 @@ jest.mock("../lib/trpc", () => ({
       },
       friends: {
         list: { invalidate: jest.fn(() => Promise.resolve()) },
+        archivedCount: { invalidate: jest.fn(() => Promise.resolve()) },
       },
       groups: {
         balances: { invalidate: jest.fn(() => Promise.resolve()) },
         detail: { invalidate: jest.fn(() => Promise.resolve()) },
         list: { invalidate: jest.fn(() => Promise.resolve()) },
+        archivedCount: { invalidate: jest.fn(() => Promise.resolve()) },
       },
     }),
   },

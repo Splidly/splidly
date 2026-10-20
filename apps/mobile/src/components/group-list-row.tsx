@@ -42,6 +42,7 @@ export function GroupListRow({
   balance,
   memberBalances,
   onPress,
+  contained = false,
 }: {
   id: string;
   name: string;
@@ -51,6 +52,7 @@ export function GroupListRow({
   balance: Money;
   memberBalances: GroupMemberBalance[];
   onPress: () => void;
+  contained?: boolean;
 }) {
   const theme = useTheme();
   const [trailingWidth, setTrailingWidth] = useState(96);
@@ -88,6 +90,7 @@ export function GroupListRow({
       ]}
     >
       <Text
+        selectable={false}
         numberOfLines={1}
         style={[
           styles.status,
@@ -105,6 +108,7 @@ export function GroupListRow({
       </Text>
       {hasOpenPayments || minor !== 0n ? (
         <Text
+        selectable={false}
           numberOfLines={1}
           style={[
             styles.amount,
@@ -133,6 +137,7 @@ export function GroupListRow({
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,
+        contained ? { marginHorizontal: 0 } : null,
         {
           backgroundColor: pressed ? theme.elevated : "transparent",
         },
@@ -151,6 +156,7 @@ export function GroupListRow({
           style={[styles.heading, isSettled ? styles.headingCentered : null]}
         >
           <Text
+        selectable={false}
             numberOfLines={1}
             style={[
               styles.name,

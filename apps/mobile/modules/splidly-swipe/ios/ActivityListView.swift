@@ -22,13 +22,16 @@ struct ActivityListView: ExpoSwiftUI.View {
           return ActivityRow(
             key: row.key,
             content: AnyView(content),
-            hostedContent: row.canDelete
+            hostedContent: row.canDelete || row.nativeContent
               ? nil
               : children[row.childIndex].uiView.map {
                 ActivityHostedContent(key: "row:\(row.key)", view: $0, height: row.height)
               },
             canDelete: row.canDelete,
-            deletionDisabled: row.deletionDisabled
+            deletionDisabled: row.deletionDisabled,
+            actionTitle: row.actionTitle,
+            actionColor: row.actionColor,
+            actionIcon: row.actionIcon
           )
         },
         footer: section.footerIndex.flatMap {
@@ -40,6 +43,7 @@ struct ActivityListView: ExpoSwiftUI.View {
       )
     }
     ActivityListRepresentable(
+      plain: props.plain,
       sections: sections,
       completion: props.completion.map {
         ActivitySwipeResult(requestId: $0.requestId, deleted: $0.deleted)
@@ -56,5 +60,6 @@ struct ActivityListView: ExpoSwiftUI.View {
         props.onHostedLayout(["key": key, "width": width])
       }
     )
+    .id(props.plain)
   }
 }

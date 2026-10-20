@@ -212,6 +212,8 @@ export const friendships = pgTable(
       .notNull()
       .references(() => users.id),
     createdVia: text("created_via").notNull(),
+    archivedByLowAt: timestamp("archived_by_low_at", { withTimezone: true }),
+    archivedByHighAt: timestamp("archived_by_high_at", { withTimezone: true }),
     removedAt: timestamp("removed_at", { withTimezone: true }),
     ...timestamps,
   },
@@ -249,6 +251,7 @@ export const groupMembers = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
     joinedAt: timestamp("joined_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -26,6 +26,7 @@ import kotlinx.coroutines.launch
 
 data class ExpenseSwipeProps(
   val enabled: Boolean = true,
+  val actionTitle: String = "Delete",
   val deleteLabel: String = "Delete expense",
   val backgroundColor: android.graphics.Color? = null
 ) : ComposeProps
@@ -76,7 +77,7 @@ class SplidlySwipeModule : Module() {
                 .padding(horizontal = 24.dp),
               contentAlignment = Alignment.CenterEnd
             ) {
-              Text("Delete", color = Color.White)
+              Text(props.actionTitle, color = Color.White)
             }
           }
         ) {

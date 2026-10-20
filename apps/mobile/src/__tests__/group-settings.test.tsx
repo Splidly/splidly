@@ -1,10 +1,11 @@
-import { fireEvent, render } from "@testing-library/react-native";
+import { act, fireEvent, render } from "@testing-library/react-native";
 import { Alert, StyleSheet } from "react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import GroupSettingsScreen from "../app/(tabs)/groups/[id]/settings";
 
 const mockUpdateMutate = jest.fn();
 const mockRemoveMutate = jest.fn();
+const mockArchiveMutate = jest.fn(async () => undefined);
 
 jest.mock("react-native-reanimated", () => {
   const { View } = jest.requireActual(
@@ -15,36 +16,6 @@ jest.mock("react-native-reanimated", () => {
     default: { View },
     FadeIn: { duration: () => undefined },
     FadeOut: { duration: () => undefined },
-  };
-});
-
-jest.mock("react-native-gesture-handler/ReanimatedSwipeable", () => {
-  const React = require("react") as typeof import("react");
-  const { View } =
-    require("react-native") as typeof import("react-native");
-  return function MockSwipeable({
-    children,
-    renderRightActions,
-    testID,
-  }: {
-    children: React.ReactNode;
-    renderRightActions: (
-      progress: { value: number },
-      translation: { value: number },
-      methods: { close: () => void },
-    ) => React.ReactNode;
-    testID: string;
-  }) {
-    return (
-      <View testID={testID}>
-        {children}
-        {renderRightActions(
-          { value: 1 },
-          { value: -88 },
-          { close: jest.fn() },
-        )}
-      </View>
-    );
   };
 });
 
@@ -62,9 +33,7 @@ jest.mock("expo-router", () => {
   }: {
     accessibilityLabel: string;
     onPress: () => void;
-  }) => (
-    <Pressable accessibilityLabel={accessibilityLabel} onPress={onPress} />
-  );
+  }) => <Pressable accessibilityLabel={accessibilityLabel} onPress={onPress} />;
   return {
     router: {
       push: jest.fn(),
@@ -93,6 +62,7 @@ jest.mock("../lib/trpc", () => ({
         detail: { invalidate: jest.fn() },
         balances: { invalidate: jest.fn() },
         list: { invalidate: jest.fn() },
+        archivedCount: { invalidate: jest.fn() },
       },
     }),
     groups: {
@@ -188,6 +158,7 @@ jest.mock("../lib/trpc", () => ({
       removeMember: {
         useMutation: () => ({
           mutate: mockRemoveMutate,
+          mutateAsync: mockRemoveMutate,
           error: null,
           isPending: false,
         }),
@@ -203,7 +174,11 @@ jest.mock("../lib/trpc", () => ({
         useMutation: () => ({ mutate: jest.fn(), error: null }),
       },
       archive: {
-        useMutation: () => ({ mutate: jest.fn(), error: null }),
+        useMutation: () => ({
+          mutate: jest.fn(),
+          mutateAsync: mockArchiveMutate,
+          error: null,
+        }),
       },
       delete: {
         useMutation: () => ({ mutate: jest.fn(), error: null }),
@@ -246,8 +221,13 @@ describe("GroupSettingsScreen", () => {
     expect(view.getByText("Lisbon")).toBeTruthy();
     expect(view.getByText("€ · EUR")).toBeTruthy();
     expect(
-      view.getByText("Share a reusable link valid for 7 days"),
-    ).toBeTruthy();
+      view
+        .getByTestId("activity-member-invite")
+        .queryAll(
+          (node) =>
+            node.props.text === "Share a reusable link valid for 7 days",
+        ),
+    ).toHaveLength(1);
     let editAncestor = view.getByTestId("edit-group").parent;
     let usesGroupColor = false;
     while (editAncestor) {
@@ -261,12 +241,36 @@ describe("GroupSettingsScreen", () => {
     expect(view.queryByText(/All settled up/)).toBeNull();
     expect(view.queryByLabelText("Name")).toBeNull();
     expect(
-      view.getAllByText("›", { includeHiddenElements: true }),
-    ).toHaveLength(1);
+      view.queryAllByText("›", { includeHiddenElements: true }),
+    ).toHaveLength(0);
 
     await fireEvent.press(view.getByTestId("edit-group"));
 
     expect(mockPush).toHaveBeenCalledWith("/groups/group-1/edit");
+  });
+
+  it("archives immediately from settings without showing a confirmation", async () => {
+    mockArchiveMutate.mockClear();
+    const view = await render(
+      <SafeAreaInsetsContext.Provider
+        value={{ top: 0, right: 0, bottom: 0, left: 0 }}
+      >
+        <GroupSettingsScreen />
+      </SafeAreaInsetsContext.Provider>,
+    );
+    const alert = jest
+      .spyOn(Alert, "alert")
+      .mockImplementation(() => undefined);
+    try {
+      await fireEvent.press(view.getByText("Archive group"));
+      expect(mockArchiveMutate).toHaveBeenCalledWith({
+        groupId: "group-1",
+        expectedVersion: 3,
+      });
+      expect(alert).not.toHaveBeenCalled();
+    } finally {
+      alert.mockRestore();
+    }
   });
 
   it("persists debt simplification directly from its switch", async () => {
@@ -313,52 +317,75 @@ describe("GroupSettingsScreen", () => {
       </SafeAreaInsetsContext.Provider>,
     );
 
+    const nativeList = view.getByTestId("native-activity-list");
+    const rows = nativeList.props.sections[1].rows;
+    expect(rows.map((row: { key: string }) => row.key)).toEqual([
+      "invite",
+      "user-2",
+      "user-1",
+      "user-3",
+    ]);
+    expect(rows.map((row: { canDelete: boolean }) => row.canDelete)).toEqual([
+      false,
+      true,
+      false,
+      true,
+    ]);
     expect(
-      view
-        .getAllByText(/^(Alex|Lasse \(You\)|Zoe)$/)
-        .map((node) => node.props.children),
-    ).toEqual(["Alex", "Lasse (You)", "Zoe"]);
-    expect(view.getByText("Owes 5.00 €")).toBeTruthy();
-    expect(view.getByText("Lent 5.00 €")).toBeTruthy();
-    expect(view.getByText("Settled up")).toBeTruthy();
-    expect(view.getByTestId("member-swipe-user-2")).toBeTruthy();
-    expect(view.queryByTestId("member-swipe-user-1")).toBeNull();
-    expect(view.getByLabelText("Remove Alex")).toBeTruthy();
-    expect(view.getByLabelText("Remove Zoe")).toBeTruthy();
-
-    const alexRow = view.getByLabelText("Alex. Owes 5.00 €");
-    await fireEvent(alexRow, "touchStart", {
-      nativeEvent: { pageX: 220, pageY: 50 },
+      rows.every((row: { nativeContent: boolean }) => row.nativeContent),
+    ).toBe(true);
+    expect(rows[1]).toMatchObject({
+      actionTitle: "Remove",
+      actionIcon: "person.badge.minus",
     });
-    await fireEvent(alexRow, "touchMove", {
-      nativeEvent: { pageX: 160, pageY: 50 },
+    expect(rows[1].actionColor).toBeUndefined();
+    const alexRow = view.getByTestId("activity-member-user-2");
+    expect(
+      alexRow.queryAll(
+        (node) =>
+          typeof node.props.onPress === "function" ||
+          node.props.matchContents !== undefined,
+      ),
+    ).toHaveLength(0);
+    const textCount = (text: string) =>
+      view.container.queryAll((node) => node.props.text === text).length;
+    expect(textCount("Owes 5.00 €")).toBe(1);
+    expect(textCount("Lent 5.00 €")).toBe(1);
+    expect(textCount("Settled up")).toBe(1);
+    expect(textCount("Alex owes 5.00 € to you")).toBe(0);
+    await fireEvent(alexRow, "buttonPress");
+    expect(textCount("Alex owes 5.00 € to you")).toBe(1);
+    await fireEvent(view.getByTestId("activity-member-user-1"), "buttonPress");
+    expect(textCount("Alex owes 5.00 € to you")).toBe(2);
+    await fireEvent(nativeList, "deleteRequested", {
+      nativeEvent: { rowKey: "user-2", requestId: "remove-alex" },
     });
-    await fireEvent.press(alexRow);
-    expect(view.queryByLabelText("Alex owes 5.00 € to you")).toBeNull();
-
-    await fireEvent(alexRow, "touchStart", {
-      nativeEvent: { pageX: 220, pageY: 50 },
-    });
-    await fireEvent.press(alexRow);
-    expect(view.getByLabelText("Alex owes 5.00 € to you")).toBeTruthy();
-
-    await fireEvent.press(view.getByLabelText("Lasse (You). Lent 5.00 €"));
-    expect(view.getAllByLabelText("Alex owes 5.00 € to you")).toHaveLength(2);
-
-    await fireEvent.press(view.getByLabelText("Remove Alex"));
     expect(Alert.alert).toHaveBeenCalledWith(
       "Settle with Alex first",
       "A member can only be removed after their group balance reaches zero.",
-      [{ text: "OK" }],
     );
     expect(mockRemoveMutate).not.toHaveBeenCalled();
 
-    await fireEvent.press(view.getByLabelText("Remove Zoe"));
+    let removal!: Promise<void>;
+    await act(() => {
+      removal = nativeList.props.onDeleteRequested({
+        nativeEvent: { rowKey: "user-3", requestId: "remove-zoe" },
+      });
+    });
     expect(Alert.alert).toHaveBeenCalledWith(
       "Remove Zoe?",
       "They can rejoin later with a new invitation.",
       expect.any(Array),
+      expect.objectContaining({ cancelable: true }),
     );
+    const buttons = (Alert.alert as jest.Mock).mock.calls.at(-1)[2];
+    await act(async () => {
+      buttons[0].onPress();
+      await removal;
+    });
+    expect(nativeList.props.completion).toEqual({
+      requestId: "remove-zoe",
+      deleted: false,
+    });
   });
-
 });

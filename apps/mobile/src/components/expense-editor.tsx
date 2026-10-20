@@ -128,7 +128,9 @@ export function ExpenseEditor({
   async function finishSaving() {
     await Promise.all([
       utils.friends.list.invalidate(),
+      utils.friends.archivedCount.invalidate(),
       utils.groups.list.invalidate(),
+      utils.groups.archivedCount.invalidate(),
       expenseId
         ? utils.expenses.detail.invalidate({ expenseId })
         : Promise.resolve(),

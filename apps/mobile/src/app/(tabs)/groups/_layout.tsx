@@ -25,6 +25,7 @@ export default function GroupsStackLayout() {
           ...inlineLargeTitleOptions(theme.text),
         }}
       />
+      <Stack.Screen name="archived" options={{ title: "Archived Groups" }} />
       <Stack.Screen
         name="new"
         options={{

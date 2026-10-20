@@ -4,12 +4,14 @@ import { NativeExpenseSwipe } from "./native-expense-swipe";
 import type { NativeActivityListProps } from "./native-activity-list.types";
 
 export function NativeActivityList({
+  appearance = "grouped",
   sections,
   header,
   footer,
   scrollProps,
 }: NativeActivityListProps) {
   const theme = useTheme();
+  const plain = appearance === "plain";
   return (
     <SectionList
       {...scrollProps}
@@ -19,11 +21,29 @@ export function NativeActivityList({
       initialNumToRender={16}
       maxToRenderPerBatch={12}
       windowSize={7}
-      ListHeaderComponent={<View style={{ gap: spacing.lg }}>{header}</View>}
-      ListFooterComponent={
-        footer ? <View style={{ marginTop: spacing.lg }}>{footer}</View> : null
+      ListHeaderComponent={
+        <View
+          style={{
+            gap: spacing.lg,
+            ...(plain ? { paddingHorizontal: spacing.md } : {}),
+          }}
+        >
+          {header}
+        </View>
       }
-      renderSectionHeader={({ section }) => (
+      ListFooterComponent={
+        footer ? (
+          <View
+            style={{
+              marginTop: spacing.lg,
+              ...(plain ? { paddingHorizontal: spacing.md } : {}),
+            }}
+          >
+            {footer}
+          </View>
+        ) : null
+      }
+      renderSectionHeader={({ section }) => plain && !section.label ? null : (
         <View testID={`activity-date-${section.key}`}>
           <Text
             selectable={false}
@@ -44,16 +64,30 @@ export function NativeActivityList({
       renderItem={({ item, index, section }) => (
         <View
           style={{
-            backgroundColor: theme.surface,
-            borderTopWidth: index === 0 ? 0 : StyleSheet.hairlineWidth,
+            backgroundColor: plain ? "transparent" : theme.surface,
+            borderTopWidth: plain || index === 0 ? 0 : StyleSheet.hairlineWidth,
             borderTopColor: theme.border,
             overflow: "hidden",
-            borderTopLeftRadius: index === 0 ? 16 : 0,
-            borderTopRightRadius: index === 0 ? 16 : 0,
-            borderBottomLeftRadius: index === section.data.length - 1 ? 16 : 0,
-            borderBottomRightRadius: index === section.data.length - 1 ? 16 : 0,
+            borderTopLeftRadius: !plain && index === 0 ? 16 : 0,
+            borderTopRightRadius: !plain && index === 0 ? 16 : 0,
+            borderBottomLeftRadius:
+              !plain && index === section.data.length - 1 ? 16 : 0,
+            borderBottomRightRadius:
+              !plain && index === section.data.length - 1 ? 16 : 0,
           }}
         >
+          {plain && index > 0 ? (
+            <View
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 94,
+                right: 16,
+                borderTopWidth: StyleSheet.hairlineWidth,
+                borderTopColor: theme.border,
+              }}
+            />
+          ) : null}
           <NativeExpenseSwipe row={item}>{item.content}</NativeExpenseSwipe>
         </View>
       )}

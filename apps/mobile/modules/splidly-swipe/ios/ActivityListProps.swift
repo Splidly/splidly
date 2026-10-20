@@ -5,6 +5,7 @@ final class ActivityListProps: ExpoSwiftUI.ViewProps {
   @Field var completion: ActivitySwipeResultRecord?
   @Field var refreshCompletion: String?
   @Field var refreshEnabled: Bool = false
+  @Field var plain: Bool = false
   @Field var bounces: Bool = true
   var onDeleteRequested = EventDispatcher()
   var onRefresh = EventDispatcher()

@@ -9,6 +9,7 @@ const ExpenseSwipeView = requireNativeView<{
   children: React.ReactNode;
   enabled: boolean;
   deleteLabel: string;
+  actionTitle: string;
   backgroundColor: string;
   onDelete: () => void;
 }>("SplidlySwipe", "ExpenseSwipeView");
@@ -23,12 +24,13 @@ export function NativeExpenseSwipe({
     <Host matchContents={{ vertical: true }}>
       <ExpenseSwipeView
         enabled={!row.deletionDisabled}
-        deleteLabel={row.deleteLabel ?? "Delete expense"}
-        backgroundColor={theme.negative as string}
+        deleteLabel={row.deleteLabel ?? row.actionTitle ?? "Delete expense"}
+        actionTitle={row.actionTitle ?? "Delete"}
+        backgroundColor={row.actionColor ?? theme.negative as string}
         onDelete={row.onDelete}
       >
         <RNHostView matchContents>
-          <View style={{ backgroundColor: theme.surface }}>{children}</View>
+          <View style={{ backgroundColor: row.backgroundColor ?? theme.surface }}>{children}</View>
         </RNHostView>
       </ExpenseSwipeView>
     </Host>

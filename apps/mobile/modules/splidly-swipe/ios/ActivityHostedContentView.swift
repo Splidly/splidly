@@ -42,6 +42,13 @@ final class ActivityHostedContentView: UIView, UIContentView {
       }
     }
     hostedHeight = configuration.content.height
+    // The first layout uses a one-point placeholder while React measures the
+    // content at the native width. Keep that pass invisible so navigation does
+    // not flash a clipped strip of the detail header or its buttons.
+    let measured = hostedHeight > 0
+    alpha = measured ? 1 : 0
+    accessibilityElementsHidden = !measured
+    isUserInteractionEnabled = measured
     invalidateIntrinsicContentSize()
     setNeedsLayout()
   }

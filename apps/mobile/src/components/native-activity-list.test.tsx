@@ -49,6 +49,10 @@ describe("native iOS activity list", () => {
     const view = await render(fixture());
     const list = view.getByTestId("native-activity-list");
     expect(list.props.bounces).toBe(true);
+    expect(list.props.sections[1].rows[0]).toMatchObject({
+      actionTitle: "Delete",
+      actionIcon: "trash",
+    });
     expect(
       list.props.sections[1].rows.map(
         (row: { canDelete: boolean }) => row.canDelete,
@@ -339,5 +343,48 @@ describe("native iOS activity list", () => {
       deleted: false,
     });
     expect(onDelete).toHaveBeenCalledTimes(1);
+  });
+});
+
+it("hosts a SwiftUI viewer row without enabling a swipe action", async () => {
+  const view = await render(
+    <NativeActivityList
+      header={<Text selectable={false}>Members</Text>}
+      sections={[
+        {
+          key: "members",
+          label: "",
+          data: [
+            {
+              key: "viewer",
+              nativeContent: true,
+              content: (
+                <ActivityExpenseRow
+                  title="Viewer"
+                  subtitle="Settled"
+                  iconKey="other"
+                  useNameFallback={false}
+                  onPress={() => undefined}
+                />
+              ),
+            },
+          ],
+        },
+      ]}
+      scrollProps={{ style: { flex: 1 } }}
+    />,
+  );
+  const list = view.getByTestId("native-activity-list");
+  expect(list.props.sections[1].rows[0]).toMatchObject({
+    canDelete: false,
+    nativeContent: true,
+  });
+  expect(view.queryByTestId("native-activity-row-viewer")).toBeNull();
+  await fireEvent(list, "deleteRequested", {
+    nativeEvent: { rowKey: "viewer", requestId: "blocked" },
+  });
+  expect(list.props.completion).toEqual({
+    requestId: "blocked",
+    deleted: false,
   });
 });

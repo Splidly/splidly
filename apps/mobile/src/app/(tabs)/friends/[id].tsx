@@ -23,7 +23,7 @@ import { groupActivityByDate } from "../../../lib/activity-dates";
 import { api } from "../../../lib/trpc";
 import { APP_URL } from "../../../lib/env";
 import { formatMoney } from "../../../lib/money-display";
-import { useTheme } from "../../../theme";
+import { spacing, useTheme } from "../../../theme";
 
 export default function FriendDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -37,8 +37,12 @@ export default function FriendDetailScreen() {
   const acceptActivityNavigation = useNavigationPressGuard();
   const deletion = useDeleteActivityExpense();
   const detail = api.friends.detail.useQuery({ friendshipId: id });
-  const list = api.friends.list.useQuery();
   const profile = api.profile.me.useQuery();
+  const friendship = detail.data?.friendship;
+  const archivedAt = friendship?.userLowId === profile.data?.userId
+    ? friendship?.archivedByLowAt
+    : friendship?.archivedByHighAt;
+  const list = api.friends.list.useQuery(archivedAt ? { archived: true } : undefined);
   if (detail.isPending || list.isPending || profile.isPending) {
     return (
       <Screen>
@@ -140,18 +144,26 @@ export default function FriendDetailScreen() {
         activityList={{
           sections: activitySections,
           footer: (
-            <Section>
-              <ListRow
-                title="Report this user"
-                subtitle="Report abusive behavior or illegal content"
-                showsDisclosureIndicator={false}
-                onPress={() =>
-                  void Linking.openURL(
-                    `${APP_URL}/report?type=user&id=${encodeURIComponent(detail.data.friend?.userId ?? id)}`,
-                  )
-                }
-              />
-            </Section>
+            <View
+              style={
+                process.env.EXPO_OS === "ios"
+                  ? { paddingTop: spacing.lg }
+                  : undefined
+              }
+            >
+              <Section>
+                <ListRow
+                  title="Report this user"
+                  subtitle="Report abusive behavior or illegal content"
+                  showsDisclosureIndicator={false}
+                  onPress={() =>
+                    void Linking.openURL(
+                      `${APP_URL}/report?type=user&id=${encodeURIComponent(detail.data.friend?.userId ?? id)}`,
+                    )
+                  }
+                />
+              </Section>
+            </View>
           ),
         }}
         onScroll={(event) => {

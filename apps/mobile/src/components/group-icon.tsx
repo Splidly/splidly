@@ -158,6 +158,10 @@ export function normalizeGroupIconKey(value: unknown): GroupIconKey {
     : "default";
 }
 
+export function groupIconImage(iconKey: GroupIconKey) {
+  return (optionsByKey.get(iconKey) ?? groupIconOptions[0]).image;
+}
+
 export function groupIconGlyphSize(iconKey: GroupIconKey, size: number) {
   return Math.round(size * (iconKey === "default" ? 0.41 : 0.49));
 }

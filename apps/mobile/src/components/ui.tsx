@@ -280,7 +280,7 @@ export function Screen({
   refreshing?: boolean;
   onRefresh?: () => Promise<unknown> | void;
   onScroll?: ScrollViewProps["onScroll"];
-  activityList?: { sections: ActivityListSection[]; footer?: ReactNode };
+  activityList?: { sections: ActivityListSection[]; footer?: ReactNode; appearance?: "plain" | "grouped" };
 }>) {
   const theme = useTheme();
   const { width: windowWidth } = useWindowDimensions();
@@ -306,6 +306,7 @@ export function Screen({
   if (activityList) {
     return (
       <NativeActivityList
+        appearance={activityList.appearance ?? "grouped"}
         sections={activityList.sections}
         header={children}
         footer={activityList.footer}
@@ -314,7 +315,7 @@ export function Screen({
           contentContainerStyle: [
             // SectionList owns row spacing; a container gap adds space between
             // every virtualized cell, splitting the date-group cards apart.
-            { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
+            { paddingHorizontal: activityList.appearance === "plain" ? 0 : spacing.md, paddingTop: spacing.sm },
             fillStyle,
             contentContainerStyle,
             tabletContentStyle,

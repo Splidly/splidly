@@ -1,5 +1,6 @@
 import {
   and,
+  count,
   eq,
   expensePayments,
   expenses,
@@ -12,6 +13,7 @@ import {
   inArray,
   invites,
   isNull,
+  isNotNull,
   ledgerEntries,
   ledgerValuations,
   lte,
@@ -115,69 +117,73 @@ async function removeGroupMember(input: {
 }
 
 export const groupsRouter = router({
-  list: protectedProcedure.query(async ({ ctx }) => {
-    const memberships = await ctx.db
-      .select({ group: groups })
-      .from(groupMembers)
-      .innerJoin(groups, eq(groups.id, groupMembers.groupId))
-      .where(
-        and(
-          eq(groupMembers.userId, ctx.session.user.id),
-          isNull(groupMembers.removedAt),
-          isNull(groups.archivedAt),
-        ),
-      );
-    const groupIds = memberships.map(({ group }) => group.id);
-    if (groupIds.length === 0) return [];
-    const [allEntries, allMembers] = await Promise.all([
-      loadGroupedLedgerAmounts(ctx.db, "group", groupIds),
-      ctx.db
-        .select({
-          groupId: groupMembers.groupId,
-          userId: groupMembers.userId,
-          displayName: profiles.displayName,
-          avatarUrl: profiles.avatarUrl,
-        })
+  list: protectedProcedure
+    .input(z.object({ archived: z.boolean().default(false) }).optional())
+    .query(async ({ ctx, input }) => {
+      const memberships = await ctx.db
+        .select({ group: groups })
         .from(groupMembers)
-        .innerJoin(profiles, eq(profiles.userId, groupMembers.userId))
+        .innerJoin(groups, eq(groups.id, groupMembers.groupId))
         .where(
           and(
-            inArray(groupMembers.groupId, groupIds),
+            eq(groupMembers.userId, ctx.session.user.id),
             isNull(groupMembers.removedAt),
+            isNull(groups.archivedAt),
+            input?.archived
+              ? isNotNull(groupMembers.archivedAt)
+              : isNull(groupMembers.archivedAt),
           ),
-        ),
-    ]);
-    const entriesByGroup = groupBy(allEntries, (entry) => entry.contextId);
-    const membersByGroup = groupBy(allMembers, (member) => member.groupId);
+        );
+      const groupIds = memberships.map(({ group }) => group.id);
+      if (groupIds.length === 0) return [];
+      const [allEntries, allMembers] = await Promise.all([
+        loadGroupedLedgerAmounts(ctx.db, "group", groupIds),
+        ctx.db
+          .select({
+            groupId: groupMembers.groupId,
+            userId: groupMembers.userId,
+            displayName: profiles.displayName,
+            avatarUrl: profiles.avatarUrl,
+          })
+          .from(groupMembers)
+          .innerJoin(profiles, eq(profiles.userId, groupMembers.userId))
+          .where(
+            and(
+              inArray(groupMembers.groupId, groupIds),
+              isNull(groupMembers.removedAt),
+            ),
+          ),
+      ]);
+      const entriesByGroup = groupBy(allEntries, (entry) => entry.contextId);
+      const membersByGroup = groupBy(allMembers, (member) => member.groupId);
 
-    return memberships.map(({ group }) => {
-      const entries = entriesByGroup.get(group.id) ?? [];
-      const members = membersByGroup.get(group.id) ?? [];
-      const membersById = new Map(
-        members.map((member) => [member.userId, member]),
-      );
-      const transfers = repaymentPlan(entries, group.simplifyDebts);
-      const memberBalances = viewerRepaymentBalances(
-        transfers,
-        members,
-        ctx.session.user.id,
-      ).map((member) => ({
-        userId: member.userId,
-        displayName: member.displayName,
-        avatarUrl:
-          membersById.get(member.userId)?.avatarUrl ?? null,
-        balance: money(group.currency, member.amountMinor),
-      }));
-      return {
-        ...group,
-        balance: money(
-          group.currency,
-          groupBalance(entries, ctx.session.user.id),
-        ),
-        memberBalances,
-      };
-    });
-  }),
+      return memberships.map(({ group }) => {
+        const entries = entriesByGroup.get(group.id) ?? [];
+        const members = membersByGroup.get(group.id) ?? [];
+        const membersById = new Map(
+          members.map((member) => [member.userId, member]),
+        );
+        const transfers = repaymentPlan(entries, group.simplifyDebts);
+        const memberBalances = viewerRepaymentBalances(
+          transfers,
+          members,
+          ctx.session.user.id,
+        ).map((member) => ({
+          userId: member.userId,
+          displayName: member.displayName,
+          avatarUrl: membersById.get(member.userId)?.avatarUrl ?? null,
+          balance: money(group.currency, member.amountMinor),
+        }));
+        return {
+          ...group,
+          balance: money(
+            group.currency,
+            groupBalance(entries, ctx.session.user.id),
+          ),
+          memberBalances,
+        };
+      });
+    }),
 
   balances: protectedProcedure
     .input(z.object({ groupId: z.uuid() }))
@@ -1059,6 +1065,13 @@ export const groupsRouter = router({
       }),
     ),
 
+  archivedCount: protectedProcedure.query(async ({ ctx }) => {
+    const [result] = await ctx.db.select({ count: count() }).from(groupMembers)
+      .innerJoin(groups, eq(groups.id, groupMembers.groupId))
+      .where(and(eq(groupMembers.userId, ctx.session.user.id), isNull(groupMembers.removedAt), isNull(groups.archivedAt), isNotNull(groupMembers.archivedAt)));
+    return result?.count ?? 0;
+  }),
+
   archive: protectedProcedure
     .input(z.object({ groupId: z.uuid(), expectedVersion: z.number().int() }))
     .mutation(async ({ ctx, input }) => {
@@ -1067,34 +1080,53 @@ export const groupsRouter = router({
         input.groupId,
         ctx.session.user.id,
       );
+      const [group] = await ctx.db
+        .select().from(groups)
+        .where(eq(groups.id, input.groupId)).limit(1);
+      if (!group || group.archivedAt) throw new TRPCError({ code: "NOT_FOUND" });
       const entries = await loadGroupedLedgerAmounts(ctx.db, "group", [
         input.groupId,
       ]);
-      const members = new Set(
-        entries.flatMap((entry) => [entry.debtorId, entry.creditorId]),
-      );
-      if ([...members].some((id) => groupBalance(entries, id) !== 0n)) {
+      const transfers = repaymentPlan(entries, group.simplifyDebts);
+      if (transfers.some((transfer) =>
+        transfer.fromUserId === ctx.session.user.id ||
+        transfer.toUserId === ctx.session.user.id
+      )) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
-          message: "All balances must be zero before archiving",
+          message: "Settle your group balance before archiving",
         });
       }
-      const [archived] = await ctx.db
-        .update(groups)
-        .set({
-          archivedAt: new Date(),
-          version: input.expectedVersion + 1,
-          updatedAt: new Date(),
-        })
+      await ctx.db
+        .update(groupMembers)
+        .set({ archivedAt: new Date() })
         .where(
           and(
-            eq(groups.id, input.groupId),
-            eq(groups.version, input.expectedVersion),
+            eq(groupMembers.groupId, input.groupId),
+            eq(groupMembers.userId, ctx.session.user.id),
           ),
-        )
-        .returning();
-      if (!archived) throw new TRPCError({ code: "CONFLICT" });
-      return archived;
+        );
+      return { archived: true };
+    }),
+
+  restore: protectedProcedure
+    .input(z.object({ groupId: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      await requireActiveGroupMember(
+        ctx.db,
+        input.groupId,
+        ctx.session.user.id,
+      );
+      await ctx.db
+        .update(groupMembers)
+        .set({ archivedAt: null })
+        .where(
+          and(
+            eq(groupMembers.groupId, input.groupId),
+            eq(groupMembers.userId, ctx.session.user.id),
+          ),
+        );
+      return { restored: true };
     }),
 
   delete: protectedProcedure

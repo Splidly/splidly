@@ -63,7 +63,9 @@ export function NotificationCoordinator() {
     (data: ExpenseNotificationData) => {
       void Promise.all([
         utils.friends.list.invalidate(),
+        utils.friends.archivedCount.invalidate(),
         utils.groups.list.invalidate(),
+        utils.groups.archivedCount.invalidate(),
         utils.groups.detail.invalidate({ groupId: data.groupId }),
         utils.groups.balances.invalidate({ groupId: data.groupId }),
         data.eventType === "expense.deleted" ||

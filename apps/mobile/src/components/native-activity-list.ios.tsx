@@ -14,6 +14,10 @@ type NativeSection = {
     key: string;
     childIndex: number;
     canDelete: boolean;
+    nativeContent: boolean;
+    actionTitle: string;
+    actionIcon: string;
+    actionColor?: string;
     deletionDisabled: boolean;
     height: number;
   }[];
@@ -27,6 +31,7 @@ type NativeListProps = {
   completion?: SwipeResult | undefined;
   refreshCompletion?: string | undefined;
   refreshEnabled: boolean;
+  plain: boolean;
   bounces: boolean;
   onDeleteRequested: (
     event: NativeSyntheticEvent<{ rowKey: string; requestId: string }>,
@@ -48,6 +53,7 @@ const ActivityListView = requireNativeView<NativeListProps>(
 // UIKit owns the list, its swipe gestures, destructive animation, and the
 // completion callback that keeps a swipe pending during confirmation.
 export function NativeActivityList({
+  appearance = "grouped",
   sections,
   header,
   footer,
@@ -137,7 +143,7 @@ export function NativeActivityList({
         `native-activity-header-${section.key}`,
       );
       const rows = section.data.map((row) => {
-        const childIndex = row.onDelete
+        const childIndex = row.onDelete || row.nativeContent
           ? children.push(
               <VStack key={row.key} alignment="leading" spacing={0}>
                 {row.content}
@@ -152,6 +158,10 @@ export function NativeActivityList({
           key: row.key,
           childIndex,
           canDelete: !!row.onDelete,
+          nativeContent: row.nativeContent ?? false,
+          actionTitle: row.actionTitle ?? "Delete",
+          actionIcon: row.actionIcon ?? "trash",
+          ...(row.actionColor ? { actionColor: row.actionColor } : {}),
           deletionDisabled: row.deletionDisabled ?? false,
           height: heights[`row:${row.key}`] ?? 0,
         };
@@ -180,6 +190,7 @@ export function NativeActivityList({
     <Host style={scrollProps.style}>
       <ActivityListView
         testID="native-activity-list"
+        plain={appearance === "plain"}
         sections={nativeSections}
         completion={completion}
         refreshCompletion={refreshCompletion}

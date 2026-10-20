@@ -1,3 +1,4 @@
+import { restoreExpenseArchives } from "../domain/expense-archives";
 import {
   and,
   eq,
@@ -601,6 +602,7 @@ export const expensesRouter = router({
           actorId: ctx.session.user.id,
           snapshot: revisionSnapshot(prepared),
         });
+        await restoreExpenseArchives(tx, input.context, prepared);
         if (expense.groupId) {
           await enqueueExpenseNotifications(tx, {
             action: "create",

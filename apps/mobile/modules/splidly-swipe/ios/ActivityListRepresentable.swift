@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ActivityListRepresentable: UIViewControllerRepresentable {
+  let plain: Bool
   let sections: [ActivitySection]
   let completion: ActivitySwipeResult?
   let refreshCompletion: String?
@@ -12,7 +13,7 @@ struct ActivityListRepresentable: UIViewControllerRepresentable {
   let onHostedLayout: @MainActor (String, CGFloat) -> Void
 
   func makeUIViewController(context: Context) -> ActivityListController {
-    ActivityListController()
+    ActivityListController(plain: plain)
   }
 
   func updateUIViewController(_ controller: ActivityListController, context: Context) {

@@ -24,6 +24,7 @@ export default function FriendsStackLayout() {
           ...inlineLargeTitleOptions(theme.text),
         }}
       />
+      <Stack.Screen name="archived" options={{ title: "Archived Friends" }} />
       <Stack.Screen name="[id]" options={{ title: "" }} />
     </Stack>
   );
