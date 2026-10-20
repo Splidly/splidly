@@ -1,10 +1,4 @@
 import type { CurrencyCode, ExpenseIconKey, Money } from "@splidly/shared";
-import { Host, Icon } from "@expo/ui";
-import {
-  MenuView,
-  type MenuAction,
-  type MenuComponentRef,
-} from "@expo/ui/community/menu";
 import SegmentedControl from "@expo/ui/community/segmented-control";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
@@ -23,16 +17,11 @@ import { useTheme } from "../theme";
 import { Avatar } from "./ui";
 import { DateField } from "./date-field";
 import { ExpenseIcon, expenseIconLabel } from "./expense-icon";
+import { MemberSortButton } from "./member-sort-button";
+import type { MemberSort } from "./member-sort-button.types";
 
 export type StatisticsRange = "all" | "12-months" | "30-days" | "custom";
 export type StatisticsTimelineBucket = "day" | "week" | "month" | "year";
-type MemberSort = "share" | "paid" | "name";
-
-const memberSortIcon = Icon.select({
-  ios: "arrow.up.arrow.down",
-  android: import("@expo/material-symbols/sort.xml"),
-});
-
 export type StatisticsRangeSelection = {
   range: StatisticsRange;
   from?: Date;
@@ -1035,95 +1024,6 @@ const memberSortDescriptions: Record<MemberSort, string> = {
   name: "Sorted by name · share and paid amounts shown",
 };
 
-function MemberSortButton({
-  value,
-  onValueChange,
-}: {
-  value: MemberSort;
-  onValueChange: (value: MemberSort) => void;
-}) {
-  const theme = useTheme();
-  const menuRef = useRef<MenuComponentRef>(null);
-  const actions: MenuAction[] = [
-    { id: "share", title: "Share", state: value === "share" ? "on" : "off" },
-    { id: "paid", title: "Paid", state: value === "paid" ? "on" : "off" },
-    { id: "name", title: "Name", state: value === "name" ? "on" : "off" },
-  ];
-
-  const icon = (
-    <Host matchContents ignoreSafeArea="all" style={styles.sortIcon}>
-      <Icon
-        name={memberSortIcon}
-        size={17}
-        color={theme.primary}
-        accessibilityLabel="Sort"
-      />
-    </Host>
-  );
-  const buttonStyle = {
-    backgroundColor: theme.surface,
-    borderColor: theme.border,
-  };
-
-  const iosButton = (
-    <Pressable
-      testID="member-sort-button"
-      accessibilityRole="button"
-      accessibilityLabel={`Sort members, currently by ${value}`}
-      accessibilityHint="Opens sorting options"
-      hitSlop={8}
-      style={({ pressed }) => [
-        styles.sortButton,
-        buttonStyle,
-        { opacity: pressed ? 0.55 : 1 },
-      ]}
-    >
-      {icon}
-    </Pressable>
-  );
-
-  return (
-    <MenuView
-      ref={menuRef}
-      title="Sort members"
-      actions={actions}
-      testID="member-sort-menu"
-      style={
-        process.env.EXPO_OS === "android"
-          ? styles.sortMenuTouchTarget
-          : undefined
-      }
-      onPressAction={({ nativeEvent }) => {
-        const next = nativeEvent.event;
-        if (next === "share" || next === "paid" || next === "name") {
-          onValueChange(next);
-        }
-      }}
-    >
-      {process.env.EXPO_OS === "android" ? (
-        <View
-          testID="member-sort-button"
-          pointerEvents="none"
-          accessible
-          accessibilityRole="button"
-          accessibilityLabel={`Sort members, currently by ${value}`}
-          accessibilityHint="Opens sorting options"
-          accessibilityActions={[{ name: "activate" }]}
-          onAccessibilityAction={({ nativeEvent }) => {
-            if (nativeEvent.actionName === "activate") {
-              menuRef.current?.show();
-            }
-          }}
-          style={styles.sortMenuTouchTarget}
-        >
-          <View style={[styles.sortButton, buttonStyle]}>{icon}</View>
-        </View>
-      ) : (
-        iosButton
-      )}
-    </MenuView>
-  );
-}
 
 export function GroupStatistics({
   data,
@@ -1305,21 +1205,6 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   sectionSubtitle: { fontSize: 13, lineHeight: 17 },
-  sortButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sortMenuTouchTarget: {
-    width: 44,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sortIcon: { width: 17, height: 17 },
   card: {
     borderRadius: 20,
     borderCurve: "continuous",

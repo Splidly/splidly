@@ -335,17 +335,9 @@ describe("group statistics", () => {
     ).toBeTruthy();
     const memberSortMenu = view.getByTestId("member-sort-menu");
     const memberSortButton = view.getByTestId("member-sort-button");
-    expect(StyleSheet.flatten(memberSortButton.props.style)).toMatchObject({
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-    });
+    expect(memberSortButton.props.systemImage).toBe("arrow.up.arrow.down");
     expect(view.queryByText("Sort")).toBeNull();
-    expect(memberSortMenu.props.actions).toEqual([
-      { id: "share", title: "Share", state: "on" },
-      { id: "paid", title: "Paid", state: "off" },
-      { id: "name", title: "Name", state: "off" },
-    ]);
+    expect(memberSortMenu.props.selection).toBe("share");
     expect(view.getByText("Uncategorized")).toBeTruthy();
     expect(
       StyleSheet.flatten(
@@ -385,8 +377,8 @@ describe("group statistics", () => {
       "Show expenses where you paid",
     ]);
 
-    await fireEvent(memberSortMenu, "pressAction", {
-      nativeEvent: { event: "paid" },
+    await fireEvent(memberSortMenu, "selectionChange", {
+      nativeEvent: { selection: "paid" },
     });
     expect(
       view.getByText("Ranked by paid amount · shares shown for context"),
@@ -401,8 +393,8 @@ describe("group statistics", () => {
       "Show expenses where Alex had a share",
       "Show expenses where Alex paid",
     ]);
-    await fireEvent(view.getByTestId("member-sort-menu"), "pressAction", {
-      nativeEvent: { event: "share" },
+    await fireEvent(view.getByTestId("member-sort-menu"), "selectionChange", {
+      nativeEvent: { selection: "share" },
     });
 
     expect(view.getByText("Paid 40.00 € less")).toBeTruthy();
