@@ -117,7 +117,9 @@ describe("native iOS activity list", () => {
     expect(outerHost).toHaveLength(1);
     expect(outerHost[0]!.props.ignoreSafeArea).toBeUndefined();
     const embeddedHosts = view.container.queryAll(
-      (node) => node.props.matchContentsVertical === true,
+      (node) =>
+        node.props.matchContentsVertical === true &&
+        node.props.expoInternalSizeFromChildren !== true,
     );
     expect(embeddedHosts).toHaveLength(4);
     for (const host of embeddedHosts) {
