@@ -1,26 +1,24 @@
-diff --git a/ios/RNSBarButtonItem.mm b/ios/RNSBarButtonItem.mm
-index 0eb1f09dee82edd99e3e614938233db5cdeaebfe..57fb3e27191798ddacd906376ba33c9100fee8c1 100644
 --- a/ios/RNSBarButtonItem.mm
 +++ b/ios/RNSBarButtonItem.mm
-@@ -315,6 +315,5 @@ - (void)setTitleStyleFromConfig:(NSDictionary *)titleStyle
+@@ -337,7 +337,6 @@
    [self setTitleTextAttributes:attrs forState:UIControlStateNormal];
    [self setTitleTextAttributes:attrs forState:UIControlStateHighlighted];
    [self setTitleTextAttributes:attrs forState:UIControlStateDisabled];
 -  [self setTitleTextAttributes:attrs forState:UIControlStateSelected];
    [self setTitleTextAttributes:attrs forState:UIControlStateFocused];
  }
-diff --git a/ios/RNSScreenStackHeaderConfig.mm b/ios/RNSScreenStackHeaderConfig.mm
-index 1c844846a5c66e31cfa530ca462774d2fb6bbea1..964243f9daa6ae739003744d93a793eda81d7ec2 100644
+ 
 --- a/ios/RNSScreenStackHeaderConfig.mm
 +++ b/ios/RNSScreenStackHeaderConfig.mm
-@@ -273,6 +273,5 @@ + (void)setTitleAttibutes:(NSDictionary *)attrs forButton:(UIBarButtonItem *)but
+@@ -296,7 +296,6 @@
    [button setTitleTextAttributes:attrs forState:UIControlStateNormal];
    [button setTitleTextAttributes:attrs forState:UIControlStateHighlighted];
    [button setTitleTextAttributes:attrs forState:UIControlStateDisabled];
 -  [button setTitleTextAttributes:attrs forState:UIControlStateSelected];
    [button setTitleTextAttributes:attrs forState:UIControlStateFocused];
  }
-@@ -518,11 +517,22 @@ + (void)updateViewController:(UIViewController *)vc
+ 
+@@ -625,11 +624,22 @@
  #if !TARGET_OS_TV
    [config configureBackItem:prevItem withPrevVC:prevVC];
  
@@ -43,22 +41,20 @@ index 1c844846a5c66e31cfa530ca462774d2fb6bbea1..964243f9daa6ae739003744d93a793ed
 +    navitem.largeTitleDisplayMode = config.largeTitle ? UINavigationItemLargeTitleDisplayModeAlways
 +                                                      : UINavigationItemLargeTitleDisplayModeNever;
 +  }
- #endif
  
-   UINavigationBarAppearance *appearance = [self buildAppearance:vc withConfig:config];
-diff --git a/ios/RNSScreenStack.mm b/ios/RNSScreenStack.mm
+ #if RNS_IPHONE_OS_VERSION_AVAILABLE(27_0)
+   if (@available(iOS 27.0, *)) {
 --- a/ios/RNSScreenStack.mm
 +++ b/ios/RNSScreenStack.mm
-@@ -174,6 +174,7 @@ @implementation RNSScreenStackView {
+@@ -260,6 +260,7 @@
    BOOL _isFullWidthSwipingWithPanGesture; // used only for content swipe with RNSPanGestureRecognizer
    RNSPercentDrivenInteractiveTransition *_interactionController;
    __weak RNSScreenStackManager *_manager;
 +  __weak id<UIGestureRecognizerDelegate> _nativeContentPopGestureDelegate;
    BOOL _updateScheduled;
  }
--
-+
-@@ -321,7 +322,13 @@ - (void)reactAddControllerToClosestParent:(UIViewController *)controller
+ 
+@@ -409,7 +410,13 @@
          _controller.interactivePopGestureRecognizer.delegate = self;
  #if RNS_IPHONE_OS_VERSION_AVAILABLE(26_0)
          if (@available(iOS 26, *)) {
@@ -73,11 +69,10 @@ diff --git a/ios/RNSScreenStack.mm b/ios/RNSScreenStack.mm
          }
  #endif // Check for iOS >= 26.0
  #endif
-@@ -848,6 +855,12 @@ - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer
+@@ -936,6 +943,12 @@
      }
  #endif // check for iOS >= 26
--
-+
+ 
 +    id<UIGestureRecognizerDelegate> nativeDelegate = [self nativeContentPopDelegateForGestureRecognizer:gestureRecognizer];
 +    if ([nativeDelegate respondsToSelector:@selector(gestureRecognizerShouldBegin:)] &&
 +        ![nativeDelegate gestureRecognizerShouldBegin:gestureRecognizer]) {
@@ -87,12 +82,10 @@ diff --git a/ios/RNSScreenStack.mm b/ios/RNSScreenStack.mm
      // _UIParallaxTransitionPanGestureRecognizer (other...)
      [self cancelTouchesInParent];
      return YES;
-@@ -1054,6 +1067,27 @@ - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event
--
-+
+@@ -1142,6 +1155,27 @@
+ 
  #if !TARGET_OS_TV && !TARGET_OS_VISION
--
-+
+ 
 +// Forward system arbitration only for iOS 26's native content backswipe.
 +// Custom transitions and the edge recognizer retain the existing Screens policy.
 +- (id<UIGestureRecognizerDelegate>)nativeContentPopDelegateForGestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
@@ -117,10 +110,11 @@ diff --git a/ios/RNSScreenStack.mm b/ios/RNSScreenStack.mm
  - (BOOL)isScrollViewPanGestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
  {
    // NOTE: This hack is required to restore native behavior of edge swipe (interactive pop gesture)
-@@ -1066,6 +1100,25 @@ - (BOOL)isScrollViewPanGestureRecognizer:(UIGestureRecognizer *)gestureRecognize
+@@ -1152,6 +1186,25 @@
+   }
+   UIScrollView *scrollView = (UIScrollView *)gestureRecognizer.view;
    return scrollView.panGestureRecognizer == gestureRecognizer;
- }
--
++}
 +
 +// A native list has a separate pan recognizer for its row swipe actions.
 +// Navigation must wait for that recognizer, including the gesture that closes
@@ -139,14 +133,11 @@ diff --git a/ios/RNSScreenStack.mm b/ios/RNSScreenStack.mm
 +    }
 +  }
 +  return NO;
-+}
-+
+ }
+ 
  // Check if ScrollView has horizontal scrolling.
- // This is the same logic as in RCTScrollView:
- // https://github.com/facebook/react-native/blob/69b131c2b1627f64f34a534dac4cf48a542e6ea6/packages/react-native/React/Views/ScrollView/RCTScrollView.m#L557
-@@ -1131,17 +1184,33 @@ - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceive
--
-+
+@@ -1219,17 +1272,33 @@
+ 
  - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceivePress:(UIPress *)press;
  {
 +  id<UIGestureRecognizerDelegate> nativeDelegate = [self nativeContentPopDelegateForGestureRecognizer:gestureRecognizer];
@@ -156,8 +147,7 @@ diff --git a/ios/RNSScreenStack.mm b/ios/RNSScreenStack.mm
 +  }
    return [self gestureRecognizer:gestureRecognizer shouldReceivePressOrTouchEvent:press];
  }
--
-+
+ 
  - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch;
  {
 +  id<UIGestureRecognizerDelegate> nativeDelegate = [self nativeContentPopDelegateForGestureRecognizer:gestureRecognizer];
@@ -167,8 +157,7 @@ diff --git a/ios/RNSScreenStack.mm b/ios/RNSScreenStack.mm
 +  }
    return [self gestureRecognizer:gestureRecognizer shouldReceivePressOrTouchEvent:touch];
  }
--
-+
+ 
  - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
      shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer
  {
@@ -181,7 +170,7 @@ diff --git a/ios/RNSScreenStack.mm b/ios/RNSScreenStack.mm
    if ([gestureRecognizer isKindOfClass:[RNSPanGestureRecognizer class]] &&
        [self isScrollViewPanGestureRecognizer:otherGestureRecognizer]) {
      RNSPanGestureRecognizer *panGestureRecognizer = (RNSPanGestureRecognizer *)gestureRecognizer;
-@@ -1163,6 +1232,22 @@ - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
+@@ -1251,6 +1320,22 @@
  - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
      shouldRequireFailureOfGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer
  {
@@ -204,7 +193,7 @@ diff --git a/ios/RNSScreenStack.mm b/ios/RNSScreenStack.mm
    if (@available(iOS 26, *)) {
      if (gestureRecognizer == _controller.interactiveContentPopGestureRecognizer &&
          [self isScrollViewPanGestureRecognizer:otherGestureRecognizer]) {
-@@ -1180,6 +1265,24 @@ - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
+@@ -1268,6 +1353,24 @@
  - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
      shouldBeRequiredToFailByGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer
  {

@@ -1,3 +1,4 @@
+import type { TextInputInstance } from "react-native";
 import { Children, useRef, type ReactNode } from "react";
 import {
   Pressable,
@@ -167,11 +168,11 @@ export function InlineAmountInput({
   placeholder?: string;
   keyboardType?: "decimal-pad" | "number-pad";
   width?: number;
-  onFocus?: (input: TextInput | null) => void;
-  onBlur?: (input: TextInput | null) => void;
+  onFocus?: (input: TextInputInstance | null) => void;
+  onBlur?: (input: TextInputInstance | null) => void;
 }) {
   const theme = useTheme();
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
   const digitCount = value.replace(/\D/g, "").length;
   const fontSize = digitCount > 9 ? 13 : digitCount > 6 ? 14 : 15;
   return (
@@ -282,8 +283,8 @@ export function AllocationRow({
   keyboardType?: "decimal-pad" | "number-pad";
   placeholder?: string;
   selectionLabel?: string;
-  onAmountFocus?: (input: TextInput | null) => void;
-  onAmountBlur?: (input: TextInput | null) => void;
+  onAmountFocus?: (input: TextInputInstance | null) => void;
+  onAmountBlur?: (input: TextInputInstance | null) => void;
 }) {
   const theme = useTheme();
   return (

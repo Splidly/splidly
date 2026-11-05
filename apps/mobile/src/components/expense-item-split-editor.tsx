@@ -1,3 +1,4 @@
+import type { ScrollViewInstance } from "react-native";
 import {
   allocateByWeights,
   parseDecimalToMinor,
@@ -65,7 +66,7 @@ export function ExpenseItemSplitEditor() {
   const [draft, setDraft] = useState<ExpenseSplitItemDraft | undefined>(
     request?.item,
   );
-  const screenRef = useRef<ScrollView>(null);
+  const screenRef = useRef<ScrollViewInstance>(null);
   const { keyboardClearance, focusInput, blurInput, onScroll } =
     useKeyboardFocusScroll(screenRef, 104);
 

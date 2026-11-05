@@ -1,3 +1,4 @@
+import type { ScrollViewInstance, TextInputInstance } from "react-native";
 import {
   convertMinor,
   detectExpenseIconKey,
@@ -228,8 +229,8 @@ export function ExpenseEditor({
   const [formError, setFormError] = useState<string>();
   const initialized = useRef<string | undefined>(undefined);
   const rateRequest = useRef(0);
-  const screenRef = useRef<ScrollView>(null);
-  const notesInputRef = useRef<TextInput>(null);
+  const screenRef = useRef<ScrollViewInstance>(null);
+  const notesInputRef = useRef<TextInputInstance>(null);
   const {
     keyboardClearance,
     focusInput: focusBottomInput,

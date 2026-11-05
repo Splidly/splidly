@@ -41,7 +41,7 @@ export function NativeActivityList({
           >
             {footer}
           </View>
-        ) : null
+        ) : undefined
       }
       renderSectionHeader={({ section }) => plain && !section.label ? null : (
         <View testID={`activity-date-${section.key}`}>

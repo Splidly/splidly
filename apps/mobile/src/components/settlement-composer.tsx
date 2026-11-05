@@ -1,3 +1,4 @@
+import type { TextInputInstance } from "react-native";
 import type { CurrencyCode } from "@splidly/shared";
 import {
   MenuView,
@@ -239,11 +240,11 @@ export function SettlementAmountCard({
   onAmountBlur?: () => void;
   onCurrencyPress: () => void;
   metadata?: ReactNode;
-  onAmountFocus?: (input: TextInput | null) => void;
-  onAmountBlurInput?: (input: TextInput | null) => void;
+  onAmountFocus?: (input: TextInputInstance | null) => void;
+  onAmountBlurInput?: (input: TextInputInstance | null) => void;
 }) {
   const theme = useTheme();
-  const amountInputRef = useRef<TextInput>(null);
+  const amountInputRef = useRef<TextInputInstance>(null);
   return (
     <View
       style={{

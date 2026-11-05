@@ -1,3 +1,4 @@
+import type { ScrollViewInstance, TextInputInstance } from "react-native";
 import type { CurrencyCode, Money } from "@splidly/shared";
 import { Image } from "expo-image";
 import { HeaderHeightContext } from "expo-router/build/react-navigation/elements/Header/HeaderHeightContext";
@@ -157,10 +158,10 @@ function useKeyboardBottomClearance() {
 }
 
 export function useKeyboardFocusScroll(
-  scrollViewRef: RefObject<ScrollView | null>,
+  scrollViewRef: RefObject<ScrollViewInstance | null>,
   additionalOffset = spacing.md,
 ) {
-  const focusedInputRef = useRef<TextInput | null>(null);
+  const focusedInputRef = useRef<TextInputInstance | null>(null);
   const scrollYRef = useRef(0);
   const keyboardTopRef = useRef<number | null>(null);
   const [keyboardClearance, setKeyboardClearance] = useState(0);
@@ -221,7 +222,7 @@ export function useKeyboardFocusScroll(
   }, [revealFocusedInput]);
 
   const focusInput = useCallback(
-    (input: TextInput | null) => {
+    (input: TextInputInstance | null) => {
       focusedInputRef.current = input;
       const metrics = Keyboard.metrics();
       if (metrics?.height) {
@@ -233,7 +234,7 @@ export function useKeyboardFocusScroll(
     [revealFocusedInput],
   );
 
-  const blurInput = useCallback((input: TextInput | null) => {
+  const blurInput = useCallback((input: TextInputInstance | null) => {
     if (focusedInputRef.current === input) focusedInputRef.current = null;
   }, []);
 
@@ -272,7 +273,7 @@ export function Screen({
   accountForTopInset?: boolean;
   underlapsHeader?: boolean;
   contentContainerStyle?: ScrollViewProps["contentContainerStyle"];
-  scrollViewRef?: RefObject<ScrollView | null>;
+  scrollViewRef?: RefObject<ScrollViewInstance | null>;
   transientBottomClearance?: number;
   bottomOverlay?: ReactNode;
   bottomOverlayHeight?: number;
@@ -380,7 +381,7 @@ export function Screen({
         showsVerticalScrollIndicator={false}
         refreshControl={
           onRefresh ? (
-            <RefreshControl refreshing={refreshing ?? false} onRefresh={onRefresh} />
+            <RefreshControl refreshing={refreshing ?? false} onRefresh={async () => { await onRefresh(); }} />
           ) : undefined
         }
         onScroll={onScroll}
@@ -459,7 +460,7 @@ export function CollectionScreen({
       showsVerticalScrollIndicator={false}
       refreshControl={
         onRefresh ? (
-          <RefreshControl refreshing={refreshing ?? false} onRefresh={onRefresh} />
+          <RefreshControl refreshing={refreshing ?? false} onRefresh={async () => { await onRefresh(); }} />
         ) : undefined
       }
       onLayout={onLayout}

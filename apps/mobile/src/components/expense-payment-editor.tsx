@@ -1,3 +1,4 @@
+import type { ScrollViewInstance } from "react-native";
 import { router, Stack } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
@@ -36,7 +37,7 @@ export function ExpensePaymentEditor() {
   const [draft, setDraft] = useState<ExpensePaymentDraft | undefined>(
     request?.draft,
   );
-  const screenRef = useRef<ScrollView>(null);
+  const screenRef = useRef<ScrollViewInstance>(null);
   const { keyboardClearance, focusInput, blurInput, onScroll } =
     useKeyboardFocusScroll(screenRef, 104);
 

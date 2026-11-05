@@ -4,14 +4,12 @@
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
-    "baseUrl": ".",
-    "ignoreDeprecations": "6.0",
     "types": [
       "jest"
     ],
     "paths": {
       "@/*": [
-        "src/*"
+        "./src/*"
       ]
     }
   },

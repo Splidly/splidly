@@ -1,3 +1,4 @@
+import type { ScrollViewInstance, TextInputInstance } from "react-native";
 import { allocateByWeights, formatMinor } from "@splidly/shared";
 import {
   MenuView,
@@ -59,8 +60,8 @@ export function ExpenseSplitEditor() {
     request?.draft,
   );
   const [methodWidth, setMethodWidth] = useState(0);
-  const screenRef = useRef<ScrollView>(null);
-  const itemInputRefs = useRef(new Map<string, TextInput>());
+  const screenRef = useRef<ScrollViewInstance>(null);
+  const itemInputRefs = useRef(new Map<string, TextInputInstance>());
   const {
     keyboardClearance,
     focusInput,

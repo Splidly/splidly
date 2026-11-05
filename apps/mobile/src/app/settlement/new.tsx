@@ -1,3 +1,4 @@
+import type { ScrollViewInstance, TextInputInstance } from "react-native";
 import {
   convertMinor,
   formatMinor,
@@ -84,8 +85,8 @@ export default function NewSettlementScreen() {
   const requestQuote = quote.mutateAsync;
   const quoteRequest = useRef(0);
   const initializedSettlement = useRef<string | undefined>(undefined);
-  const screenRef = useRef<ScrollView>(null);
-  const notesInputRef = useRef<TextInput>(null);
+  const screenRef = useRef<ScrollViewInstance>(null);
+  const notesInputRef = useRef<TextInputInstance>(null);
   const {
     keyboardClearance,
     focusInput: focusBottomInput,

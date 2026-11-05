@@ -1,3 +1,4 @@
+import type { ScrollViewInstance } from "react-native";
 import type { CurrencyCode, ExpenseIconKey, Money } from "@splidly/shared";
 import SegmentedControl from "@expo/ui/community/segmented-control";
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -523,7 +524,7 @@ function TimelineChart({
 }) {
   const theme = useTheme();
   const { width } = useWindowDimensions();
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<ScrollViewInstance>(null);
   const scrolledTimelineKey = useRef<string | undefined>(undefined);
   const completedData = useMemo(() => completeTimeline(data), [data]);
   const chartData = useMemo(() => {

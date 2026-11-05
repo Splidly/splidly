@@ -1,3 +1,5 @@
+import type { ScrollViewInstance } from "react-native";
+import type { TextInputInstance } from "react-native";
 import { useState } from "react";
 import { act, fireEvent, render } from "@testing-library/react-native";
 import { HeaderHeightContext } from "expo-router/build/react-navigation/elements/Header/HeaderHeightContext";
@@ -27,14 +29,14 @@ describe("useKeyboardFocusScroll", () => {
     const input = {
       measureInWindow: (callback: (x: number, y: number, width: number, height: number) => void) =>
         callback(0, inputY.current, 100, 34),
-    } as unknown as TextInput;
+    } as unknown as TextInputInstance;
     const scrollView = {
       getNativeScrollRef: () => ({
         measureInWindow: (callback: (x: number, y: number, width: number, height: number) => void) =>
           callback(0, 0, 400, 700),
       }),
       scrollTo,
-    } as unknown as ScrollView;
+    } as unknown as ScrollViewInstance;
     const scrollRef = { current: scrollView };
     let controls!: ReturnType<typeof useKeyboardFocusScroll>;
     function Probe() {
