@@ -1,5 +1,5 @@
-FROM node:26.12.1-alpine3.24 AS build
-RUN npm install --global pnpm@11.17.0
+FROM node:26.13.0-alpine3.24 AS build
+RUN npm install --global pnpm@12.16.1
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
@@ -23,7 +23,7 @@ FROM build AS production-dependencies
 WORKDIR /app
 RUN pnpm --filter @splidly/server deploy --prod --legacy /prod/server
 
-FROM node:26.12.1-alpine3.24 AS runtime
+FROM node:26.13.0-alpine3.24 AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=production-dependencies --chown=node:node /prod/server ./apps/server

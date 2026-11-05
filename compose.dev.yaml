@@ -2,7 +2,7 @@ name: splidly-dev
 
 services:
   postgres:
-    image: postgres:17.10-alpine3.24
+    image: postgres:17.11-alpine3.24
     ports:
       - "${POSTGRES_PORT:-5433}:5432"
     environment:
@@ -18,7 +18,7 @@ services:
       retries: 20
 
   frankfurter:
-    image: lineofflight/frankfurter:2.3.5
+    image: lineofflight/frankfurter:2.6.1
     ports:
       - "8080:8080"
     environment:
@@ -30,7 +30,7 @@ services:
         condition: service_completed_successfully
 
   frankfurter-data-init:
-    image: lineofflight/frankfurter:2.3.5
+    image: lineofflight/frankfurter:2.6.1
     user: root
     command: ["sh", "-c", "chown -R frankfurter:frankfurter /data"]
     restart: "no"

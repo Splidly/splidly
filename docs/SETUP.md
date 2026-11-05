@@ -9,7 +9,7 @@ Requirements: Node 24, pnpm 11, Docker, Xcode for physical iOS builds, and the
 Android Studio/SDK for Android builds.
 
 ```sh
-npm install --global pnpm@11.17.0
+npm install --global pnpm@12.16.1
 pnpm install
 cp .env.example .env
 docker compose -f compose.dev.yaml up -d

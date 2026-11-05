@@ -1,5 +1,7 @@
 # Agent Instructions
 
+When updating dependencies, also check and update Docker base and service images, the pinned package manager, CI runtimes and actions, and matching documentation references, while keeping Expo-managed packages on its supported version matrix.
+
 ## Do not create change-explanation Markdown files
 
 Do not create `.md` files to explain or summarize your changes, document

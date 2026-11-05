@@ -111,7 +111,7 @@ services:
     networks: [backend]
 
   postgres:
-    image: postgres:17.10-alpine3.24
+    image: postgres:17.11-alpine3.24
     restart: unless-stopped
     stop_grace_period: 60s
     pids_limit: 200
@@ -136,7 +136,7 @@ services:
     networks: [backend]
 
   frankfurter:
-    image: lineofflight/frankfurter:2.3.5
+    image: lineofflight/frankfurter:2.6.1
     restart: unless-stopped
     init: true
     read_only: true
@@ -157,7 +157,7 @@ services:
     networks: [backend, egress]
 
   frankfurter-data-init:
-    image: lineofflight/frankfurter:2.3.5
+    image: lineofflight/frankfurter:2.6.1
     user: root
     command: ["sh", "-c", "chown -R frankfurter:frankfurter /data"]
     restart: "no"
