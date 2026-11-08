@@ -5,11 +5,11 @@ repository-root `.env` is the single environment file for the entire workspace.
 
 ## Local development
 
-Requirements: Node 24, pnpm 11, Docker, Xcode for physical iOS builds, and the
+Requirements: Node 24, pnpm 12, Docker, Xcode for physical iOS builds, and the
 Android Studio/SDK for Android builds.
 
 ```sh
-npm install --global pnpm@12.16.1
+npm install --global pnpm@12.18.0
 pnpm install
 cp .env.example .env
 docker compose -f compose.dev.yaml up -d
@@ -22,6 +22,10 @@ Do not create `apps/mobile/.env.local`. The server, Expo app, and Metro all load
 the root `.env`; only `EXPO_PUBLIC_` values are embedded in the mobile bundle.
 Development PostgreSQL uses host port `5433` by default. Override
 `POSTGRES_PORT` and update `DATABASE_URL` if required.
+
+Run `pnpm security:check` after installation to exercise the installed security
+backports in the Expo/Jest dependency chain. These backports keep compatible
+package versions, so the registry's version-only audit still reports them.
 
 Expo Go is not supported because authentication and linking use native modules.
 Use signed development builds on physical devices; do not use an iOS Simulator.

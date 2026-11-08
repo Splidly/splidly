@@ -1,5 +1,5 @@
 FROM node:26.13.0-alpine3.24 AS build
-RUN npm install --global pnpm@12.16.1
+RUN npm install --global pnpm@12.18.0
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
