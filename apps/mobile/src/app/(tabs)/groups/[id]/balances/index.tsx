@@ -1,26 +1,23 @@
-import { Stack, router, useLocalSearchParams } from "expo-router";
+import { useColorScheme } from "react-native";
 import { useState } from "react";
-import { View } from "react-native";
-import {
-  GroupBalanceMemberRow,
-  MemberRelationships,
-} from "../../../../../components/group-balances";
+import { Stack, router, useLocalSearchParams } from "expo-router";
+import { memberBalanceRows } from "../../../../../components/member-balance-list";
+import { useNavigationPressGuard } from "../../../../../lib/use-navigation-press-guard";
 import {
   ErrorState,
   HeaderButton,
   LoadingState,
-  RowDivider,
   Screen,
-  Section,
+  SectionFooter,
 } from "../../../../../components/ui";
 import { api } from "../../../../../lib/trpc";
 import { toolbarIcons } from "../../../../../lib/toolbar-icons";
 
 export default function GroupBalancesScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [expandedUserIds, setExpandedUserIds] = useState<ReadonlySet<string>>(
-    () => new Set(),
-  );
+  const acceptNavigation = useNavigationPressGuard();
+  const scheme = useColorScheme() === "dark" ? "dark" : "light";
+  const [expandedUserIds, setExpandedUserIds] = useState<ReadonlySet<string>>(() => new Set());
   const balances = api.groups.balances.useQuery({ groupId: id });
 
   if (balances.isPending) {
@@ -47,53 +44,36 @@ export default function GroupBalancesScreen() {
       sensitivity: "base",
     });
   });
-  const viewerUserId =
-    members.find((member) => member.isViewer)?.userId ?? "";
-  const openSettleUp = () =>
-    router.push({
+  const openSettleUp = () => {
+    if (acceptNavigation()) router.push({
       pathname: "/settlement/group",
       params: { id, returnTo: "balances" },
     });
+  };
+  const viewerUserId = members.find(member => member.isViewer)?.userId ?? "";
+  const toggleMember = (userId: string) => setExpandedUserIds(current => {
+    const next = new Set(current);
+    if (next.has(userId)) next.delete(userId); else next.add(userId);
+    return next;
+  });
+  const explanation = balances.data.group.simplifyDebts
+    ? "Balances use the group’s simplified repayment plan."
+    : "Balances preserve who owes whom in this group.";
 
   return (
     <>
       <Screen
         refreshing={balances.isRefetching}
         onRefresh={() => void balances.refetch()}
-      >
-        <Section
-          title={`${members.length} ${members.length === 1 ? "member" : "members"}`}
-          footer={
-            balances.data.group.simplifyDebts
-              ? "Balances use the group’s simplified repayment plan."
-              : "Balances preserve who owes whom in this group."
-          }
-        >
-          {members.map((member, index) => (
-            <View key={member.userId}>
-              {index > 0 ? <RowDivider /> : null}
-              <GroupBalanceMemberRow
-                member={member}
-                expanded={expandedUserIds.has(member.userId)}
-                onPress={() =>
-                  setExpandedUserIds((current) => {
-                    const next = new Set(current);
-                    if (next.has(member.userId)) next.delete(member.userId);
-                    else next.add(member.userId);
-                    return next;
-                  })
-                }
-              />
-              {expandedUserIds.has(member.userId) ? (
-                <MemberRelationships
-                  member={member}
-                  viewerUserId={viewerUserId}
-                />
-              ) : null}
-            </View>
-          ))}
-        </Section>
-      </Screen>
+        activityList={{ sections: [{
+          key: "members",
+          label: `${members.length} ${members.length === 1 ? "member" : "members"}`,
+          nativeHeader: true,
+          nativeFooter: explanation,
+          ...(process.env.EXPO_OS !== "ios" ? { footer: <SectionFooter>{explanation}</SectionFooter> } : {}),
+          data: members.flatMap(member => memberBalanceRows(member, () => toggleMember(member.userId), viewerUserId, expandedUserIds.has(member.userId), scheme)),
+        }] }}
+      />
       <Stack.Screen
         options={{
           title: "Group Balances",

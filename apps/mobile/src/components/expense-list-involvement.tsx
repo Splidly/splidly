@@ -1,5 +1,5 @@
 import type { CurrencyCode, Money } from "@splidly/shared";
-import { Text, View } from "react-native";
+import { Text, View, type ColorValue } from "react-native";
 import { formatMoney } from "../lib/money-display";
 import { useTheme } from "../theme";
 
@@ -50,8 +50,17 @@ export function ExpenseListInvolvement({
 }) {
   const theme = useTheme();
   const { label, color } = expenseInvolvementPresentation(kind, theme);
+  return <ExpenseBalanceStatus label={label} color={color} amount={kind === "none" ? null : amount} constrained />;
+}
+
+export function ExpenseBalanceStatus({ label, color, amount, constrained = false }: {
+  label: string;
+  color: ColorValue;
+  amount: Money | null;
+  constrained?: boolean;
+}) {
   return (
-    <View style={{ maxWidth: "38%", alignItems: "flex-end", gap: 1 }}>
+    <View style={[{ alignItems: "flex-end", gap: 1 }, constrained ? { maxWidth: "38%" } : null]}>
       <Text
         selectable={false}
         numberOfLines={1}
@@ -66,7 +75,7 @@ export function ExpenseListInvolvement({
       >
         {label}
       </Text>
-      {kind !== "none" ? (
+      {amount ? (
         <Text
           selectable={false}
           numberOfLines={1}

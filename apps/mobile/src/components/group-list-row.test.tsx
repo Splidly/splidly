@@ -1,11 +1,48 @@
 import { fireEvent, render } from "@testing-library/react-native";
-import { StyleSheet } from "react-native";
+import { Dimensions, StyleSheet } from "react-native";
 import {
   GroupListRow,
   GroupListSummary,
 } from "./group-list-row";
 
 describe("GroupListRow", () => {
+  beforeEach(() => {
+    jest.spyOn(Dimensions, "get").mockReturnValue({
+      width: 390, height: 844, scale: 3, fontScale: 1,
+    });
+  });
+  afterEach(() => jest.restoreAllMocks());
+
+  it.each([1, 1.8])("stacks totals in a narrow Android row at font scale %s", async (fontScale) => {
+    jest.spyOn(Dimensions, "get").mockReturnValue({
+      width: 390, height: 844, scale: 3, fontScale,
+    });
+    const onPress = jest.fn();
+    const view = await render(
+      <GroupListRow
+        id="narrow"
+        name="A very long group name for our next holiday together"
+        iconKey="trip"
+        balance={{ currency: "EUR", minor: "123456789" }}
+        memberBalances={[]}
+        onPress={onPress}
+        contained
+      />,
+    );
+    const row = view.getByTestId("activity-group-narrow");
+    await fireEvent(row, "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: fontScale > 1 ? 390 : 320, height: 120 } },
+    });
+    expect(StyleSheet.flatten(view.getByTestId("group-total-narrow").props.style)).toMatchObject({
+      alignItems: "flex-start", maxWidth: "100%",
+    });
+    expect(StyleSheet.flatten(view.getByTestId("group-total-narrow").props.style).position).toBeUndefined();
+    expect(view.getByText("A very long group name for our next holiday together").props.numberOfLines).toBeUndefined();
+    await fireEvent.press(row);
+    expect(onPress).toHaveBeenCalledTimes(1);
+    expect(view.container.queryAll((node) => node.props.selectable === true)).toHaveLength(0);
+  });
+
   it("shows a large group entry with both repayment directions", async () => {
     const onPress = jest.fn();
     const view = await render(

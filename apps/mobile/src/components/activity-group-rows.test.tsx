@@ -1,6 +1,14 @@
 import { fireEvent, render } from "@testing-library/react-native";
+import * as ReactNative from "react-native";
 import { ActivityGroupRow } from "./activity-group-row.ios";
-import { ActivityGroupMemberRow } from "./activity-group-member-row.ios";
+import { memberBalanceRow } from "./member-balance-list";
+
+beforeEach(() => {
+  jest.spyOn(ReactNative.Dimensions, "get").mockReturnValue({
+    width: 390, height: 844, scale: 3, fontScale: 1,
+  });
+});
+afterEach(() => jest.restoreAllMocks());
 
 jest.mock("react-native-reanimated", () => {
   const { View } = require("react-native");
@@ -108,45 +116,12 @@ it("keeps a zero-net group with open debts distinct from a settled group", async
   );
 });
 
-it("renders the viewer and expanded empty details without a nested native wrapper", async () => {
-  const onToggle = jest.fn();
-  const view = await render(
-    <ActivityGroupMemberRow
-      viewerUserId="me"
-      expanded
-      member={{
-        userId: "me",
-        displayName: "Sam",
-        avatarUrl: null,
-        isViewer: true,
-        owes: { currency: "EUR", minor: "0" },
-        lent: { currency: "EUR", minor: "0" },
-        relationships: [],
-      }}
-      onToggle={onToggle}
-    />,
-  );
-  const row = view.getByTestId("activity-member-me");
-  expect(row.queryAll((node) => node.props.text === "Sam (You)")).toHaveLength(
-    1,
-  );
-  expect(row.queryAll((node) => node.props.text === "Settled up")).toHaveLength(
-    1,
-  );
-  expect(
-    view.container.queryAll(
-      (node) => node.props.text === "No outstanding balances.",
-    ),
-  ).toHaveLength(1);
-  expect(
-    row.queryAll(
-      (node) =>
-        node.props.onPress !== undefined ||
-        node.props.matchContents !== undefined,
-    ),
-  ).toHaveLength(0);
-  await fireEvent(row, "buttonPress");
-  expect(onToggle).toHaveBeenCalledTimes(1);
+it("provides the member and its details for the native outline list", () => {
+  const row = memberBalanceRow({ userId: "me", displayName: "Sam", avatarUrl: null,
+    isViewer: true, owes: { currency: "EUR", minor: "0" }, lent: { currency: "EUR", minor: "0" }, relationships: [],
+  }, jest.fn());
+  expect(row.settings).toMatchObject({ title: "Sam (You)", value: "Settled up", avatar: true, showsDisclosure: false, disclosure: true, details: [{ title: "No outstanding balances.", value: "", tone: "muted" }] });
+  expect(row.content).toBeNull();
 });
 
 it("reserves measured total width only beside the heading and first balance line", async () => {
@@ -188,8 +163,55 @@ it("reserves measured total width only beside the heading and first balance line
   }
   expect(
     view.getByTestId("group-name-reference").props.modifiers,
-  ).toContainEqual(expect.objectContaining({ $type: "frame", height: 24 }));
+  ).toContainEqual(expect.objectContaining({ $type: "frame", minHeight: 24 }));
   expect(
     view.getByTestId("group-balance-positive-lin").props.modifiers,
-  ).toContainEqual(expect.objectContaining({ $type: "frame", height: 17 }));
+  ).toContainEqual(expect.objectContaining({ $type: "frame", minHeight: 17 }));
+  await fireEvent(total, "globalEvent", {
+    nativeEvent: { onGeometryChange: { x: 0, y: 0, width: 220, height: 34 } },
+  });
+  expect(trailingPadding("group-name-reference")).toBe(0);
+  await fireEvent(view.getByTestId("group-layout-reference"), "globalEvent", {
+    nativeEvent: { onGeometryChange: { x: 0, y: 0, width: 600, height: 80 } },
+  });
+  expect(trailingPadding("group-name-reference")).toBe(228);
+});
+
+it.each([1, 1.8])("gives names and balances their own space at narrow widths (font scale %s)", async (fontScale) => {
+  const dimensions = jest.spyOn(ReactNative.Dimensions, "get").mockReturnValue({
+    width: 390, height: 844, scale: 3, fontScale,
+  });
+  try {
+    const view = await render(
+      <ActivityGroupRow
+        id="narrow"
+        name="A very long group name for our next holiday together"
+        iconKey="trip"
+        balance={{ currency: "EUR", minor: "123456789" }}
+        memberBalances={[
+          { userId: "alex", displayName: "Alex", balance: { currency: "EUR", minor: "123456789" } },
+        ]}
+        onPress={jest.fn()}
+      />,
+    );
+    await fireEvent(view.getByTestId("group-layout-narrow"), "globalEvent", {
+      nativeEvent: { onGeometryChange: { x: 0, y: 0, width: fontScale > 1 ? 390 : 320, height: 80 } },
+    });
+    const name = view.getByTestId("group-name-narrow");
+    expect(name.props.modifiers).toContainEqual(
+      expect.objectContaining({ $type: "padding", trailing: 0 }),
+    );
+    expect(name.props.modifiers).toContainEqual(
+      expect.objectContaining({ $type: "font", size: 19 * fontScale }),
+    );
+    expect(name.props.modifiers.some((modifier: { $type: string }) => modifier.$type === "lineLimit")).toBe(false);
+    const total = view.getByTestId("group-total-narrow");
+    expect(total.props.alignment).toBe("leading");
+    expect(total.parent).toBe(name.parent);
+    expect(view.getByTestId("group-balance-positive-alex").props.modifiers).toContainEqual(
+      expect.objectContaining({ $type: "padding", trailing: 0 }),
+    );
+  } finally {
+    dimensions.mockRestore();
+  }
 });
