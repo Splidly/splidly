@@ -1,23 +1,16 @@
-import type {
-  CurrencyCode,
-  CustomImageDataUrl,
-} from "@splidly/shared";
+import type { CurrencyCode } from "@splidly/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Alert, Linking } from "react-native";
-import {
-  Avatar,
-  ErrorState,
-  Field,
-  FormSection,
-  ListRow,
-  RowDivider,
-  Screen,
-  Section,
-} from "../../../components/ui";
-import { CurrencyField } from "../../../components/currency-field";
-import { PictureEditor } from "../../../components/picture-editor";
+import * as Application from "expo-application";
+import { ErrorState, LoadingState, Screen } from "../../../components/ui";
+import { ProfileSettingsScreen } from "../../../components/profile-settings-screen";
+import { ProfileFooter, ProfileIdentity, ProfileSection, ProfileSettingRow } from "../../../components/profile-settings";
+import { beginCurrencySelection } from "../../../lib/currency-selection";
+import { getCurrency } from "../../../lib/currencies";
+import { useNavigationPressGuard } from "../../../lib/use-navigation-press-guard";
+import { usePushOnce } from "../../../lib/use-push-once";
 import { authClient } from "../../../lib/auth-client";
 import { useConnectivity } from "../../../lib/connectivity";
 import { APP_URL } from "../../../lib/env";
@@ -32,54 +25,22 @@ import {
 } from "../../../lib/push-installation";
 import { api } from "../../../lib/trpc";
 
-type SavedProfile = {
-  displayName: string;
-  homeCurrency: CurrencyCode;
-  avatarUrl: string | null;
-};
-
 const RECENT_SIGN_IN_ERROR = "Sign in again before deleting your account";
 
 export default function ProfileScreen() {
-  const profile = api.profile.me.useQuery();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const profile = api.profile.me.useQuery(undefined, { enabled: !isSigningOut });
   const { isOnline } = useConnectivity();
   const utils = api.useUtils();
   const queryClient = useQueryClient();
-  const [name, setName] = useState("");
-  const [currency, setCurrency] = useState<CurrencyCode>("EUR");
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const push = usePushOnce();
+  const acceptCurrencyPress = useNavigationPressGuard();
   const [accountError, setAccountError] = useState<string>();
-  const initializedUser = useRef<string | undefined>(undefined);
-  const saved = useRef<SavedProfile | undefined>(undefined);
-  const lastAttempted = useRef<string | undefined>(undefined);
-
-  useEffect(() => {
-    if (isOnline) lastAttempted.current = undefined;
-  }, [isOnline]);
-
-  useEffect(() => {
-    if (!profile.data || initializedUser.current === profile.data.userId) return;
-    const initial = {
-      displayName: profile.data.displayName,
-      homeCurrency: profile.data.homeCurrency as CurrencyCode,
-      avatarUrl: profile.data.avatarUrl ?? null,
-    };
-    initializedUser.current = profile.data.userId;
-    saved.current = initial;
-    setName(initial.displayName);
-    setCurrency(initial.homeCurrency);
-    setAvatarUrl(initial.avatarUrl);
-  }, [profile.data]);
+  const signingOut = useRef(false);
 
   const update = api.profile.update.useMutation({
     async onSuccess(updated) {
       if (!updated) return;
-      saved.current = {
-        displayName: updated.displayName,
-        homeCurrency: updated.homeCurrency as CurrencyCode,
-        avatarUrl: updated.avatarUrl,
-      };
-      lastAttempted.current = undefined;
       utils.profile.me.setData(undefined, updated);
       await Promise.all([
         utils.friends.list.invalidate(),
@@ -88,32 +49,15 @@ export default function ProfileScreen() {
     },
   });
 
-  useEffect(() => {
-    if (!initializedUser.current || update.isPending || !isOnline) return;
-    const displayName = name.trim();
-    const current = saved.current;
-    const draftKey = `${displayName}\u0000${currency}\u0000${avatarUrl ?? ""}`;
-    if (
-      displayName.length === 0 ||
-      lastAttempted.current === draftKey ||
-      (current?.displayName === displayName &&
-        current.homeCurrency === currency &&
-        current.avatarUrl === avatarUrl)
-    ) {
-      return;
-    }
-    const timer = setTimeout(() => {
-      lastAttempted.current = draftKey;
-      update.mutate({
-        displayName,
-        homeCurrency: currency,
-        ...(current?.avatarUrl !== avatarUrl
-          ? { avatarUrl: avatarUrl as CustomImageDataUrl | null }
-          : {}),
-      });
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [avatarUrl, currency, isOnline, name, update.isPending]);
+  function chooseCurrency() {
+    const current = profile.data;
+    if (!current || update.isPending || !isOnline || !acceptCurrencyPress()) return;
+    beginCurrencySelection(current.homeCurrency as CurrencyCode, (homeCurrency) => {
+      if (homeCurrency === current.homeCurrency) return;
+      update.mutate({ displayName: current.displayName, homeCurrency });
+    });
+    push("/currency-picker");
+  }
 
   const remove = api.profile.deleteAccount.useMutation({
     async onSuccess(result) {
@@ -157,6 +101,9 @@ export default function ProfileScreen() {
   const unregisterPush = api.push.unregister.useMutation();
 
   async function signOut() {
+    if (signingOut.current) return;
+    signingOut.current = true;
+    setIsSigningOut(true);
     setAccountError(undefined);
     try {
       const installationId = await getExistingPushInstallationId();
@@ -168,12 +115,18 @@ export default function ProfileScreen() {
       await unregisterNativePushNotifications().catch(() => {
         // Native token cleanup is best effort and must not strand the account.
       });
+      // Cancel protected reads before revoking the cookie. Keep the profile
+      // query disabled until this route unmounts after a successful logout.
+      await queryClient.cancelQueries();
       const result = await authClient.signOut();
       if (result.error) throw new Error(result.error.message);
       queryClient.clear();
       router.replace("/sign-in");
     } catch (cause) {
       setAccountError(friendlyErrorMessage(cause, "Could not sign out"));
+      setIsSigningOut(false);
+    } finally {
+      signingOut.current = false;
     }
   }
 
@@ -192,96 +145,76 @@ export default function ProfileScreen() {
     );
   }
 
+  const current = profile.data;
+  const accountBusy = isSigningOut || remove.isPending;
+  const notificationsEnabled = current?.notificationsEnabled !== false;
+
+  if (isSigningOut) {
+    return <Screen><LoadingState /></Screen>;
+  }
+
   return (
-    <Screen>
-      <FormSection
-        title="Profile"
-        footer="Currency changes apply to new entries only. Historical balances stay in their original buckets."
-      >
-        <PictureEditor
-          label="profile photo"
-          imageUrl={avatarUrl}
-          disabled={update.isPending}
-          onImageChange={setAvatarUrl}
-          preview={
-            <Avatar
-              name={name || profile.data?.displayName || "Splidly"}
-              colorKey={profile.data?.userId}
-              imageUrl={avatarUrl}
-              size={88}
-            />
-          }
+    <ProfileSettingsScreen>
+      {profile.isPending ? <LoadingState /> : null}
+      {current ? (
+        <ProfileIdentity
+          name={current.displayName}
+          userId={current.userId}
+          imageUrl={current.avatarUrl}
+          disabled={accountBusy}
+          onPress={() => push("/profile/edit")}
         />
-        <Field
-          label="Display name"
-          value={name}
-          onChangeText={setName}
+      ) : null}
+      <ProfileSection title="Preferences" footer="Currency changes apply to new entries only. Historical balances stay in their original buckets.">
+        <ProfileSettingRow
+          title="Home currency"
+          subtitle={getCurrency(current?.homeCurrency ?? "EUR")?.name ?? current?.homeCurrency}
+          value={current?.homeCurrency}
+          icon="currency"
+          disabled={!current || update.isPending || accountBusy || !isOnline}
+          onPress={chooseCurrency}
         />
-        <CurrencyField
-          label="Home currency"
-          value={currency}
-          onValueChange={setCurrency}
-        />
-      </FormSection>
-      <Section title="Preferences">
-        <ListRow
+        <ProfileSettingRow
           title="Notifications"
-          subtitle="Choose which expense updates reach you"
-          onPress={() => router.push("/profile/notifications")}
+          subtitle="Expense and payment updates"
+          value={notificationsEnabled ? "On" : "Off"}
+          icon="notifications"
+          divider
+          disabled={accountBusy}
+          onPress={() => push("/profile/notifications")}
         />
-      </Section>
-      <Section title="Privacy">
-        <ListRow
-          title="Terms of Service"
-          subtitle="Eligibility, acceptable use, and service rules"
-          showsDisclosureIndicator
-          onPress={() => void Linking.openURL(`${APP_URL}/terms`)}
-        />
-        <RowDivider inset={16} />
-        <ListRow
-          title="Privacy policy"
-          subtitle="How Splidly collects, uses, and retains your data"
-          showsDisclosureIndicator
-          onPress={() => void Linking.openURL(`${APP_URL}/privacy`)}
-        />
-        <RowDivider inset={16} />
-        <ListRow
-          title="Legal notice"
-          subtitle="Operator and contact information"
-          showsDisclosureIndicator
-          onPress={() => void Linking.openURL(`${APP_URL}/legal`)}
-        />
-        <RowDivider inset={16} />
-        <ListRow
-          title="Report content or abuse"
-          subtitle="Contact the moderation channel"
-          showsDisclosureIndicator
-          onPress={() => void Linking.openURL(`${APP_URL}/report`)}
-        />
-      </Section>
-      <Section title="Account">
-        <ListRow
-          title="Sign out"
+      </ProfileSection>
+      {update.error ? <ErrorState message={update.error.message} /> : null}
+      <ProfileSection title="Legal & support">
+        <ProfileSettingRow title="Terms of Service" icon="terms" onPress={() => void Linking.openURL(`${APP_URL}/terms`)} />
+        <ProfileSettingRow title="Privacy policy" icon="privacy" divider onPress={() => void Linking.openURL(`${APP_URL}/privacy`)} />
+        <ProfileSettingRow title="Legal notice" icon="info" divider onPress={() => void Linking.openURL(`${APP_URL}/legal`)} />
+        <ProfileSettingRow title="Report content or abuse" icon="report" divider onPress={() => void Linking.openURL(`${APP_URL}/report`)} />
+      </ProfileSection>
+      <ProfileSection title="Account">
+        <ProfileSettingRow
+          title={isSigningOut ? "Signing out…" : "Sign out"}
+          icon="signOut"
           showsDisclosureIndicator={false}
+          disabled={accountBusy}
           onPress={() => void signOut()}
         />
-        <RowDivider inset={16} />
-        <ListRow
-          title="Delete account"
+        <ProfileSettingRow
+          title={remove.isPending ? "Deleting account…" : "Delete account"}
+          icon="delete"
           destructive
+          divider
           showsDisclosureIndicator={false}
+          disabled={accountBusy}
           onPress={confirmDelete}
         />
-      </Section>
-      {update.error ? <ErrorState message={update.error.message} /> : null}
+      </ProfileSection>
       {remove.error ? <ErrorState message={remove.error.message} /> : null}
       {accountError ? <ErrorState message={accountError} /> : null}
       {profile.error ? (
-        <ErrorState
-          message={profile.error.message}
-          onRetry={() => void profile.refetch()}
-        />
+        <ErrorState message={profile.error.message} onRetry={() => void profile.refetch()} />
       ) : null}
-    </Screen>
+      <ProfileFooter version={Application.nativeApplicationVersion} />
+    </ProfileSettingsScreen>
   );
 }
