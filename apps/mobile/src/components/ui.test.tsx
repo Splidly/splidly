@@ -11,9 +11,22 @@ import {
   ErrorState,
   Field,
   Screen,
+  Section,
+  SectionFooter,
   useKeyboardFocusScroll,
 } from "./ui";
 import { SERVER_UNAVAILABLE_MESSAGE } from "../lib/network";
+
+it("keeps section headings and footers non-selectable on sheet surfaces", async () => {
+  const view = await render(
+    <Section title="Members" footer="Member actions" surface="sheet">
+      <SectionFooter>All settled</SectionFooter>
+    </Section>,
+  );
+  expect(view.getByText("Members").props.selectable).toBe(false);
+  expect(view.getByText("Member actions").props.selectable).toBe(false);
+  expect(view.getByText("All settled").props.selectable).toBe(false);
+});
 
 function ControlledField() {
   const [value, setValue] = useState("");

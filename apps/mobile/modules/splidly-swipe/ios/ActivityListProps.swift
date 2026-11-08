@@ -11,4 +11,7 @@ final class ActivityListProps: ExpoSwiftUI.ViewProps {
   var onRefresh = EventDispatcher()
   var onScroll = EventDispatcher()
   var onHostedLayout = EventDispatcher()
+  var onPreviewOpen = EventDispatcher()
+  var onPreviewAction = EventDispatcher()
+  var onRowPress = EventDispatcher()
 }

@@ -91,6 +91,7 @@ export function NativeActivityList({
           <NativeExpenseSwipe row={item}>{item.content}</NativeExpenseSwipe>
         </View>
       )}
+      renderSectionFooter={({ section }) => section.footer ? <View>{section.footer}</View> : null}
     />
   );
 }

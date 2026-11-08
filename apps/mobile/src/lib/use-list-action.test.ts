@@ -106,3 +106,17 @@ it("archives immediately without a dialog, blocks duplicates, and waits for the 
     alert.mockRestore();
   }
 });
+
+it("does not show an operation error after its screen has unmounted", async () => {
+  const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
+  try {
+    let reject!: (cause: Error) => void;
+    const perform = () => new Promise<void>((_resolve, fail) => { reject = fail; });
+    const { result, unmount } = await renderHook(useListAction);
+    const pending = result.current({ confirmation: false, title: "Archive", message: "", label: "Archive", perform });
+    await unmount();
+    await expect(pending).resolves.toBe(false);
+    await act(async () => { reject(new Error("Request failed")); });
+    expect(alert).not.toHaveBeenCalled();
+  } finally { alert.mockRestore(); }
+});

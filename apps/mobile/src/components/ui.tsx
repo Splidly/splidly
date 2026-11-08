@@ -269,7 +269,7 @@ export function Screen({
 }: PropsWithChildren<{
   scroll?: boolean;
   bounces?: boolean;
-  background?: "default" | "sheet";
+  background?: "default" | "sheet" | "groupedSheet";
   accountForTopInset?: boolean;
   underlapsHeader?: boolean;
   contentContainerStyle?: ScrollViewProps["contentContainerStyle"];
@@ -292,7 +292,11 @@ export function Screen({
   const insets = useSafeAreaInsets();
   const keyboardBottomClearance = useKeyboardBottomClearance();
   const backgroundColor =
-    background === "sheet" ? theme.sheet : theme.background;
+    background === "groupedSheet"
+      ? theme.groupedSheet
+      : background === "sheet"
+        ? theme.sheet
+        : theme.background;
   const { fillStyle, onLayout, onContentSizeChange } = useScrollViewportFill({
     accountForTopInset,
     underlapsHeader:
@@ -495,32 +499,42 @@ export function SheetCaption({ children }: PropsWithChildren) {
   );
 }
 
+export function SectionFooter({ children }: PropsWithChildren) {
+  const theme = useTheme();
+  return (
+    <Text selectable={false} style={[styles.sectionFooter, { color: theme.muted }]}>
+      {children}
+    </Text>
+  );
+}
+
 export function Section({
   title,
   footer,
+  surface = "default",
   children,
-}: PropsWithChildren<{ title?: string; footer?: string }>) {
+}: PropsWithChildren<{
+  title?: string;
+  footer?: string;
+  surface?: "default" | "sheet";
+}>) {
   const theme = useTheme();
   return (
     <View style={styles.section}>
       {title ? (
-        <Text style={[styles.sectionTitle, { color: theme.muted }]}>
+        <Text selectable={false} style={[styles.sectionTitle, { color: theme.muted }]}>
           {title}
         </Text>
       ) : null}
       <View
         style={[
           styles.sectionBody,
-          { backgroundColor: theme.surface },
+          { backgroundColor: surface === "sheet" ? theme.sheetSurface : theme.surface },
         ]}
       >
         {children}
       </View>
-      {footer ? (
-        <Text style={[styles.sectionFooter, { color: theme.muted }]}>
-          {footer}
-        </Text>
-      ) : null}
+      {footer ? <SectionFooter>{footer}</SectionFooter> : null}
     </View>
   );
 }
@@ -738,6 +752,7 @@ export function Avatar({
         />
       ) : (
         <Text
+          selectable={false}
           style={{
             color: colors.foreground,
             fontSize: size * 0.36,
@@ -904,7 +919,7 @@ export function Field({
     >
       {leading}
       {label ? (
-        <Text style={[styles.label, { color: theme.text }]}>
+        <Text selectable={false} style={[styles.label, { color: theme.text }]}>
           {label}
         </Text>
       ) : null}
@@ -928,7 +943,7 @@ export function Field({
         ]}
       />
       {hint ? (
-        <Text style={[styles.hint, { color: theme.muted }]}>
+        <Text selectable={false} style={[styles.hint, { color: theme.muted }]}>
           {hint}
         </Text>
       ) : null}

@@ -3,6 +3,8 @@ import { useColorScheme, type ColorValue } from "react-native";
 type Palette = {
   background: ColorValue;
   sheet: ColorValue;
+  groupedSheet: ColorValue;
+  sheetSurface: ColorValue;
   surface: ColorValue;
   elevated: ColorValue;
   text: ColorValue;
@@ -22,6 +24,8 @@ type Palette = {
 const light: Palette = {
   background: "#F2F2F7",
   sheet: "#FFFFFF",
+  groupedSheet: "#F2F2F7",
+  sheetSurface: "#FFFFFF",
   surface: "#FFFFFF",
   elevated: "#E9E9F2",
   text: "#17171C",
@@ -41,6 +45,8 @@ const light: Palette = {
 const dark: Palette = {
   background: "#000000",
   sheet: "#1C1C1E",
+  groupedSheet: "#1C1C1E",
+  sheetSurface: "#2C2C2E",
   surface: "#1C1C1E",
   elevated: "#2C2C2E",
   text: "#F5F5F7",
@@ -67,5 +73,9 @@ export const spacing = {
 };
 
 export function useTheme() {
-  return useColorScheme() === "dark" ? dark : light;
+  return themeForScheme(useColorScheme());
+}
+
+export function themeForScheme(scheme: string | null | undefined) {
+  return scheme === "dark" ? dark : light;
 }
