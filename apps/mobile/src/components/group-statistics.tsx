@@ -826,12 +826,14 @@ export function MemberShareCategoryOverview({
 function MemberMetric({
   member,
   metric,
+  prominent,
   maximumMinor,
   color,
   onOpen,
 }: {
   member: GroupStatisticsData["members"][number];
   metric: "paid" | "share";
+  prominent: boolean;
   maximumMinor: bigint;
   color: string;
   onOpen: () => void;
@@ -848,14 +850,14 @@ function MemberMetric({
       onPress={onOpen}
       hitSlop={4}
       style={({ pressed }) => [
-        isShare ? styles.memberShareMetric : styles.memberPaidMetric,
+        prominent ? styles.memberPrimaryMetric : styles.memberSecondaryMetric,
         { opacity: pressed ? 0.62 : 1 },
       ]}
     >
       <Text
         selectable={false}
         style={[
-          isShare ? styles.memberShareLabel : styles.memberPaidLabel,
+          prominent ? styles.memberPrimaryLabel : styles.memberSecondaryLabel,
           { color: theme.muted },
         ]}
       >
@@ -864,7 +866,7 @@ function MemberMetric({
       <View
         testID={`member-${metric}-track-${member.userId}`}
         style={[
-          isShare ? styles.memberShareTrack : styles.memberPaidTrack,
+          prominent ? styles.memberPrimaryTrack : styles.memberSecondaryTrack,
           { backgroundColor: theme.elevated },
         ]}
       >
@@ -884,8 +886,8 @@ function MemberMetric({
         selectable={false}
         numberOfLines={1}
         style={[
-          isShare ? styles.memberShareAmount : styles.memberPaidAmount,
-          { color: isShare ? theme.text : theme.muted },
+          prominent ? styles.memberPrimaryAmount : styles.memberSecondaryAmount,
+          { color: prominent ? theme.text : theme.muted },
         ]}
       >
         {formatted(member[metric])}
@@ -894,7 +896,7 @@ function MemberMetric({
         accessibilityElementsHidden
         selectable={false}
         style={[
-          isShare ? styles.memberShareDisclosure : styles.smallDisclosure,
+          prominent ? styles.memberPrimaryDisclosure : styles.smallDisclosure,
           { color: theme.subtle },
         ]}
       >
@@ -999,6 +1001,7 @@ function MemberBreakdown({
                 <MemberMetric
                   member={member}
                   metric="share"
+                  prominent={sort !== "paid"}
                   maximumMinor={maximumShareMinor}
                   color={shareColor}
                   onOpen={() => onOpenMember(member, "share")}
@@ -1006,6 +1009,7 @@ function MemberBreakdown({
                 <MemberMetric
                   member={member}
                   metric="paid"
+                  prominent={sort === "paid"}
                   maximumMinor={maximumPaidMinor}
                   color={accent}
                   onOpen={() => onOpenMember(member, "paid")}
@@ -1018,13 +1022,6 @@ function MemberBreakdown({
     </View>
   );
 }
-
-const memberSortDescriptions: Record<MemberSort, string> = {
-  share: "Ranked by share · initial payments shown for context",
-  paid: "Ranked by paid amount · shares shown for context",
-  name: "Sorted by name · share and paid amounts shown",
-};
-
 
 export function GroupStatistics({
   data,
@@ -1087,7 +1084,6 @@ export function GroupStatistics({
 
           <SectionCard
             title="Spending by member"
-            subtitle={memberSortDescriptions[memberSort]}
             action={
               <MemberSortButton
                 value={memberSort}
@@ -1314,20 +1310,20 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   memberMetrics: { gap: 4, paddingLeft: 46 },
-  memberShareMetric: {
+  memberPrimaryMetric: {
     minHeight: 34,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
-  memberShareLabel: {
+  memberPrimaryLabel: {
     width: 38,
     fontSize: 12,
     lineHeight: 16,
     fontWeight: "700",
     letterSpacing: 0.2,
   },
-  memberShareAmount: {
+  memberPrimaryAmount: {
     width: 78,
     textAlign: "right",
     fontSize: 18,
@@ -1336,25 +1332,25 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
     fontVariant: ["tabular-nums"],
   },
-  memberShareDisclosure: { fontSize: 20, lineHeight: 20, fontWeight: "300" },
-  memberShareTrack: {
+  memberPrimaryDisclosure: { fontSize: 20, lineHeight: 20, fontWeight: "300" },
+  memberPrimaryTrack: {
     flex: 1,
     height: 8,
     borderRadius: 4,
     overflow: "hidden",
   },
-  memberPaidMetric: {
+  memberSecondaryMetric: {
     minHeight: 26,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
-  memberPaidLabel: {
+  memberSecondaryLabel: {
     width: 38,
     fontSize: 11,
     lineHeight: 15,
   },
-  memberPaidAmount: {
+  memberSecondaryAmount: {
     width: 78,
     textAlign: "right",
     fontSize: 12,
@@ -1362,7 +1358,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontVariant: ["tabular-nums"],
   },
-  memberPaidTrack: {
+  memberSecondaryTrack: {
     flex: 1,
     height: 3,
     borderRadius: 2,
