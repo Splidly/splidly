@@ -45,6 +45,7 @@ import {
   viewerRepaymentBalances,
 } from "../domain/debt-simplification";
 import { expenseActivitySummary } from "../domain/expense-activity";
+import { loadExpensePreviewDebts } from "../domain/expense-preview-debts";
 import { allocateByUser } from "../domain/expense-allocation";
 import {
   buildGroupStatistics,
@@ -734,6 +735,7 @@ export const groupsRouter = router({
         settlementProfiles.map((profile) => [profile.userId, profile]),
       );
       const activityIds = activity.map((expense) => expense.id);
+      const previewDebts = await loadExpensePreviewDebts(ctx.db, activityIds, ctx.session.user.id);
       const [activityRates, activityPayments, viewerSplits, legacyPayers] =
         activity.length === 0
           ? [[], [], [], []]
@@ -893,6 +895,7 @@ export const groupsRouter = router({
           canonicalAmount,
           ...summary,
           viewerInvolvement,
+          previewDebts: previewDebts.get(expense.id) ?? [],
         };
       });
       const settlementActivity = settlementRecords

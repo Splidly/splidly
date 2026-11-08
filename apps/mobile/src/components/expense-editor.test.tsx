@@ -13,6 +13,8 @@ import { ExpenseSplitSessionProvider } from "./expense-split-session";
 
 const mockQuote = jest.fn();
 const mockCreateExpense = jest.fn();
+const mockUpdateExpense = jest.fn();
+const mockExpenseDetail = jest.fn();
 
 jest.mock("expo-crypto", () => ({
   randomUUID: () => "00000000-0000-4000-8000-000000000000",
@@ -83,9 +85,9 @@ jest.mock("./currency-field", () => ({
 }));
 
 jest.mock("./date-field", () => ({
-  DateField: () => {
+  DateField: ({ value }: { value: Date }) => {
     const { Text } = require("react-native") as typeof import("react-native");
-    return <Text>Date</Text>;
+    return <Text testID="expense-date" accessibilityValue={{ text: value.toISOString() }}>Date</Text>;
   },
 }));
 
@@ -146,11 +148,7 @@ jest.mock("../lib/trpc", () => ({
     },
     expenses: {
       detail: {
-        useQuery: () => ({
-          data: undefined,
-          error: null,
-          isPending: false,
-        }),
+        useQuery: (...args: unknown[]) => mockExpenseDetail(...args),
       },
       create: {
         useMutation: () => ({
@@ -163,7 +161,7 @@ jest.mock("../lib/trpc", () => ({
         useMutation: () => ({
           error: null,
           isPending: false,
-          mutate: jest.fn(),
+          mutate: mockUpdateExpense,
         }),
       },
     },
@@ -193,11 +191,12 @@ jest.mock("../lib/trpc", () => ({
   },
 }));
 
-function EditorHarness() {
+function EditorHarness({ duplicateExpenseId }: { duplicateExpenseId?: string | undefined }) {
   const paymentSession = useExpensePaymentSession();
   return (
     <>
       <ExpenseEditor
+        {...(duplicateExpenseId ? { duplicateExpenseId } : {})}
         newContext={{
           type: "friend",
           friendshipId: "11111111-1111-4111-8111-111111111111",
@@ -208,7 +207,7 @@ function EditorHarness() {
   );
 }
 
-function renderEditor() {
+function renderEditor(duplicateExpenseId?: string) {
   return render(
     <HeaderHeightContext.Provider value={96}>
       <SafeAreaInsetsContext.Provider
@@ -216,7 +215,7 @@ function renderEditor() {
       >
         <ExpensePaymentSessionProvider>
           <ExpenseSplitSessionProvider>
-            <EditorHarness />
+            <EditorHarness duplicateExpenseId={duplicateExpenseId} />
           </ExpenseSplitSessionProvider>
         </ExpensePaymentSessionProvider>
       </SafeAreaInsetsContext.Provider>
@@ -235,6 +234,9 @@ describe("ExpenseEditor", () => {
     jest.useFakeTimers();
     mockQuote.mockReset();
     mockCreateExpense.mockReset();
+    mockUpdateExpense.mockReset();
+    mockExpenseDetail.mockReset();
+    mockExpenseDetail.mockReturnValue({ data: undefined, error: null, isPending: false });
     mockQuote.mockResolvedValue({
       id: "22222222-2222-4222-8222-222222222222",
       expiresAt: "2026-07-28T22:00:00.000Z",
@@ -261,6 +263,70 @@ describe("ExpenseEditor", () => {
 
   afterEach(() => {
     jest.useRealTimers();
+  });
+
+  it("duplicates the allocation into a new draft with today's date and fresh exchange rates", async () => {
+    // Expense dates are saved at local noon, which can have a different UTC day from midnight.
+    jest.setSystemTime(new Date(2026, 10, 8, 12));
+    const sourceId = "33333333-3333-4333-8333-333333333333";
+    mockExpenseDetail.mockReturnValue({
+      isPending: false, error: null,
+      data: {
+        expense: {
+          id: sourceId, contextType: "friend", friendshipId: "11111111-1111-4111-8111-111111111111",
+          description: "Weekend trip", sourceAmountMinor: 10000n, sourceCurrency: "EUR",
+          occurredAt: new Date("2020-01-01T12:00:00Z"), notes: "Train and taxi",
+          iconKey: "travel", iconManuallySet: true, version: 7,
+        },
+        payer: { userId: "user-1", displayName: "Lasse", homeCurrency: "EUR" },
+        payers: [
+          { userId: "user-1", displayName: "Lasse", homeCurrency: "EUR", sourceAmountMinor: 7000n },
+          { userId: "user-2", displayName: "Friend", homeCurrency: "USD", sourceAmountMinor: 3000n },
+        ],
+        splits: [
+          { userId: "user-1", displayName: "Lasse", homeCurrency: "EUR", sourceAmountMinor: 5000n },
+          { userId: "user-2", displayName: "Friend", homeCurrency: "USD", sourceAmountMinor: 5000n },
+        ],
+        split: { mode: "equal", participantIds: ["user-1", "user-2"] },
+        rates: [{ base: "EUR", quote: "USD", rate: "0.9", provider: "Old rate", providerDate: "2020-01-01", source: "automatic" }],
+      },
+    });
+    mockQuote.mockResolvedValue({
+      id: "fresh-quote", expiresAt: new Date(Date.now() + 60000).toISOString(),
+      rates: [
+        { base: "EUR", quote: "EUR", rate: "1", provider: "identity", providerDate: "2026-11-06", source: "automatic" },
+        { base: "EUR", quote: "USD", rate: "1.25", provider: "Fresh rate", providerDate: "2026-11-06", source: "automatic" },
+      ],
+    });
+    const view = await renderEditor(sourceId);
+    expect(mockExpenseDetail).toHaveBeenCalledWith({ expenseId: sourceId }, { enabled: true });
+    expect(view.getByLabelText("Description").props.value).toBe("Weekend trip");
+    expect(view.getByLabelText("Amount").props.value).toBe("100.00");
+    expect(view.getByLabelText("Notes").props.value).toBe("Train and taxi");
+    expect(view.getByTestId("expense-date").props.accessibilityValue.text).toBe(new Date().toISOString());
+    expect(mockCreateExpense).not.toHaveBeenCalled();
+    await act(async () => { await jest.advanceTimersByTimeAsync(450); });
+    expect(mockQuote).toHaveBeenCalled();
+    await fireEvent.press(view.getByText("Save expense"));
+    expect(mockUpdateExpense).not.toHaveBeenCalled();
+    expect(mockCreateExpense).toHaveBeenCalledWith(expect.objectContaining({
+      context: { type: "friend", friendshipId: "11111111-1111-4111-8111-111111111111" },
+      clientMutationId: "00000000-0000-4000-8000-000000000000",
+      description: "Weekend trip", notes: "Train and taxi", iconKey: "travel", iconManuallySet: true,
+      amount: { currency: "EUR", minor: "10000" }, quoteId: "fresh-quote",
+      payments: [{ userId: "user-1", amountMinor: "7000" }, { userId: "user-2", amountMinor: "3000" }],
+      split: { mode: "equal", participantIds: ["user-1", "user-2"] },
+    }));
+    expect(mockCreateExpense.mock.calls[0]![0]).not.toHaveProperty("expenseId");
+    expect(mockCreateExpense.mock.calls[0]![0].occurredAt.slice(0, 10)).toBe(new Date().toISOString().slice(0, 10));
+  });
+
+  it("waits for the original expense before offering a duplicate draft", async () => {
+    mockExpenseDetail.mockReturnValue({ data: undefined, error: null, isPending: true });
+    const view = await renderEditor("original");
+    expect(view.queryByLabelText("Description")).toBeNull();
+    expect(mockCreateExpense).not.toHaveBeenCalled();
+    expect(mockUpdateExpense).not.toHaveBeenCalled();
   });
 
   it("uses a focused composer with progressive details and a floating save action", async () => {

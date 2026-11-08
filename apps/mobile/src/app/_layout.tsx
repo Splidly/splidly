@@ -66,7 +66,7 @@ function Navigation() {
           name="expense/[id]/index"
           options={{
             title: "Expense",
-            ...expenseDetailSheetOptions(theme.sheet),
+            ...expenseDetailSheetOptions(theme.groupedSheet),
           }}
         />
         <Stack.Screen
@@ -110,6 +110,13 @@ function Navigation() {
             sheetGrabberVisible: false,
             sheetCornerRadius: 30,
             headerBackButtonMenuEnabled: false,
+          }}
+        />
+        <Stack.Screen
+          name="settlement/[id]"
+          options={{
+            title: "Payment",
+            ...expenseDetailSheetOptions(theme.groupedSheet),
           }}
         />
         <Stack.Screen

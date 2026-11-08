@@ -23,6 +23,9 @@ import { groupActivityByDate } from "../../../lib/activity-dates";
 import { api } from "../../../lib/trpc";
 import { APP_URL } from "../../../lib/env";
 import { formatMoney } from "../../../lib/money-display";
+import { expensePreview, settlementPreview } from "../../../lib/activity-preview";
+import { expensePreviewActions, settlementPreviewActions } from "../../../lib/activity-preview-actions";
+import { useDeleteActivitySettlement } from "../../../lib/use-delete-activity-settlement";
 import { spacing, useTheme } from "../../../theme";
 
 export default function FriendDetailScreen() {
@@ -36,6 +39,7 @@ export default function FriendDetailScreen() {
   const identityBottomRef = useRef(0);
   const acceptActivityNavigation = useNavigationPressGuard();
   const deletion = useDeleteActivityExpense();
+  const settlementDeletion = useDeleteActivitySettlement();
   const detail = api.friends.detail.useQuery({ friendshipId: id });
   const profile = api.profile.me.useQuery();
   const friendship = detail.data?.friendship;
@@ -95,15 +99,8 @@ export default function FriendDetailScreen() {
           settlement={item.record}
           onPress={() =>
             openActivity({
-              pathname: "/settlement/new",
-              params: {
-                type: "friend",
-                id,
-                friendshipId: id,
-                friendId,
-                canonicalCurrency: item.record.canonicalCurrency,
-                settlementId: item.record.id,
-              },
+              pathname: "/settlement/[id]",
+              params: { id: item.record.id },
             })
           }
         />
@@ -129,13 +126,33 @@ export default function FriendDetailScreen() {
     data: dateGroup.items.map((item) => ({
       key: `${item.type}:${item.record.id}`,
       content: renderActivityItem(item),
+      nativeContent: process.env.EXPO_OS === "ios",
       ...(item.type === "expense"
         ? {
             onDelete: () => deletion.confirmDelete(item.record),
+            ...(process.env.EXPO_OS === "ios" && {
+              preview: expensePreview(item.record, name,
+                item.record.payerId === profile.data.userId ? "You" : name),
+              onPreviewOpen: () => openActivity(`/expense/${item.record.id}` as Href),
+              previewActions: expensePreviewActions(item.record.id, openActivity,
+                () => deletion.confirmDelete(item.record), deletion.isPending),
+            }),
             deleteLabel: `Delete ${item.record.description}`,
             deletionDisabled: deletion.isPending,
           }
-        : {}),
+        : {
+            onDelete: () => settlementDeletion.confirmDelete(item.record),
+            deleteLabel: "Delete payment",
+            deletionDisabled: settlementDeletion.isPending,
+            ...(process.env.EXPO_OS === "ios" && {
+              preview: settlementPreview(item.record, name),
+              onPress: () => openActivity({ pathname: "/settlement/[id]", params: { id: item.record.id } }),
+              onPreviewOpen: () => openActivity({ pathname: "/settlement/[id]", params: { id: item.record.id } }),
+              previewActions: settlementPreviewActions(item.record,
+                { type: "friend", friendshipId: id }, item.record.canonicalCurrency as CurrencyCode, openActivity,
+                () => settlementDeletion.confirmDelete(item.record), settlementDeletion.isPending),
+            }),
+          }),
     })),
   }));
   return (

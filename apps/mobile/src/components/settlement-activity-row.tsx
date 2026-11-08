@@ -1,27 +1,13 @@
-import type { Money } from "@splidly/shared";
 import { Pressable, Text, View } from "react-native";
 import { settlementPaymentSummary } from "../lib/settlement-activity";
 import { useTheme } from "../theme";
 import { Avatar } from "./ui";
-
-type SettlementPerson = {
-  userId: string;
-  displayName: string;
-  avatarUrl?: string | null;
-  isViewer: boolean;
-};
+import type { SettlementActivityRowProps } from "./settlement-activity-row.types";
 
 export function SettlementActivityRow({
   settlement,
   onPress,
-}: {
-  settlement: {
-    from: SettlementPerson;
-    to: SettlementPerson;
-    amount: Money;
-  };
-  onPress?: () => void;
-}) {
+}: SettlementActivityRowProps) {
   const theme = useTheme();
 
   return (
@@ -31,19 +17,20 @@ export function SettlementActivityRow({
       accessibilityLabel={`Payment. ${settlementPaymentSummary(settlement)}`}
       onPress={onPress}
       style={({ pressed }) => ({
-        minHeight: 78,
+        width: "100%",
+        minHeight: 64,
         paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingVertical: 8,
         flexDirection: "row",
         alignItems: "center",
         gap: 12,
-        backgroundColor: pressed && onPress ? theme.surface : theme.elevated,
+        backgroundColor: pressed && onPress ? theme.elevated : "transparent",
       })}
     >
       <View
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
-        style={{ width: 58, height: 44 }}
+        style={{ width: 58, height: 44, flexShrink: 0 }}
       >
         <View style={{ position: "absolute", left: 0, top: 6 }}>
           <Avatar
@@ -75,6 +62,7 @@ export function SettlementActivityRow({
           }}
         >
           <Text
+            selectable={false}
             style={{
               color: theme.primaryText,
               fontSize: 12,
@@ -87,32 +75,21 @@ export function SettlementActivityRow({
         </View>
       </View>
 
-      <View style={{ flex: 1, minWidth: 0, gap: 5 }}>
-        <View
+      <View style={{ flex: 1, minWidth: 0, flexShrink: 1, gap: 2 }}>
+        <Text
+          selectable={false}
           style={{
-            alignSelf: "flex-start",
-            paddingHorizontal: 8,
-            paddingVertical: 3,
-            borderRadius: 8,
-            backgroundColor: theme.primary,
+            color: theme.primary,
+            fontSize: 13,
+            lineHeight: 18,
+            fontWeight: "600",
           }}
         >
-          <Text
-            style={{
-              color: theme.primaryText,
-              fontSize: 10,
-              lineHeight: 13,
-              fontWeight: "800",
-              letterSpacing: 0.45,
-              textTransform: "uppercase",
-            }}
-          >
-            Payment
-          </Text>
-        </View>
+          Payment
+        </Text>
         <Text
-          numberOfLines={1}
-          style={{ color: theme.muted, fontSize: 14, lineHeight: 18 }}
+          selectable={false}
+          style={{ color: theme.muted, fontSize: 14, lineHeight: 20, flexShrink: 1 }}
         >
           {settlementPaymentSummary(settlement)}
         </Text>

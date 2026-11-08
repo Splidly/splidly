@@ -25,6 +25,7 @@ import {
 } from "../domain/debt-simplification";
 import { groupBy, requireFriendshipParticipant } from "../domain/helpers";
 import { loadGroupedLedgerAmounts } from "../domain/ledger-summary";
+import { loadExpensePreviewDebts } from "../domain/expense-preview-debts";
 import { protectedProcedure, router } from "../trpc";
 
 async function listFriends(
@@ -359,6 +360,7 @@ export const friendsRouter = router({
             ),
         ]);
       const friend = friendRows[0];
+      const previewDebts = await loadExpensePreviewDebts(ctx.db, activity.map((expense) => expense.id), ctx.session.user.id);
       const settlementProfilesById = new Map(
         settlementProfiles.map((profile) => [profile.userId, profile]),
       );
@@ -367,6 +369,7 @@ export const friendsRouter = router({
         friend,
         expenses: activity.reverse().map((expense) => ({
           ...expense,
+          previewDebts: previewDebts.get(expense.id) ?? [],
           canonicalAmount: money(
             expense.sourceCurrency as CurrencyCode,
             expense.sourceAmountMinor,

@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { useTheme } from "../theme";
 import { DropdownChevron } from "./dropdown-chevron";
-import { Avatar, PrimaryButton } from "./ui";
+import { Avatar, PrimaryButton, RowDivider } from "./ui";
 
 export type SettlementMember = {
   userId: string;
@@ -31,6 +31,7 @@ function PartyChoice({
   disabled,
   testID,
   width,
+  compact = false,
 }: {
   label: string;
   value: SettlementMember | undefined;
@@ -40,6 +41,7 @@ function PartyChoice({
   disabled: boolean;
   testID: string;
   width: number;
+  compact?: boolean;
 }) {
   const theme = useTheme();
   const name = value
@@ -47,11 +49,44 @@ function PartyChoice({
       ? "You"
       : value.displayName
     : "Choose";
-  const content = (
+  const content = compact ? (
     <View
       accessible
       accessibilityRole={disabled ? undefined : "button"}
       accessibilityLabel={`${label}: ${name}`}
+      pointerEvents={process.env.EXPO_OS === "android" && !disabled ? "none" : "auto"}
+      style={{
+        width: width > 0 ? width : "100%",
+        minHeight: 54,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+      }}
+    >
+      <Text selectable={false} style={{ color: theme.muted, fontSize: 15 }}>
+        {label}
+      </Text>
+      <Text
+        selectable={false}
+        numberOfLines={1}
+        style={{ flex: 1, textAlign: "right", color: theme.text, fontSize: 16 }}
+      >
+        {name}
+      </Text>
+      {!disabled ? (
+        <View pointerEvents="none">
+          <DropdownChevron color={theme.primary} testID={`${testID}-chevron`} />
+        </View>
+      ) : null}
+    </View>
+  ) : (
+    <View
+      accessible
+      accessibilityRole={disabled ? undefined : "button"}
+      accessibilityLabel={`${label}: ${name}`}
+      pointerEvents={process.env.EXPO_OS === "android" && !disabled ? "none" : "auto"}
       style={{
         width: width > 0 ? width : "100%",
         minWidth: 0,
@@ -78,11 +113,11 @@ function PartyChoice({
             backgroundColor: theme.elevated,
           }}
         >
-          <Text style={{ color: theme.muted, fontSize: 26 }}>?</Text>
+          <Text selectable={false} style={{ color: theme.muted, fontSize: 26 }}>?</Text>
         </View>
       )}
       <View style={{ alignItems: "center", gap: 2, maxWidth: "100%" }}>
-        <Text
+        <Text selectable={false}
           style={{
             color: theme.muted,
             fontSize: 11,
@@ -94,7 +129,7 @@ function PartyChoice({
         >
           {label}
         </Text>
-        <Text
+        <Text selectable={false}
           numberOfLines={1}
           style={{ color: theme.text, fontSize: 17, fontWeight: "700", textAlign: "center" }}
         >
@@ -137,6 +172,7 @@ export function SettlementDirectionCard({
   onFromChange,
   onToChange,
   locked,
+  compact = false,
 }: {
   from: SettlementMember | undefined;
   to: SettlementMember | undefined;
@@ -145,19 +181,53 @@ export function SettlementDirectionCard({
   onFromChange: (userId: string) => void;
   onToChange: (userId: string) => void;
   locked: boolean;
+  compact?: boolean;
 }) {
   const theme = useTheme();
   const [slotWidth, setSlotWidth] = useState(0);
+  if (compact) {
+    return (
+      <View>
+        <View
+          testID="settlement-paid-by-slot"
+          onLayout={({ nativeEvent: { layout: { width } } }) => setSlotWidth(width)}
+        >
+          <PartyChoice
+            label="Paid by"
+            value={from}
+            viewerId={viewerId}
+            members={members}
+            onValueChange={onFromChange}
+            disabled={locked}
+            testID="settlement-paid-by"
+            width={slotWidth}
+            compact
+          />
+        </View>
+        <RowDivider inset={16} />
+        <View testID="settlement-paid-to-slot">
+          <PartyChoice
+            label="Paid to"
+            value={to}
+            viewerId={viewerId}
+            members={members}
+            onValueChange={onToChange}
+            disabled={locked}
+            testID="settlement-paid-to"
+            width={slotWidth}
+            compact
+          />
+        </View>
+      </View>
+    );
+  }
   return (
     <View
       style={{
         minHeight: 146,
         paddingHorizontal: 16,
         paddingVertical: 18,
-        borderRadius: 24,
-        borderCurve: "continuous",
-        backgroundColor: theme.surface,
-        boxShadow: "0 8px 28px rgba(0, 0, 0, 0.08)",
+        backgroundColor: "transparent",
         flexDirection: "row",
         alignItems: "flex-start",
         gap: 10,
@@ -197,7 +267,7 @@ export function SettlementDirectionCard({
           backgroundColor: theme.elevated,
         }}
       >
-        <Text
+        <Text selectable={false}
           style={{
             color: theme.primary,
             fontSize: 21,
@@ -251,13 +321,10 @@ export function SettlementAmountCard({
         paddingHorizontal: 18,
         paddingVertical: 16,
         gap: 8,
-        borderRadius: 24,
-        borderCurve: "continuous",
-        backgroundColor: theme.surface,
-        boxShadow: "0 8px 28px rgba(0, 0, 0, 0.08)",
+        backgroundColor: "transparent",
       }}
     >
-      <Text
+      <Text selectable={false}
         style={{
           color: theme.muted,
           fontSize: 11,
@@ -302,7 +369,8 @@ export function SettlementAmountCard({
           accessibilityHint={`Currently ${currency}`}
           onPress={onCurrencyPress}
           style={({ pressed }) => ({
-            minHeight: 42,
+            minHeight: 48,
+            minWidth: 48,
             paddingHorizontal: 14,
             borderRadius: 21,
             alignItems: "center",
@@ -312,9 +380,10 @@ export function SettlementAmountCard({
           })}
         >
           <View
+            pointerEvents="none"
             style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
           >
-            <Text
+            <Text selectable={false}
               style={{ color: theme.primary, fontSize: 16, fontWeight: "700" }}
             >
               {currency}

@@ -22,6 +22,9 @@ import {
 import { api } from "../../../../lib/trpc";
 import { groupActivityByDate } from "../../../../lib/activity-dates";
 import { expensePaymentSummary } from "../../../../lib/expense-activity";
+import { expensePreview, settlementPreview } from "../../../../lib/activity-preview";
+import { expensePreviewActions, settlementPreviewActions } from "../../../../lib/activity-preview-actions";
+import { useDeleteActivitySettlement } from "../../../../lib/use-delete-activity-settlement";
 import { groupBalanceLines } from "../../../../lib/group-balance-summary";
 import { groupActionColorsFor } from "../../../../lib/group-colors";
 import { toolbarIcons } from "../../../../lib/toolbar-icons";
@@ -36,6 +39,7 @@ export default function GroupDetailScreen() {
   const colorScheme = useColorScheme() === "dark" ? "dark" : "light";
   const acceptActivityNavigation = useNavigationPressGuard();
   const deletion = useDeleteActivityExpense();
+  const settlementDeletion = useDeleteActivitySettlement();
   const detail = api.groups.detail.useQuery({ groupId: id });
   if (detail.isPending) {
     return (
@@ -94,13 +98,8 @@ export default function GroupDetailScreen() {
           settlement={item.record}
           onPress={() =>
             openActivity({
-              pathname: "/settlement/new",
-              params: {
-                type: "group",
-                id: group.id,
-                canonicalCurrency: group.currency,
-                settlementId: item.record.id,
-              },
+              pathname: "/settlement/[id]",
+              params: { id: item.record.id },
             })
           }
         />
@@ -124,13 +123,32 @@ export default function GroupDetailScreen() {
     data: dateGroup.items.map((item) => ({
       key: `${item.type}:${item.record.id}`,
       content: renderActivityItem(item),
+      nativeContent: process.env.EXPO_OS === "ios",
       ...(item.type === "expense"
         ? {
             onDelete: () => deletion.confirmDelete(item.record),
+            ...(process.env.EXPO_OS === "ios" && {
+              preview: expensePreview(item.record, group.name),
+              onPreviewOpen: () => openActivity(`/expense/${item.record.id}` as Href),
+              previewActions: expensePreviewActions(item.record.id, openActivity,
+                () => deletion.confirmDelete(item.record), deletion.isPending),
+            }),
             deleteLabel: `Delete ${item.record.description}`,
             deletionDisabled: deletion.isPending,
           }
-        : {}),
+        : {
+            onDelete: () => settlementDeletion.confirmDelete(item.record),
+            deleteLabel: "Delete payment",
+            deletionDisabled: settlementDeletion.isPending,
+            ...(process.env.EXPO_OS === "ios" && {
+              preview: settlementPreview(item.record, group.name),
+              onPress: () => openActivity({ pathname: "/settlement/[id]", params: { id: item.record.id } }),
+              onPreviewOpen: () => openActivity({ pathname: "/settlement/[id]", params: { id: item.record.id } }),
+              previewActions: settlementPreviewActions(item.record,
+                { type: "group", groupId: group.id }, group.currency as CurrencyCode, openActivity,
+                () => settlementDeletion.confirmDelete(item.record), settlementDeletion.isPending),
+            }),
+          }),
     })),
   }));
   const emptyActivity =
