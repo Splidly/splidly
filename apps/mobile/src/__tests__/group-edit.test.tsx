@@ -1,8 +1,11 @@
-import { fireEvent, render } from "@testing-library/react-native";
+import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
+import { pickCustomImage } from "../lib/custom-image";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import EditGroupScreen from "../app/(tabs)/groups/[id]/edit";
 
 const mockUpdateMutate = jest.fn();
+
+jest.mock("../lib/custom-image", () => ({ pickCustomImage: jest.fn() }));
 
 jest.mock("expo-router", () => ({
   router: {
@@ -62,6 +65,20 @@ describe("EditGroupScreen", () => {
     mockUpdateMutate.mockClear();
   });
 
+  it("waits for photo preparation before allowing the group to be saved", async () => {
+    let finish!: (image: string) => void;
+    (pickCustomImage as jest.Mock).mockReturnValue(new Promise(resolve => { finish = resolve; }));
+    const view = await render(<SafeAreaInsetsContext.Provider value={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+      <EditGroupScreen />
+    </SafeAreaInsetsContext.Provider>);
+    await fireEvent.press(view.getByLabelText("Add group photo"));
+    expect(view.getByRole("button", { name: "Save changes" }).props.accessibilityState.disabled).toBe(true);
+    await fireEvent.press(view.getByText("Save changes"));
+    expect(mockUpdateMutate).not.toHaveBeenCalled();
+    await act(async () => { finish("data:image/jpeg;base64,PHOTO"); });
+    expect(view.getByRole("button", { name: "Save changes" }).props.accessibilityState.disabled).toBe(false);
+  });
+
   it("edits group identity in the dedicated form sheet", async () => {
     const view = await render(
       <SafeAreaInsetsContext.Provider
@@ -84,5 +101,23 @@ describe("EditGroupScreen", () => {
       currency: "EUR",
       simplifyDebts: true,
     });
+  });
+
+  it("previews a selected group photo, saves it and allows restoring the group icon", async () => {
+    (pickCustomImage as jest.Mock).mockResolvedValue("data:image/jpeg;base64,PHOTO");
+    const view = await render(
+      <SafeAreaInsetsContext.Provider value={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+        <EditGroupScreen />
+      </SafeAreaInsetsContext.Provider>,
+    );
+    await fireEvent.press(view.getByLabelText("Add group photo"));
+    await waitFor(() => expect(view.getByLabelText("Change group photo")).toBeTruthy());
+    expect(view.getAllByLabelText("Lisbon group picture")).toHaveLength(2);
+    await fireEvent.press(view.getByText("Save changes"));
+    expect(mockUpdateMutate).toHaveBeenLastCalledWith(expect.objectContaining({ imageUrl: "data:image/jpeg;base64,PHOTO" }));
+    await fireEvent.press(view.getByText("Remove"));
+    expect(view.getByLabelText("Add group photo")).toBeTruthy();
+    await fireEvent.press(view.getByText("Save changes"));
+    expect(mockUpdateMutate).toHaveBeenLastCalledWith(expect.objectContaining({ imageUrl: null }));
   });
 });

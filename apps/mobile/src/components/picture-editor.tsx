@@ -1,5 +1,5 @@
 import type { CustomImageDataUrl } from "@splidly/shared";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { pickCustomImage } from "../lib/custom-image";
 import { spacing, useTheme } from "../theme";
@@ -10,29 +10,43 @@ export function PictureEditor({
   preview,
   label,
   disabled = false,
+  onPreparingChange,
 }: {
   imageUrl?: string | null | undefined;
   onImageChange: (value: CustomImageDataUrl | null) => void;
   preview: ReactNode;
   label: string;
   disabled?: boolean;
+  onPreparingChange?: (preparing: boolean) => void;
 }) {
   const theme = useTheme();
   const [isPicking, setIsPicking] = useState(false);
+  const picking = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   async function choosePhoto() {
-    if (disabled || isPicking) return;
+    if (disabled || picking.current) return;
+    picking.current = true;
     setIsPicking(true);
+    onPreparingChange?.(true);
     try {
       const selected = await pickCustomImage();
-      if (selected) onImageChange(selected);
+      if (selected && mounted.current) onImageChange(selected);
     } catch (cause) {
-      Alert.alert(
+      if (mounted.current) Alert.alert(
         "Couldn’t use that photo",
         cause instanceof Error ? cause.message : "Choose another photo.",
       );
     } finally {
-      setIsPicking(false);
+      picking.current = false;
+      if (mounted.current) {
+        setIsPicking(false);
+        onPreparingChange?.(false);
+      }
     }
   }
 
@@ -60,7 +74,7 @@ export function PictureEditor({
             },
           ]}
         >
-          <Text style={[styles.badgeGlyph, { color: theme.primaryText }]}>+</Text>
+          <Text selectable={false} style={[styles.badgeGlyph, { color: theme.primaryText }]}>+</Text>
         </View>
       </Pressable>
       <View style={styles.actions}>
@@ -71,6 +85,7 @@ export function PictureEditor({
           hitSlop={8}
         >
           <Text
+            selectable={false}
             style={{
               color: disabled ? theme.subtle : theme.primary,
               fontSize: 15,
@@ -86,7 +101,7 @@ export function PictureEditor({
         </Pressable>
         {imageUrl ? (
           <>
-            <Text style={{ color: theme.subtle }}>·</Text>
+            <Text selectable={false} style={{ color: theme.subtle }}>·</Text>
             <Pressable
               accessibilityRole="button"
               disabled={disabled || isPicking}
@@ -94,6 +109,7 @@ export function PictureEditor({
               hitSlop={8}
             >
               <Text
+                selectable={false}
                 style={{
                   color: disabled ? theme.subtle : theme.negative,
                   fontSize: 15,

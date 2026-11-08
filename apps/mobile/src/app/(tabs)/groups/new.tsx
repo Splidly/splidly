@@ -34,6 +34,7 @@ export default function NewGroupScreen() {
   const [iconKey, setIconKey] = useState<GroupIconKey>("default");
   const [color, setColor] = useState<GroupColor>(() => randomGroupColor());
   const [imageUrl, setImageUrl] = useState<CustomImageDataUrl | null>(null);
+  const [preparingImage, setPreparingImage] = useState(false);
   const [currency, setCurrency] = useState<CurrencyCode>();
   const create = api.groups.create.useMutation({
     async onSuccess(group) {
@@ -74,6 +75,7 @@ export default function NewGroupScreen() {
         imageUrl={imageUrl}
         disabled={create.isPending}
         onImageChange={setImageUrl}
+        onPreparingChange={setPreparingImage}
         preview={
           <GroupIcon
             iconKey={iconKey}
@@ -129,7 +131,7 @@ export default function NewGroupScreen() {
       <View style={styles.footer}>
         <PrimaryButton
           label={create.isPending ? "Creating…" : "Create group"}
-          disabled={create.isPending || name.trim().length === 0}
+          disabled={create.isPending || preparingImage || name.trim().length === 0}
           onPress={() =>
             create.mutate({
               name: name.trim(),
