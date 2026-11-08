@@ -6,7 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Linking, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppIcon } from "../components/app-icon";
 import {
   ErrorState,
@@ -42,6 +42,7 @@ export default function SignInScreen() {
   });
   const handledUserId = useRef<string | undefined>(undefined);
   const [busy, setBusy] = useState(false);
+  const signingIn = useRef(false);
   const [error, setError] = useState<string>();
   const profileState = profileNavigationState(profile);
   const profileError = profile.error
@@ -80,6 +81,8 @@ export default function SignInScreen() {
   }
 
   async function signInGoogle() {
+    if (signingIn.current) return;
+    signingIn.current = true;
     setBusy(true);
     setError(undefined);
     try {
@@ -97,11 +100,14 @@ export default function SignInScreen() {
     } catch (cause) {
       setError(friendlyErrorMessage(cause, "Google sign-in failed"));
     } finally {
+      signingIn.current = false;
       setBusy(false);
     }
   }
 
   async function signInApple() {
+    if (signingIn.current) return;
+    signingIn.current = true;
     setBusy(true);
     setError(undefined);
     try {
@@ -141,11 +147,14 @@ export default function SignInScreen() {
       if (isAppleSignInCancellation(cause)) return;
       setError(friendlyErrorMessage(cause, "Apple sign-in failed"));
     } finally {
+      signingIn.current = false;
       setBusy(false);
     }
   }
 
   async function signInDemo() {
+    if (signingIn.current) return;
+    signingIn.current = true;
     setBusy(true);
     setError(undefined);
     try {
@@ -154,161 +163,148 @@ export default function SignInScreen() {
     } catch (cause) {
       setError(friendlyErrorMessage(cause, "Demo sign-in failed"));
     } finally {
+      signingIn.current = false;
       setBusy(false);
     }
   }
 
-  return (
-    <Screen
-      bounces={false}
-      accountForTopInset
-      contentContainerStyle={{
-        justifyContent: "space-between",
-      }}
+  const googleButton = (
+    <GoogleSigninButton
+      testID="sign-in-google"
+      size={GoogleSigninButton.Size.Wide}
+      color={GoogleSigninButton.Color.Light}
+      onPress={() => void signInGoogle()}
+      disabled={busy}
+      style={styles.providerButton}
+    />
+  );
+  const appleButton = process.env.EXPO_OS === "ios" ? (
+    <View
+      style={styles.fullWidth}
+      pointerEvents={busy ? "none" : "auto"}
+      accessibilityState={{ disabled: busy }}
     >
-      <View style={{ gap: 24 }}>
-        <AppIcon size={68} />
-        <View style={{ gap: 12 }}>
-          <Text
-            selectable={false}
-            style={{
-              color: theme.text,
-              fontSize: 40,
-              lineHeight: 44,
-              fontWeight: "800",
-              letterSpacing: -1.4,
-            }}
-          >
-            Split the cost.{`\n`}Keep the friendship.
-          </Text>
-          <Text
-            selectable={false}
-            style={{ color: theme.muted, fontSize: 17, lineHeight: 24 }}
-          >
-            A private, precise ledger for trips, homes, and everything friends
-            pay for together.
-          </Text>
+      <AppleAuthentication.AppleAuthenticationButton
+        testID="sign-in-apple"
+        buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+        buttonStyle={
+          theme.background === "#000000"
+            ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+            : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+        }
+        cornerRadius={12}
+        style={[styles.providerButton, { opacity: busy ? 0.5 : 1 }]}
+        onPress={() => void signInApple()}
+      />
+    </View>
+  ) : (
+    <PrimaryButton
+      label="Continue with Apple"
+      onPress={() => void signInApple()}
+      disabled={busy}
+      tone="secondary"
+    />
+  );
+
+  return (
+    <Screen accountForTopInset contentContainerStyle={styles.screen}>
+      <View style={styles.welcomeArea}>
+        <View style={[styles.content, styles.welcome]}>
+          <View style={styles.brand}>
+            <AppIcon size={44} />
+            <Text selectable={false} style={[styles.wordmark, { color: theme.text }]}>Splidly</Text>
+          </View>
+          <View style={styles.intro}>
+            <Text selectable={false} accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
+              A simpler way{`\n`}to split expenses.
+            </Text>
+            <Text selectable={false} style={[styles.description, { color: theme.muted }]}>
+              Trips, dinners, and everyday costs.{`\n`}Keep track together, settle up easily.
+            </Text>
+          </View>
         </View>
       </View>
 
-      <View style={{ gap: 12, alignItems: "center" }}>
-        {busy ? <ActivityIndicator color={theme.primary} /> : null}
-        <Text
-          selectable={false}
-          style={{
-            color: theme.muted,
-            textAlign: "center",
-            fontSize: 12,
-            lineHeight: 17,
-            paddingHorizontal: 16,
-          }}
-        >
-          By continuing, you agree to the Terms of Service and acknowledge the
-          Privacy Notice.
-        </Text>
-        <GoogleSigninButton
-          size={GoogleSigninButton.Size.Wide}
-          color={
-            theme.background === "#000000"
-              ? GoogleSigninButton.Color.Dark
-              : GoogleSigninButton.Color.Light
-          }
-          onPress={() => void signInGoogle()}
-          disabled={busy}
-          style={{ width: "100%", height: 52 }}
-        />
-        {process.env.EXPO_OS === "ios" ? (
-          <AppleAuthentication.AppleAuthenticationButton
-            buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
-            buttonStyle={
-              theme.background === "#000000"
-                ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-                : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
-            }
-            cornerRadius={12}
-            style={{ width: "100%", height: 50 }}
-            onPress={() => void signInApple()}
-          />
-        ) : (
-          <View style={{ width: "100%" }}>
-        <PrimaryButton
-          label="Continue with Apple"
-          onPress={() => void signInApple()}
-          disabled={busy}
-          tone="secondary"
-        />
+      <View style={[styles.content, styles.signIn]}>
+        <View style={styles.actions}>
+          <View testID="sign-in-providers" style={styles.providers}>
+            <View
+              style={[styles.providerButtons, { opacity: busy ? 0 : 1 }]}
+              pointerEvents={busy ? "none" : "auto"}
+              accessibilityElementsHidden={busy}
+              importantForAccessibility={busy ? "no-hide-descendants" : "auto"}
+            >
+              {process.env.EXPO_OS === "ios" ? googleButton : appleButton}
+              {process.env.EXPO_OS === "ios" ? appleButton : googleButton}
+            </View>
+            {busy ? (
+              <View
+                accessibilityRole="progressbar"
+                accessibilityLabel="Signing in"
+                accessibilityLiveRegion="polite"
+                style={[styles.progress, { backgroundColor: theme.background }]}
+              >
+                <ActivityIndicator color={theme.muted} />
+                <Text selectable={false} style={[styles.smallText, { color: theme.muted }]}>Signing you in…</Text>
+              </View>
+            ) : null}
           </View>
-        )}
-        {__DEV__ ? (
-          <View style={{ width: "100%" }}>
-            <PrimaryButton
-              label="Continue as Demo User"
-              onPress={() => void signInDemo()}
+          {__DEV__ ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: busy }}
               disabled={busy}
-              tone="plain"
-            />
-          </View>
-        ) : null}
-        {error || profileError ? (
-          <View style={{ width: "100%" }}>
+              onPress={() => void signInDemo()}
+              style={({ pressed }) => [styles.demoButton, { opacity: busy ? 0.4 : pressed ? 0.6 : 1 }]}
+            >
+              <Text selectable={false} style={[styles.demoText, { color: theme.muted }]}>Try the demo</Text>
+            </Pressable>
+          ) : null}
+          {error || profileError ? (
             <ErrorState
               message={error ?? profileError ?? "Could not load your profile"}
-              {...(!error && profile.error
-                ? { onRetry: () => void profile.refetch() }
-                : {})}
+              {...(!error && profile.error ? { onRetry: () => void profile.refetch() } : {})}
             />
-          </View>
-        ) : null}
-        <Text
-          selectable={false}
-          style={{
-            color: theme.muted,
-            textAlign: "center",
-            fontSize: 12,
-            lineHeight: 17,
-            paddingHorizontal: 16,
-          }}
-        >
-          Splidly records shared accounting. It never moves your money.
-        </Text>
-        <View
-          style={{ flexDirection: "row", flexWrap: "wrap", gap: 16 }}
-        >
-          <Pressable
-            accessibilityRole="link"
-            onPress={() => void Linking.openURL(`${APP_URL}/terms`)}
-          >
-            <Text
-              selectable={false}
-              style={{ color: theme.primary, fontSize: 12 }}
-            >
-              Terms of Service
-            </Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="link"
-            onPress={() => void Linking.openURL(`${APP_URL}/privacy`)}
-          >
-            <Text
-              selectable={false}
-              style={{ color: theme.primary, fontSize: 12 }}
-            >
-              Privacy notice
-            </Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="link"
-            onPress={() => void Linking.openURL(`${APP_URL}/legal`)}
-          >
-            <Text
-              selectable={false}
-              style={{ color: theme.primary, fontSize: 12 }}
-            >
-              Legal notice
-            </Text>
-          </Pressable>
+          ) : null}
+        </View>
+
+        <View style={styles.footer}>
+          <Text selectable={false} style={[styles.legalText, { color: theme.muted }]}>
+            By continuing, you agree to the{" "}
+            <Text selectable={false} accessibilityRole="link" style={{ color: theme.primary }} onPress={() => void Linking.openURL(`${APP_URL}/terms`)}>Terms of Service</Text>
+            {" "}and acknowledge the{" "}
+            <Text selectable={false} accessibilityRole="link" style={{ color: theme.primary }} onPress={() => void Linking.openURL(`${APP_URL}/privacy`)}>Privacy Notice</Text>.
+            {" "}
+            <Text selectable={false} accessibilityRole="link" style={{ color: theme.primary }} onPress={() => void Linking.openURL(`${APP_URL}/legal`)}>Legal notice</Text>.
+          </Text>
         </View>
       </View>
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: { gap: 32 },
+  content: { width: "100%", maxWidth: 380, alignSelf: "center" },
+  // Only this child takes up spare space. The shared scroll container keeps
+  // its measured minimum height and can still overflow on smaller devices.
+  welcomeArea: { flexGrow: 1, flexShrink: 0, justifyContent: "center", paddingVertical: 24 },
+  welcome: { alignItems: "center", gap: 28 },
+  signIn: { gap: 24 },
+  brand: { flexDirection: "row", alignItems: "center", gap: 12 },
+  wordmark: { fontSize: 23, fontWeight: "700", letterSpacing: -0.6 },
+  intro: { alignSelf: "stretch", gap: 14 },
+  title: { fontSize: 34, lineHeight: 40, fontWeight: "700", letterSpacing: -1, textAlign: "center" },
+  description: { fontSize: 16, lineHeight: 24, textAlign: "center" },
+  actions: { gap: 12 },
+  providers: { position: "relative" },
+  providerButtons: { gap: 12 },
+  providerButton: { width: "100%", height: 52 },
+  fullWidth: { width: "100%" },
+  progress: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, alignItems: "center", justifyContent: "center", gap: 12 },
+  demoButton: { minHeight: 48, alignItems: "center", justifyContent: "center" },
+  demoText: { fontSize: 14, fontWeight: "500" },
+  footer: { alignItems: "center" },
+  smallText: { fontSize: 13, lineHeight: 19, textAlign: "center" },
+  legalText: { fontSize: 13, lineHeight: 20, textAlign: "center" },
+});
