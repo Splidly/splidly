@@ -20,6 +20,8 @@ import { overallGroupBalanceLines } from "../lib/group-balance-summary";
 import { toolbarIcons } from "../lib/toolbar-icons";
 import { api } from "../lib/trpc";
 import { useListAction } from "../lib/use-list-action";
+import { groupPreview } from "../lib/activity-preview";
+import { groupPreviewActions } from "../lib/activity-preview-actions";
 
 export function GroupsCollection({ archived = false }: { archived?: boolean }) {
   const theme = useTheme();
@@ -55,6 +57,13 @@ export function GroupsCollection({ archived = false }: { archived?: boolean }) {
   const pending = archive.isPending || restore.isPending;
   const rows = (groups.data ?? []).map((group) => ({
     key: group.id,
+    ...(process.env.EXPO_OS === "ios" && {
+      onPress: () => push(`/groups/${group.id}`),
+      preview: groupPreview(group),
+      onPreviewOpen: () => push(`/groups/${group.id}`),
+      previewActions: groupPreviewActions(group.id,
+        BigInt(group.balance.minor) !== 0n || group.memberBalances.some((member) => BigInt(member.balance.minor) !== 0n), push),
+    }),
     backgroundColor: theme.background,
     actionColor: "#FF9500",
     deleteLabel: archived ? "Restore group" : "Archive group",
@@ -93,7 +102,7 @@ export function GroupsCollection({ archived = false }: { archived?: boolean }) {
           sections: rows.length
             ? [{ key: "groups", label: "", data: rows }]
             : [],
-          ...(!archived
+          ...(!archived && groups.data !== undefined
             ? {
                 footer: (
                   <ArchiveLink
