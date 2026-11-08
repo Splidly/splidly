@@ -27,6 +27,8 @@ function context(userId: string, results: unknown[][]) {
   }[] = [];
   const filters: string[] = [];
   const db = {
+    transaction: async (run: (tx: Database) => Promise<unknown>) => run(db),
+    execute: async () => [],
     select: () => {
       const result = results.shift() ?? [];
       const query = {

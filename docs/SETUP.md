@@ -23,6 +23,15 @@ the root `.env`; only `EXPO_PUBLIC_` values are embedded in the mobile bundle.
 Development PostgreSQL uses host port `5433` by default. Override
 `POSTGRES_PORT` and update `DATABASE_URL` if required.
 
+Concurrency tests use a separate PostgreSQL database, never the development
+application database. CI starts this database automatically. To run them locally:
+
+```sh
+docker run --rm -d --name splidly-test-db -p 127.0.0.1:5544:5432 -e POSTGRES_PASSWORD=splidly-test -e POSTGRES_DB=splidly_test postgres:17.11-alpine3.24
+TEST_DATABASE_URL=postgresql://postgres:splidly-test@127.0.0.1:5544/splidly_test pnpm test:integration
+docker stop splidly-test-db
+```
+
 Run `pnpm security:check` after installation to exercise the installed security
 backports in the Expo/Jest dependency chain. These backports keep compatible
 package versions, so the registry's version-only audit still reports them.

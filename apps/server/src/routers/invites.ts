@@ -1,3 +1,4 @@
+import { groupWriteProcedure, serializeGroupWrites } from "../domain/group-write";
 import {
   and,
   eq,
@@ -17,6 +18,22 @@ import {
   requireActiveGroupMember,
 } from "../domain/helpers";
 import { protectedProcedure, publicProcedure, router } from "../trpc";
+
+const inviteRevokeProcedure = serializeGroupWrites(async (db, raw) => {
+  const byId = z.object({ inviteId: z.uuid() }).safeParse(raw);
+  if (!byId.success) return undefined;
+  const [invite] = await db.select({ groupId: invites.groupId }).from(invites)
+    .where(eq(invites.id, byId.data.inviteId)).limit(1);
+  return invite?.groupId ?? undefined;
+});
+
+const inviteAcceptProcedure = serializeGroupWrites(async (db, raw) => {
+  const byToken = z.object({ token: z.string().min(20).max(200) }).safeParse(raw);
+  if (!byToken.success) return undefined;
+  const [invite] = await db.select({ groupId: invites.groupId }).from(invites)
+    .where(eq(invites.tokenHash, hashInviteToken(byToken.data.token))).limit(1);
+  return invite?.groupId ?? undefined;
+});
 
 export function hashInviteToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
@@ -96,7 +113,7 @@ export const invitesRouter = router({
       };
     }),
 
-  create: protectedProcedure
+  create: groupWriteProcedure
     .input(
       z.discriminatedUnion("kind", [
         z.object({ kind: z.literal("friend") }),
@@ -167,7 +184,7 @@ export const invitesRouter = router({
         .where(eq(invites.inviterId, ctx.session.user.id));
     }),
 
-  revoke: protectedProcedure
+  revoke: inviteRevokeProcedure
     .input(z.object({ inviteId: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       const [invite] = await ctx.db
@@ -192,7 +209,7 @@ export const invitesRouter = router({
       return { revoked: true };
     }),
 
-  accept: protectedProcedure
+  accept: inviteAcceptProcedure
     .input(z.object({ token: z.string().min(20).max(200) }))
     .mutation(async ({ ctx, input }) => {
       const invite = await readInvite(ctx.db, input.token);

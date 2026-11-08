@@ -32,4 +32,5 @@ export function createDatabase(
   return { db, pool };
 }
 
-export type Database = ReturnType<typeof createDatabase>["db"];
+// Transactions expose the same query API; only the root connection owns $client.
+export type Database = Omit<ReturnType<typeof createDatabase>["db"], "$client">;

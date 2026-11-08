@@ -19,7 +19,8 @@
     "docker:down": "docker compose down",
     "production:check": "node ops/validate-production-config.mjs",
     "publication:check": "node ops/validate-publication.mjs",
-    "security:check": "node ops/verify-dependency-fixes.mjs"
+    "security:check": "node ops/verify-dependency-fixes.mjs",
+    "test:integration": "node ops/run-integration-tests.mjs"
   },
   "devDependencies": {
     "turbo": "2.11.10",
