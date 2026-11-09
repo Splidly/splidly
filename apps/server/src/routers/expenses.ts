@@ -1,3 +1,4 @@
+import { expenseWriteProcedure, groupContextWriteProcedure } from "../domain/group-write";
 import { restoreExpenseArchives } from "../domain/expense-archives";
 import {
   and,
@@ -526,7 +527,7 @@ export const expensesRouter = router({
       };
     }),
 
-  create: protectedProcedure
+  create: groupContextWriteProcedure
     .input(expenseMutationSchema)
     .mutation(async ({ ctx, input }) => {
       let prepared: PreparedExpense;
@@ -626,7 +627,7 @@ export const expensesRouter = router({
       });
     }),
 
-  update: protectedProcedure
+  update: expenseWriteProcedure
     .input(
       expenseMutationSchema.and(
         z.object({
@@ -753,7 +754,7 @@ export const expensesRouter = router({
       });
     }),
 
-  remove: protectedProcedure
+  remove: expenseWriteProcedure
     .input(
       z.object({
         expenseId: z.uuid(),

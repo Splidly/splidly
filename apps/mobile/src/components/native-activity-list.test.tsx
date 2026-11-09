@@ -2,6 +2,7 @@ import { act, fireEvent, render } from "@testing-library/react-native";
 import { StyleSheet, Text } from "react-native";
 import { ActivityExpenseRow } from "./activity-expense-row.ios";
 import { NativeActivityList } from "./native-activity-list.ios";
+import type { ActivityListSection } from "./native-activity-list.types";
 import { spacing } from "../theme";
 
 function sections(onDelete = jest.fn(async () => false), onPress = jest.fn()) {
@@ -33,7 +34,7 @@ function sections(onDelete = jest.fn(async () => false), onPress = jest.fn()) {
     },
   ];
 }
-function fixture(data = sections()) {
+function fixture(data: ActivityListSection[] = sections()) {
   return (
     <NativeActivityList
       header={<Text selectable={false}>Overview</Text>}
@@ -45,6 +46,133 @@ function fixture(data = sections()) {
 }
 
 describe("native iOS activity list", () => {
+  it("passes settings headings to UIKit without depending on React header measurements", async () => {
+    const view = await render(
+      <NativeActivityList
+        header={null}
+        scrollProps={{ style: { flex: 1 } }}
+        sections={[
+          { key: "preferences", label: "Preferences", nativeHeader: true, data: [] },
+          { key: "legal", label: "Legal & support", nativeHeader: true, data: [] },
+        ]}
+      />,
+    );
+    const list = view.getByTestId("native-activity-list");
+    expect(list.props.sections.slice(1).map((section: { headerTitle: string; headerHeight: number }) => ({
+      title: section.headerTitle, height: section.headerHeight,
+    }))).toEqual([
+      { title: "Preferences", height: 0 },
+      { title: "Legal & support", height: 0 },
+    ]);
+    expect(view.queryByTestId("activity-date-label-legal")).toBeNull();
+    expect(view.queryByTestId("activity-date-label-preferences")).toBeNull();
+  });
+
+  it("routes native cell selections only to current enabled row actions", async () => {
+    const onPress = jest.fn();
+    const data = [{ key: "settings", label: "Settings", data: [
+      { key: "enabled", nativeContent: true, content: <Text selectable={false}>Enabled</Text>, onPress },
+      { key: "disabled", nativeContent: true, content: <Text selectable={false}>Disabled</Text> },
+    ] }];
+    const view = await render(fixture(data));
+    const list = view.getByTestId("native-activity-list");
+    expect(list.props.sections[1].rows.map((row: { selectable: boolean }) => row.selectable)).toEqual([true, false]);
+    for (const rowKey of ["disabled", "unknown", "enabled"]) {
+      await fireEvent(list, "rowPress", { nativeEvent: { rowKey } });
+    }
+    expect(onPress).toHaveBeenCalledTimes(1);
+    await view.rerender(fixture([]));
+    await fireEvent(view.getByTestId("native-activity-list"), "rowPress", { nativeEvent: { rowKey: "enabled" } });
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps section footers separate and combines the last one with the screen footer once", async () => {
+    const view = await render(fixture([
+      { key: "first", label: "First", data: [], footer: <Text selectable={false}>First note</Text> },
+      { key: "last", label: "Last", data: [], footer: <Text selectable={false}>Last note</Text> },
+    ]));
+    const list = view.getByTestId("native-activity-list");
+    const first = view.getByTestId("native-activity-footer-first");
+    const last = view.getByTestId("native-activity-footer-content");
+    expect(first.queryAll((node) => node.props.children === "First note").length).toBeGreaterThan(0);
+    expect(last.queryAll((node) => node.props.children === "Last note").length).toBeGreaterThan(0);
+    expect(last.queryAll((node) => node.props.children === "Report").length).toBeGreaterThan(0);
+    expect(view.getAllByText("Last note")).toHaveLength(1);
+    expect(list.props.sections[1].footerIndex).not.toBe(list.props.sections[2].footerIndex);
+  });
+
+  it("sends menu metadata without callbacks and ignores disabled, unknown and stale actions", async () => {
+    const edit = jest.fn();
+    const remove = jest.fn();
+    const data = [{ key: "today", label: "Today", data: [{
+      key: "expense:1", content: <Text selectable={false}>Dinner</Text>,
+      preview: { title: "Dinner", subtitle: "Trip", symbol: "receipt", headline: "10 €", caption: "Total", details: [] },
+      onPreviewOpen: jest.fn(),
+      previewActions: [
+        { id: "edit", title: "Edit", symbol: "pencil", onPress: edit },
+        { id: "delete", title: "Delete", symbol: "trash", destructive: true, disabled: true, onPress: remove },
+      ],
+    }] }];
+    const view = await render(fixture(data));
+    const list = view.getByTestId("native-activity-list");
+    expect(list.props.sections[1].rows[0].previewActions).toEqual([
+      { id: "edit", title: "Edit", symbol: "pencil", destructive: false, disabled: false },
+      { id: "delete", title: "Delete", symbol: "trash", destructive: true, disabled: true },
+    ]);
+    for (const actionId of ["delete", "missing", "edit"]) {
+      await fireEvent(list, "previewAction", { nativeEvent: { rowKey: "expense:1", actionId } });
+    }
+    expect(edit).toHaveBeenCalledTimes(1);
+    expect(remove).not.toHaveBeenCalled();
+    await view.rerender(fixture([]));
+    await fireEvent(view.getByTestId("native-activity-list"), "previewAction", { nativeEvent: { rowKey: "expense:1", actionId: "edit" } });
+    expect(edit).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not present the same confirmation twice while an action is pending", async () => {
+    let finish!: () => void;
+    const remove = jest.fn(() => new Promise<void>((resolve) => { finish = resolve; }));
+    const view = await render(fixture([{ key: "today", label: "Today", data: [{
+      key: "expense:1", content: <Text selectable={false}>Dinner</Text>,
+      preview: { title: "Dinner", subtitle: "Trip", symbol: "receipt", headline: "10 €", caption: "Total", details: [] },
+      onPreviewOpen: jest.fn(),
+      previewActions: [{ id: "delete", title: "Delete", symbol: "trash", destructive: true, onPress: remove }],
+    }] }]));
+    const list = view.getByTestId("native-activity-list");
+    const event = { nativeEvent: { rowKey: "expense:1", actionId: "delete" } };
+    let pending!: Promise<void>;
+    await act(() => { pending = list.props.onPreviewAction(event); });
+    await fireEvent(list, "previewAction", event);
+    expect(remove).toHaveBeenCalledTimes(1);
+    await act(async () => { finish(); await pending; });
+  });
+
+  it("bridges preview data separately from deletion and opens only a current preview row", async () => {
+    const onPreviewOpen = jest.fn();
+    const onDelete = jest.fn(async () => true);
+    const preview = {
+      title: "Dinner", subtitle: "Lisbon", symbol: "receipt",
+      headline: "40.00 €", caption: "Total expense", details: [],
+    };
+    const data = [{ key: "today", label: "Today", data: [{
+      key: "expense:1", content: <Text selectable={false}>Dinner</Text>,
+      preview, onPreviewOpen, onDelete,
+    }] }];
+    const view = await render(fixture(data));
+    const list = view.getByTestId("native-activity-list");
+    expect(list.props.sections[1].rows[0].preview).toEqual(preview);
+    expect(onPreviewOpen).not.toHaveBeenCalled();
+    await fireEvent(list, "previewOpen", { nativeEvent: { rowKey: "expense:1" } });
+    expect(onPreviewOpen).toHaveBeenCalledTimes(1);
+    expect(onDelete).not.toHaveBeenCalled();
+    expect(list.props.completion).toBeUndefined();
+    await view.rerender(fixture([]));
+    await fireEvent(view.getByTestId("native-activity-list"), "previewOpen", {
+      nativeEvent: { rowKey: "expense:1" },
+    });
+    expect(onPreviewOpen).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps overview, payments, and footer in independent measured native hosts", async () => {
     const view = await render(fixture());
     const list = view.getByTestId("native-activity-list");
@@ -115,7 +243,7 @@ describe("native iOS activity list", () => {
       (node) => StyleSheet.flatten(node.props.style)?.flex === 1,
     );
     expect(outerHost).toHaveLength(1);
-    expect(outerHost[0]!.props.ignoreSafeArea).toBeUndefined();
+    expect(outerHost[0]!.props.ignoreSafeArea).toBe("container");
     const embeddedHosts = view.container.queryAll(
       (node) =>
         node.props.matchContentsVertical === true &&
@@ -125,6 +253,19 @@ describe("native iOS activity list", () => {
     for (const host of embeddedHosts) {
       expect(host.props.ignoreSafeArea).toBe("all");
     }
+  });
+
+  it("reports a measured empty overview so section-only lists can display their rows", async () => {
+    const view = await render(
+      <NativeActivityList header={null} sections={sections()} scrollProps={{ style: { flex: 1 } }} />,
+    );
+    const list = view.getByTestId("native-activity-list");
+    expect(list.props.sections[0].headerHeight).toBe(-1);
+    await fireEvent(list, "hostedLayout", { nativeEvent: { key: "header:overview", width: 320 } });
+    await fireEvent(view.getByTestId("native-activity-header-content"), "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: 320, height: 0 } },
+    });
+    expect(view.getByTestId("native-activity-list").props.sections[0].headerHeight).toBe(0);
   });
 
   it("renders the overview even when there is no activity", async () => {
@@ -150,7 +291,7 @@ describe("native iOS activity list", () => {
     await fireEvent(header, "layout", {
       nativeEvent: { layout: { x: 0, y: 0, width: 0, height: 300 } },
     });
-    expect(list.props.sections[0].headerHeight).toBe(0);
+    expect(list.props.sections[0].headerHeight).toBe(-1);
     await fireEvent(list, "hostedLayout", {
       nativeEvent: { key: "header:overview", width: 320 },
     });

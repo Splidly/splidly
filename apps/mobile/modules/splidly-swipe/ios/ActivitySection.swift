@@ -6,4 +6,6 @@ struct ActivitySection {
   let header: ActivityHostedContent
   let rows: [ActivityRow]
   let footer: ActivityHostedContent?
+  var headerTitle: String? = nil
+  var footerTitle: String? = nil
 }

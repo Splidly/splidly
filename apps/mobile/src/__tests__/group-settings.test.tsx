@@ -1,11 +1,20 @@
 import { act, fireEvent, render } from "@testing-library/react-native";
-import { Alert, StyleSheet } from "react-native";
+import { Alert } from "react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import GroupSettingsScreen from "../app/(tabs)/groups/[id]/settings";
 
 const mockUpdateMutate = jest.fn();
+const mockNotificationMutate = jest.fn();
+let mockSimplificationPending = false;
+let mockAppNotificationsEnabled = true;
 const mockRemoveMutate = jest.fn();
 const mockArchiveMutate = jest.fn(async () => undefined);
+
+jest.mock("@expo/ui/jetpack-compose", () => {
+  const actual = jest.requireActual("@expo/ui/jetpack-compose");
+  const { View } = require("react-native");
+  return { ...actual, Host: ({ children, ...props }: { children: React.ReactNode; [key: string]: unknown }) => <View {...props}>{children}</View> };
+});
 
 jest.mock("react-native-reanimated", () => {
   const { View } = jest.requireActual(
@@ -152,7 +161,7 @@ jest.mock("../lib/trpc", () => ({
         useMutation: () => ({
           mutate: mockUpdateMutate,
           error: null,
-          isPending: false,
+          isPending: mockSimplificationPending,
         }),
       },
       removeMember: {
@@ -165,7 +174,7 @@ jest.mock("../lib/trpc", () => ({
       },
       setNotificationPreference: {
         useMutation: () => ({
-          mutate: jest.fn(),
+          mutate: mockNotificationMutate,
           error: null,
           isPending: false,
         }),
@@ -186,7 +195,7 @@ jest.mock("../lib/trpc", () => ({
     },
     profile: {
       me: {
-        useQuery: () => ({ data: { userId: "user-1" } }),
+        useQuery: () => ({ data: { userId: "user-1", notificationsEnabled: mockAppNotificationsEnabled } }),
       },
     },
     invites: {
@@ -201,9 +210,12 @@ jest.mock("../lib/trpc", () => ({
   },
 }));
 
-describe("GroupSettingsScreen", () => {
+(process.env.EXPO_OS === "android" ? describe.skip : describe)("GroupSettingsScreen", () => {
   beforeEach(() => {
     mockPush.mockClear();
+    mockSimplificationPending = false;
+    mockAppNotificationsEnabled = true;
+    mockNotificationMutate.mockClear();
     mockUpdateMutate.mockClear();
     mockRemoveMutate.mockClear();
     jest.spyOn(Alert, "alert").mockClear();
@@ -218,35 +230,29 @@ describe("GroupSettingsScreen", () => {
       </SafeAreaInsetsContext.Provider>,
     );
 
-    expect(view.getByText("Lisbon")).toBeTruthy();
-    expect(view.getByText("€ · EUR")).toBeTruthy();
-    expect(
-      view
-        .getByTestId("activity-member-invite")
-        .queryAll(
-          (node) =>
-            node.props.text === "Share a reusable link valid for 7 days",
-        ),
-    ).toHaveLength(1);
-    let editAncestor = view.getByTestId("edit-group").parent;
-    let usesGroupColor = false;
-    while (editAncestor) {
-      if (editAncestor.props.seedColor === "#1764B0") {
-        usesGroupColor = true;
-        break;
-      }
-      editAncestor = editAncestor.parent;
-    }
-    expect(usesGroupColor).toBe(true);
-    expect(view.queryByText(/All settled up/)).toBeNull();
+    const list = view.getByTestId("native-activity-list");
+    const sections = list.props.sections.slice(1);
+    expect(sections.map((section: { headerTitle: string }) => section.headerTitle)).toEqual([
+      "", "Preferences", "Members (3)", "Group actions",
+    ]);
+    expect(sections[1].rows.map((row: { key: string }) => row.key)).toEqual(["group-notifications", "simplify-debts"]);
+    expect(sections[1].rows[1].settings.infoMessage).toBeUndefined();
+    expect(sections[1].footerTitle).toBe("Simplify debts reduces repayments without changing anyone’s net balance.");
+    expect(sections[1].rows[1].settings.subtitle).toBeUndefined();
+    expect(sections[2].footerTitle).toBe("Swipe to remove settled members.");
+    expect(sections.every((section: { rows: { nativeContent: boolean; settings: unknown }[] }) =>
+      section.rows.every(row => row.nativeContent && row.settings))).toBe(true);
+    expect(sections[0].rows[0].settings).toMatchObject({
+      title: "Lisbon", subtitle: "€ · EUR", identity: true, symbol: "airplane",
+      avatarFallback: { initials: "", rounded: true, backgroundColor: expect.any(String), foregroundColor: expect.any(String) },
+    });
+    expect(sections[2].rows[0].settings).toMatchObject({ title: "Invite people", subtitle: "Link valid for 7 days" });
     expect(view.queryByLabelText("Name")).toBeNull();
-    expect(
-      view.queryAllByText("›", { includeHiddenElements: true }),
-    ).toHaveLength(0);
-
-    await fireEvent.press(view.getByTestId("edit-group"));
+    await fireEvent(list, "rowPress", { nativeEvent: { rowKey: "edit-group" } });
+    await fireEvent(list, "rowPress", { nativeEvent: { rowKey: "edit-group" } });
 
     expect(mockPush).toHaveBeenCalledWith("/groups/group-1/edit");
+    expect(mockPush).toHaveBeenCalledTimes(1);
   });
 
   it("archives immediately from settings without showing a confirmation", async () => {
@@ -262,7 +268,7 @@ describe("GroupSettingsScreen", () => {
       .spyOn(Alert, "alert")
       .mockImplementation(() => undefined);
     try {
-      await fireEvent.press(view.getByText("Archive group"));
+      await fireEvent(view.getByTestId("native-activity-list"), "rowPress", { nativeEvent: { rowKey: "archive" } });
       expect(mockArchiveMutate).toHaveBeenCalledWith({
         groupId: "group-1",
         expectedVersion: 3,
@@ -282,20 +288,11 @@ describe("GroupSettingsScreen", () => {
       </SafeAreaInsetsContext.Provider>,
     );
 
-    expect(
-      view.queryByText("Use fewer payments to settle the group"),
-    ).toBeNull();
-    const switchStyle = StyleSheet.flatten(
-      view.getByLabelText("Simplify debts").props.style,
-    );
-    expect(switchStyle.alignSelf).toBe("center");
-    expect(switchStyle.transform).toBeUndefined();
-
-    await fireEvent(
-      view.getByLabelText("Simplify debts"),
-      "valueChange",
-      false,
-    );
+    const list = view.getByTestId("native-activity-list");
+    expect(list.props.sections.find((section: { key: string }) => section.key === "preferences").rows[1].settings)
+      .toMatchObject({ title: "Simplify debts", toggleValue: true, enabled: true });
+    await fireEvent(list, "rowPress", { nativeEvent: { rowKey: "simplify-debts" } });
+    expect(view.getByTestId("native-activity-list").props.sections.find((section: { key: string }) => section.key === "preferences").rows[1].settings.toggleValue).toBe(false);
 
     expect(mockUpdateMutate).toHaveBeenCalledWith({
       groupId: "group-1",
@@ -308,7 +305,7 @@ describe("GroupSettingsScreen", () => {
     });
   });
 
-  it("combines sorted members with balances, tap disclosures, and swipe removal", async () => {
+  it("uses native member disclosures and preserves swipe removal", async () => {
     const view = await render(
       <SafeAreaInsetsContext.Provider
         value={{ top: 0, right: 0, bottom: 0, left: 0 }}
@@ -318,7 +315,7 @@ describe("GroupSettingsScreen", () => {
     );
 
     const nativeList = view.getByTestId("native-activity-list");
-    const rows = nativeList.props.sections[1].rows;
+    const rows = nativeList.props.sections.find((section: { key: string }) => section.key === "members").rows;
     expect(rows.map((row: { key: string }) => row.key)).toEqual([
       "invite",
       "user-2",
@@ -339,24 +336,15 @@ describe("GroupSettingsScreen", () => {
       actionIcon: "person.badge.minus",
     });
     expect(rows[1].actionColor).toBeUndefined();
-    const alexRow = view.getByTestId("activity-member-user-2");
-    expect(
-      alexRow.queryAll(
-        (node) =>
-          typeof node.props.onPress === "function" ||
-          node.props.matchContents !== undefined,
-      ),
-    ).toHaveLength(0);
-    const textCount = (text: string) =>
-      view.container.queryAll((node) => node.props.text === text).length;
-    expect(textCount("Owes 5.00 €")).toBe(1);
-    expect(textCount("Lent 5.00 €")).toBe(1);
-    expect(textCount("Settled up")).toBe(1);
-    expect(textCount("Alex owes 5.00 € to you")).toBe(0);
-    await fireEvent(alexRow, "buttonPress");
-    expect(textCount("Alex owes 5.00 € to you")).toBe(1);
-    await fireEvent(view.getByTestId("activity-member-user-1"), "buttonPress");
-    expect(textCount("Alex owes 5.00 € to you")).toBe(2);
+    expect(rows[1].settings).toMatchObject({ title: "Alex", value: "Owes 5.00 €", disclosure: true, showsDisclosure: false, details: [{ title: "Owes you", value: "5.00 €", tone: "negative" }] });
+    expect(rows[1].settings.avatarFallback).toMatchObject({ initials: "A", backgroundColor: expect.any(String) });
+    expect(rows[2].settings.avatarFallback).toMatchObject({ initials: "L" });
+    expect(rows[3].settings.avatarFallback).toMatchObject({ initials: "Z" });
+    expect(rows[2].settings).toMatchObject({ title: "Lasse (You)", value: "Lent 5.00 €" });
+    expect(rows[3].settings).toMatchObject({ title: "Zoe", value: "Settled up" });
+    expect(view.queryByText("No outstanding balances.")).toBeNull();
+    expect(rows[1].selectable).toBe(false);
+    expect(mockPush).not.toHaveBeenCalled();
     await fireEvent(nativeList, "deleteRequested", {
       nativeEvent: { rowKey: "user-2", requestId: "remove-alex" },
     });
@@ -387,5 +375,52 @@ describe("GroupSettingsScreen", () => {
       requestId: "remove-zoe",
       deleted: false,
     });
+  });
+  it("updates the native notification switch and respects the app-wide disabled state", async () => {
+    const view = await render(<SafeAreaInsetsContext.Provider value={{ top: 0, right: 0, bottom: 0, left: 0 }}><GroupSettingsScreen /></SafeAreaInsetsContext.Provider>);
+    await fireEvent(view.getByTestId("native-activity-list"), "rowPress", { nativeEvent: { rowKey: "group-notifications" } });
+    expect(mockNotificationMutate).toHaveBeenCalledWith({ groupId: "group-1", enabled: false });
+    mockAppNotificationsEnabled = false;
+    await view.rerender(<SafeAreaInsetsContext.Provider value={{ top: 0, right: 0, bottom: 0, left: 0 }}><GroupSettingsScreen /></SafeAreaInsetsContext.Provider>);
+    const list = view.getByTestId("native-activity-list");
+    const section = list.props.sections.find((section: { key: string }) => section.key === "preferences");
+    expect(section.rows[0]).toMatchObject({ selectable: false, settings: { enabled: false, toggleValue: false } });
+    expect(section.footerTitle).toContain("Notifications are off in Profile > Notifications.");
+    mockNotificationMutate.mockClear();
+    await fireEvent(list, "rowPress", { nativeEvent: { rowKey: "group-notifications" } });
+    expect(mockNotificationMutate).not.toHaveBeenCalled();
+  });
+
+  it("disables the native debt switch during a save", async () => {
+    mockSimplificationPending = true;
+    const view = await render(<SafeAreaInsetsContext.Provider value={{ top: 0, right: 0, bottom: 0, left: 0 }}><GroupSettingsScreen /></SafeAreaInsetsContext.Provider>);
+    const list = view.getByTestId("native-activity-list");
+    expect(list.props.sections.find((section: { key: string }) => section.key === "preferences").rows[1])
+      .toMatchObject({ selectable: false, settings: { toggleValue: true, enabled: false } });
+    await fireEvent(list, "rowPress", { nativeEvent: { rowKey: "simplify-debts" } });
+    expect(mockUpdateMutate).not.toHaveBeenCalled();
+  });
+
+});
+
+(process.env.EXPO_OS === "android" ? describe : describe.skip)("Android group settings", () => {
+  it("preserves its summary, switches, member expansion and actions", async () => {
+    mockPush.mockClear();
+    mockUpdateMutate.mockClear();
+    mockSimplificationPending = false;
+    mockAppNotificationsEnabled = true;
+    const view = await render(<SafeAreaInsetsContext.Provider value={{ top: 0, right: 0, bottom: 0, left: 0 }}><GroupSettingsScreen /></SafeAreaInsetsContext.Provider>);
+    expect(view.getByText("Lisbon")).toBeTruthy();
+    expect(view.getByText("€ · EUR")).toBeTruthy();
+    expect(view.getByLabelText("Simplify debts")).toBeTruthy();
+    await fireEvent(view.getByLabelText("Simplify debts"), "valueChange", false);
+    expect(mockUpdateMutate).toHaveBeenCalledWith(expect.objectContaining({ simplifyDebts: false }));
+    expect(view.getByLabelText("Notifications for Lisbon")).toBeTruthy();
+    await fireEvent.press(view.getByLabelText("Alex. Owes 5.00 €"));
+    expect(view.getByText("Owes you")).toBeTruthy();
+    expect(view.getByText("Archive group")).toBeTruthy();
+    mockArchiveMutate.mockClear();
+    await fireEvent.press(view.getByText("Archive group"));
+    expect(mockArchiveMutate).toHaveBeenCalledWith({ groupId: "group-1", expectedVersion: 3 });
   });
 });

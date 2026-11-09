@@ -25,11 +25,13 @@ import {
 } from "../domain/debt-simplification";
 import { groupBy, requireFriendshipParticipant } from "../domain/helpers";
 import { loadGroupedLedgerAmounts } from "../domain/ledger-summary";
+import { loadExpensePreviewDebts } from "../domain/expense-preview-debts";
 import { protectedProcedure, router } from "../trpc";
 
 async function listFriends(
   ctx: { db: Database; session: { user: { id: string } } },
   archived = false,
+  includeArchived = false,
 ) {
   const userId = ctx.session.user.id;
   const [rows, simplifiedMemberships] = await Promise.all([
@@ -43,7 +45,7 @@ async function listFriends(
             eq(friendships.userHighId, userId),
           ),
           isNull(friendships.removedAt),
-          or(
+          includeArchived ? undefined : or(
             and(
               eq(friendships.userLowId, userId),
               archived
@@ -227,7 +229,7 @@ async function listFriends(
       friend,
       canArchive: [...buckets.values()].every((bucket) => bucket.canonicalMinor === 0n && bucket.viewerMinor === 0n && bucket.friendMinor === 0n),
       balances: [...buckets.values()]
-        .filter((bucket) => bucket.viewerMinor !== 0n)
+        .filter((bucket) => bucket.canonicalMinor !== 0n || bucket.viewerMinor !== 0n || bucket.friendMinor !== 0n)
         .map((bucket) => ({
           contextId: bucket.contextId,
           contextType: bucket.contextType,
@@ -244,8 +246,11 @@ async function listFriends(
 
 export const friendsRouter = router({
   list: protectedProcedure
-    .input(z.object({ archived: z.boolean().default(false) }).optional())
-    .query(({ ctx, input }) => listFriends(ctx, input?.archived)),
+    .input(z.object({
+      archived: z.boolean().default(false),
+      includeArchived: z.boolean().default(false),
+    }).optional())
+    .query(({ ctx, input }) => listFriends(ctx, input?.archived, input?.includeArchived)),
 
   archivedCount: protectedProcedure.query(async ({ ctx }) => {
     const userId = ctx.session.user.id;
@@ -359,6 +364,7 @@ export const friendsRouter = router({
             ),
         ]);
       const friend = friendRows[0];
+      const previewDebts = await loadExpensePreviewDebts(ctx.db, activity.map((expense) => expense.id), ctx.session.user.id);
       const settlementProfilesById = new Map(
         settlementProfiles.map((profile) => [profile.userId, profile]),
       );
@@ -367,6 +373,7 @@ export const friendsRouter = router({
         friend,
         expenses: activity.reverse().map((expense) => ({
           ...expense,
+          previewDebts: previewDebts.get(expense.id) ?? [],
           canonicalAmount: money(
             expense.sourceCurrency as CurrencyCode,
             expense.sourceAmountMinor,

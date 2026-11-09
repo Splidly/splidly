@@ -81,9 +81,11 @@ function rateBasis(base: CurrencyCode, targets: CurrencyCode[]) {
 
 export function ExpenseEditor({
   expenseId,
+  duplicateExpenseId,
   newContext,
 }: {
   expenseId?: string;
+  duplicateExpenseId?: string;
   newContext?: ExpenseContext;
 }) {
   const acceptCurrencyPickerPress = useNavigationPressGuard();
@@ -92,12 +94,14 @@ export function ExpenseEditor({
   const paymentSession = useExpensePaymentSession();
   const splitSession = useExpenseSplitSession();
   const editing = Boolean(expenseId);
+  const copying = !editing && Boolean(duplicateExpenseId);
+  const sourceExpenseId = expenseId ?? duplicateExpenseId;
   const detail = api.expenses.detail.useQuery(
-    { expenseId: expenseId ?? "" },
-    { enabled: editing },
+    { expenseId: sourceExpenseId ?? "" },
+    { enabled: Boolean(sourceExpenseId) },
   );
   const context = useMemo<ExpenseContext | undefined>(() => {
-    if (!editing) return newContext;
+    if (!sourceExpenseId) return newContext;
     const expense = detail.data?.expense;
     if (expense?.contextType === "group" && expense.groupId) {
       return { type: "group", groupId: expense.groupId };
@@ -106,7 +110,7 @@ export function ExpenseEditor({
       return { type: "friend", friendshipId: expense.friendshipId };
     }
     return undefined;
-  }, [detail.data?.expense, editing, newContext]);
+  }, [detail.data?.expense, sourceExpenseId, newContext]);
   const contextId =
     context?.type === "group"
       ? context.groupId
@@ -213,7 +217,7 @@ export function ExpenseEditor({
   const [description, setDescription] = useState("");
   const [manualIconKey, setManualIconKey] = useState<ExpenseIconKey>();
   const [notes, setNotes] = useState("");
-  const [notesExpanded, setNotesExpanded] = useState(editing);
+  const [notesExpanded, setNotesExpanded] = useState(editing || copying);
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState<CurrencyCode>("EUR");
   const [date, setDate] = useState(() => new Date());
@@ -323,10 +327,10 @@ export function ExpenseEditor({
 
   useEffect(() => {
     if (!context || participants.length === 0 || !canonicalCurrency) return;
-    const key = expenseId ?? "new";
+    const key = sourceExpenseId ? `${editing ? "edit" : "copy"}:${sourceExpenseId}` : "new";
     if (initialized.current === key) return;
 
-    if (!editing) {
+    if (!sourceExpenseId) {
       const initialCurrency = (
         context.type === "group"
           ? group.data?.group.currency
@@ -382,10 +386,11 @@ export function ExpenseEditor({
     setNotes(expense.notes);
     setAmount(formatMinor(expense.sourceAmountMinor, initialCurrency));
     setCurrency(initialCurrency);
-    setDate(expense.occurredAt);
-    setFrozenRates(detail.data.rates);
+    setDate(copying ? new Date() : expense.occurredAt);
+    setFrozenRates(copying ? [] : detail.data.rates);
+    setQuoteId(undefined);
     setQuoteExpiresAt(undefined);
-    setPreviewBasis(
+    setPreviewBasis(copying ? "" :
       rateBasis(
         initialCurrency,
         requiredRateTargets(
@@ -396,14 +401,15 @@ export function ExpenseEditor({
         ),
       ),
     );
-    setRateStatus("ready");
+    setRateStatus(copying ? "idle" : "ready");
     initialized.current = key;
   }, [
     canonicalCurrency,
     context,
     detail.data,
     editing,
-    expenseId,
+    copying,
+    sourceExpenseId,
     group.data?.group.currency,
     participants,
     profile.data?.homeCurrency,
@@ -566,7 +572,7 @@ export function ExpenseEditor({
     profile.isPending ||
     (context?.type === "group" && group.isPending) ||
     (context?.type === "friend" && friend.isPending);
-  if ((editing && detail.isPending) || contextPending) {
+  if ((sourceExpenseId && detail.isPending) || contextPending) {
     return (
       <Screen underlapsHeader={false}>
         <LoadingState />
@@ -582,7 +588,7 @@ export function ExpenseEditor({
           message={loadingError?.message ?? "Expense not found"}
           onRetry={() => {
             void profile.refetch();
-            if (editing) void detail.refetch();
+            if (sourceExpenseId) void detail.refetch();
             if (context?.type === "group") void group.refetch();
             if (context?.type === "friend") void friend.refetch();
           }}

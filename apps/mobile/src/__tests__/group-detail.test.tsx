@@ -3,6 +3,8 @@ import { StyleSheet } from "react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import GroupDetailScreen from "../app/(tabs)/groups/[id]";
 
+const mockConfirmSettlementDelete = jest.fn(async () => true);
+
 jest.mock("expo-router", () => {
   const React = require("react") as typeof import("react");
   const Screen = ({ options }: { options?: { title?: string } }) => {
@@ -46,6 +48,10 @@ jest.mock("../lib/use-delete-activity-expense", () => ({
   }),
 }));
 
+jest.mock("../lib/use-delete-activity-settlement", () => ({
+  useDeleteActivitySettlement: () => ({ confirmDelete: mockConfirmSettlementDelete, isPending: false }),
+}));
+
 jest.mock("../lib/trpc", () => ({
   api: {
     groups: {
@@ -81,6 +87,7 @@ jest.mock("../lib/trpc", () => ({
             settlements: [
               {
                 id: "settlement-1",
+                version: 4,
                 occurredAt: new Date("2026-07-21T12:00:00.000Z"),
                 notes: "",
                 amount: { currency: "EUR", minor: "600" },
@@ -205,12 +212,14 @@ describe("GroupDetailScreen actions", () => {
     expect(nativeText(view, /You \+ Alex paid 24\.00 €$/)).toBeTruthy();
     expect(nativeText(view, "You lent")).toBeTruthy();
     expect(nativeText(view, "10.00 €")).toBeTruthy();
-    expect(view.getByText("Payment")).toBeTruthy();
+    expect(nativeText(view, "Payment")).toBeTruthy();
     expect(view.getByTestId("settlement-activity-row")).toBeTruthy();
-    expect(view.getByLabelText("Payment. Alex paid you 6.00 €")).toBeTruthy();
-    expect(view.getByText("Alex paid you 6.00 €")).toBeTruthy();
+    expect(view.getByTestId("settlement-activity-row").props.modifiers).toContainEqual(
+      expect.objectContaining({ $type: "accessibilityLabel", label: "Payment. Alex paid you 6.00 €" }),
+    );
+    expect(nativeText(view, "Alex paid you 6.00 €")).toBeTruthy();
     expect(view.queryByText("You received")).toBeNull();
-    expect(view.queryByText("6.00 €")).toBeNull();
+    expect(view.container.queryAll((node) => node.props.text === "6.00 €")).toHaveLength(0);
     expect(
       view.getAllByTestId(/^activity-date-\d{4}-\d{2}-\d{2}$/),
     ).toHaveLength(2);
@@ -223,6 +232,21 @@ describe("GroupDetailScreen actions", () => {
     ).toBe(14);
     expect(view.queryByText(/20 Jul ·/)).toBeNull();
     expect(view.queryByText("Open balances")).toBeNull();
+    expect(view.getByTestId("native-activity-list").props.sections[1].rows[0]).toMatchObject({
+      selectable: true,
+      canDelete: true,
+      preview: { title: "Payment", headline: "6.00 €", caption: "You received" },
+      previewActions: [
+        expect.objectContaining({ id: "open" }),
+        expect.objectContaining({ id: "edit" }),
+        expect.objectContaining({ id: "delete", destructive: true }),
+      ],
+    });
+    await fireEvent(view.getByTestId("native-activity-list"), "deleteRequested", {
+      nativeEvent: { rowKey: "settlement:settlement-1", requestId: "payment-swipe" },
+    });
+    expect(mockConfirmSettlementDelete).toHaveBeenCalledWith(expect.objectContaining({ id: "settlement-1", version: 4 }));
+    expect(view.getByTestId("native-activity-list").props.completion).toEqual({ requestId: "payment-swipe", deleted: true });
     expect(view.getByLabelText("Lisbon statistics")).toBeTruthy();
     expect(view.getByTestId("group-navigation-title").props.children).toBe("");
     expect(
@@ -237,15 +261,10 @@ describe("GroupDetailScreen actions", () => {
     await fireEvent.press(view.getByLabelText("Lisbon statistics"));
     expect(mockPush).toHaveBeenCalledWith("/groups/group-1/statistics");
     mockPush.mockClear();
-    await fireEvent.press(view.getByTestId("settlement-activity-row"));
+    await fireEvent(view.getByTestId("settlement-activity-row"), "buttonPress");
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: "/settlement/new",
-      params: {
-        type: "group",
-        id: "group-1",
-        canonicalCurrency: "EUR",
-        settlementId: "settlement-1",
-      },
+      pathname: "/settlement/[id]",
+      params: { id: "settlement-1" },
     });
     mockPush.mockClear();
     expect(

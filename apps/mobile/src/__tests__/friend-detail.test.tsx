@@ -3,6 +3,8 @@ import { router } from "expo-router";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import FriendDetailScreen from "../app/(tabs)/friends/[id]";
 
+const mockConfirmSettlementDelete = jest.fn(async () => false);
+
 let mockFriendExpenses: Array<{
   id: string;
   description: string;
@@ -17,6 +19,7 @@ let mockFriendSettlements: Array<{
   occurredAt: Date;
   createdAt: Date;
   canonicalCurrency: string;
+  version: number;
   amount: { currency: string; minor: string };
   from: {
     userId: string;
@@ -50,6 +53,10 @@ jest.mock("../lib/use-delete-activity-expense", () => ({
     confirmDelete: jest.fn(),
     isPending: false,
   }),
+}));
+
+jest.mock("../lib/use-delete-activity-settlement", () => ({
+  useDeleteActivitySettlement: () => ({ confirmDelete: mockConfirmSettlementDelete, isPending: false }),
 }));
 
 jest.mock("../lib/trpc", () => ({
@@ -179,6 +186,7 @@ describe("FriendDetailScreen", () => {
     mockFriendSettlements = [
       {
         id: "settlement-1",
+        version: 4,
         occurredAt,
         createdAt: new Date("2026-07-20T15:00:00.000Z"),
         canonicalCurrency: "EUR",
@@ -204,18 +212,28 @@ describe("FriendDetailScreen", () => {
       </SafeAreaInsetsContext.Provider>,
     );
 
-    expect(view.getByText("You paid Demo User 5.00 €")).toBeTruthy();
-    await fireEvent.press(view.getByTestId("settlement-activity-row"));
+    expect(view.container.queryAll((node) => node.props.text === "You paid Demo User 5.00 €")).toHaveLength(1);
+    expect(view.container.queryAll((node) => node.props.text === "5.00 €")).toHaveLength(0);
+    expect(view.getByTestId("native-activity-list").props.sections[1].rows[0].nativeContent).toBe(true);
+    expect(view.getByTestId("native-activity-list").props.sections[1].rows[0]).toMatchObject({
+      selectable: true,
+      canDelete: true,
+      preview: { title: "Payment", headline: "5.00 €", caption: "You paid" },
+      previewActions: [
+        expect.objectContaining({ id: "open" }),
+        expect.objectContaining({ id: "edit" }),
+        expect.objectContaining({ id: "delete", destructive: true }),
+      ],
+    });
+    await fireEvent(view.getByTestId("native-activity-list"), "deleteRequested", {
+      nativeEvent: { rowKey: "settlement:settlement-1", requestId: "payment-swipe" },
+    });
+    expect(mockConfirmSettlementDelete).toHaveBeenCalledWith(expect.objectContaining({ id: "settlement-1", version: 4 }));
+    expect(view.getByTestId("native-activity-list").props.completion).toEqual({ requestId: "payment-swipe", deleted: false });
+    await fireEvent(view.getByTestId("settlement-activity-row"), "buttonPress");
     expect(router.push).toHaveBeenCalledWith({
-      pathname: "/settlement/new",
-      params: {
-        type: "friend",
-        id: "friendship-1",
-        friendshipId: "friendship-1",
-        friendId: "user-2",
-        canonicalCurrency: "EUR",
-        settlementId: "settlement-1",
-      },
+      pathname: "/settlement/[id]",
+      params: { id: "settlement-1" },
     });
   });
 

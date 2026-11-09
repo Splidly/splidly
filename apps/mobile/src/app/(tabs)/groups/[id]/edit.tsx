@@ -38,6 +38,7 @@ export default function EditGroupScreen() {
   const [iconKey, setIconKey] = useState<GroupIconKey>("default");
   const [color, setColor] = useState<GroupColor>("#4745B8");
   const [imageUrl, setImageUrl] = useState<CustomImageDataUrl | null>(null);
+  const [preparingImage, setPreparingImage] = useState(false);
   const [currency, setCurrency] = useState<CurrencyCode>("EUR");
 
   useEffect(() => {
@@ -102,6 +103,7 @@ export default function EditGroupScreen() {
         imageUrl={imageUrl}
         disabled={update.isPending}
         onImageChange={setImageUrl}
+        onPreparingChange={setPreparingImage}
         preview={
           <GroupIcon
             iconKey={iconKey}
@@ -157,7 +159,7 @@ export default function EditGroupScreen() {
       <View style={styles.footer}>
         <PrimaryButton
           label={update.isPending ? "Saving…" : "Save changes"}
-          disabled={update.isPending || name.trim().length === 0}
+          disabled={update.isPending || preparingImage || name.trim().length === 0}
           onPress={() =>
             update.mutate({
               groupId: id,

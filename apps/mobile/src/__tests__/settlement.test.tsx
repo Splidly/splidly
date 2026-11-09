@@ -1,10 +1,11 @@
 import { act, fireEvent, render } from "@testing-library/react-native";
-import { Alert, StyleSheet } from "react-native";
+import { StyleSheet } from "react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import NewSettlementScreen from "../app/settlement/new";
 
 let mockSettlementParams: Record<string, string | undefined> = {};
 let mockSettlementDetailData: unknown;
+const mockFriendDetailInvalidate = jest.fn(async () => undefined);
 
 jest.mock("@expo/ui/community/menu", () => {
   const { View } = require("react-native") as typeof import("react-native");
@@ -186,7 +187,7 @@ jest.mock("../lib/trpc", () => ({
     useUtils: () => ({
       friends: {
         list: { invalidate: jest.fn() },
-        detail: { invalidate: jest.fn() },
+        detail: { invalidate: mockFriendDetailInvalidate },
       },
       groups: {
         list: { invalidate: jest.fn() },
@@ -210,6 +211,7 @@ describe("NewSettlementScreen group context", () => {
       canonicalMinor: "1234",
     };
     mockSettlementDetailData = undefined;
+    mockFriendDetailInvalidate.mockClear();
     jest.useFakeTimers();
     mockQuote.mockClear();
     (
@@ -257,34 +259,19 @@ describe("NewSettlementScreen group context", () => {
     expect(view.getByLabelText("Paid by: Alex")).toBeTruthy();
     expect(view.getByLabelText("Paid to: You")).toBeTruthy();
     expect(view.getByDisplayValue("12.34")).toBeTruthy();
-    await fireEvent(view.getByTestId("settlement-paid-by-slot"), "layout", {
-      nativeEvent: { layout: { x: 0, y: 0, width: 220, height: 110 } },
-    });
     expect(
-      StyleSheet.flatten(view.getByTestId("settlement-paid-by").props.style)
-        .width,
-    ).toBe(220);
+      StyleSheet.flatten(view.getByTestId("settlement-paid-by").props.style).width,
+    ).toBe("100%");
     expect(
-      StyleSheet.flatten(view.getByTestId("settlement-paid-to").props.style)
-        .width,
-    ).toBe(220);
-    expect(
-      StyleSheet.flatten(view.getByTestId("settlement-paid-by-slot").props.style)
-        .flex,
-    ).toBe(1);
-    expect(
-      StyleSheet.flatten(view.getByTestId("settlement-paid-to-slot").props.style)
-        .flex,
-    ).toBe(1);
-    expect(
-      StyleSheet.flatten(
-        view.getByTestId("settlement-direction-arrow", {
-          includeHiddenElements: true,
-        }).props.style,
-      ),
-    ).toEqual(
-      expect.objectContaining({ alignSelf: "flex-start", marginTop: 13 }),
+      StyleSheet.flatten(view.getByTestId("settlement-paid-to").props.style).width,
+    ).toBe("100%");
+    expect(view.getByTestId("settlement-paid-by").props.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "user-2", state: "on" }),
+        expect.objectContaining({ id: "user-1", state: "off" }),
+      ]),
     );
+    expect(view.getByTestId("settlement-direction-arrow", { includeHiddenElements: true })).toBeTruthy();
     expect(
       view.getByTestId("currency-chevron", { includeHiddenElements: true }),
     ).toBeTruthy();
@@ -391,6 +378,35 @@ describe("NewSettlementScreen group context", () => {
     ).toHaveBeenCalledWith("/groups/group-1");
   });
 
+  it.each(["cancel", "save"])("returns from the editor to the correct screen after %s", async (action) => {
+    mockSettlementParams.settlementId = "settlement-1";
+    mockSettlementParams.returnToDetail = "true";
+    mockSettlementDetailData = {
+      settlement: {
+        id: "settlement-1", version: 2, fromUserId: "user-2", toUserId: "user-1",
+        sourceCurrency: "EUR", sourceAmountMinor: 900n,
+        occurredAt: new Date("2026-07-20T12:00:00Z"), notes: "Cash",
+      },
+      rates: [],
+    };
+    const view = await render(
+      <SafeAreaInsetsContext.Provider value={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+        <NewSettlementScreen />
+      </SafeAreaInsetsContext.Provider>,
+    );
+    if (action === "cancel") {
+      await fireEvent.press(view.getByLabelText("Cancel payment"));
+    } else {
+      const api = (jest.requireMock("../lib/trpc") as {
+        api: { settlements: { update: { useMutation: jest.Mock }; remove: { useMutation: jest.Mock } } };
+      }).api;
+      const hook = api.settlements.update.useMutation;
+      await act(async () => { await hook.mock.calls.at(-1)?.[0].onSuccess(); });
+    }
+    const { router } = jest.requireMock("expo-router") as { router: { dismissTo: jest.Mock } };
+    expect(router.dismissTo).toHaveBeenCalledWith("/settlement/settlement-1");
+  });
+
   it("returns to group balances when launched from the balances flow", async () => {
     mockSettlementParams.returnTo = "balances";
     const view = await render(
@@ -430,6 +446,7 @@ describe("NewSettlementScreen group context", () => {
     };
 
     await act(async () => options.onSuccess());
+    expect(mockFriendDetailInvalidate).toHaveBeenCalledWith();
 
     expect(
       (
@@ -471,6 +488,8 @@ describe("NewSettlementScreen group context", () => {
     await act(async () => {});
 
     expect(view.getByDisplayValue("9.00")).toBeTruthy();
+    expect(view.getByText("Payment plan")).toBeTruthy();
+    expect(view.queryByTestId("settlement-direction-arrow", { includeHiddenElements: true })).toBeNull();
     expect(view.getByLabelText("Paid by: Flo")).toBeTruthy();
     expect(view.getByDisplayValue("Cash")).toBeTruthy();
     const saveButton = view.getByText("Save changes").parent;
@@ -497,7 +516,7 @@ describe("NewSettlementScreen group context", () => {
     );
   });
 
-  it("deletes an existing payment after destructive confirmation", async () => {
+  it("keeps deletion out of the payment editor", async () => {
     mockSettlementParams = {
       type: "group",
       id: "group-1",
@@ -517,7 +536,6 @@ describe("NewSettlementScreen group context", () => {
       },
       rates: [],
     };
-    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => {});
 
     const view = await render(
       <SafeAreaInsetsContext.Provider
@@ -528,29 +546,9 @@ describe("NewSettlementScreen group context", () => {
     );
     await act(async () => {});
 
-    await fireEvent.press(view.getByText("Delete payment"));
-    expect(alert).toHaveBeenCalledWith(
-      "Delete payment?",
-      "This payment will be removed and its balances will be reversed.",
-      expect.any(Array),
-    );
-    const buttons = alert.mock.calls[0]?.[2];
-    const destructive = buttons?.find(
-      (button) => button.style === "destructive",
-    );
-    destructive?.onPress?.();
+    expect(view.queryByText("Delete payment")).toBeNull();
+    expect(view.getByText("Save changes")).toBeTruthy();
+    expect(view.getByLabelText("Cancel payment")).toBeTruthy();
 
-    const removeHook = (
-      jest.requireMock("../lib/trpc") as {
-        api: { settlements: { remove: { useMutation: jest.Mock } } };
-      }
-    ).api.settlements.remove.useMutation;
-    const removeMutate = removeHook.mock.results
-      .map((result) => result.value.mutate as jest.Mock)
-      .find((mutate) => mutate.mock.calls.length > 0);
-    expect(removeMutate).toHaveBeenCalledWith({
-      settlementId: "settlement-1",
-      expectedVersion: 2,
-    });
   });
 });

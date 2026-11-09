@@ -37,12 +37,11 @@ export function ExpenseDetailHero({
     <View
       style={{
         overflow: "hidden",
-        padding: 14,
-        borderRadius: 20,
+        padding: 16,
+        borderRadius: 16,
         borderCurve: "continuous",
-        backgroundColor: theme.surface,
-        boxShadow: "0 4px 18px rgba(0, 0, 0, 0.07)",
-        gap: 13,
+        backgroundColor: theme.sheetSurface,
+        gap: 12,
       }}
     >
       <View
@@ -104,12 +103,7 @@ export function ExpenseDetailHero({
               accessible
               accessibilityLabel={`${convertedAmount} in your home currency`}
               style={{
-                minHeight: 29,
-                paddingHorizontal: 9,
-                paddingVertical: 5,
-                borderRadius: 9,
-                borderCurve: "continuous",
-                backgroundColor: theme.elevated,
+                minHeight: 22,
                 flexDirection: "row",
                 alignItems: "center",
                 justifyContent: "space-between",
@@ -117,6 +111,7 @@ export function ExpenseDetailHero({
               }}
             >
               <Text
+                selectable={false}
                 style={{
                   color: theme.muted,
                   fontSize: 12,
@@ -180,13 +175,12 @@ function Metadata({
       }}
     >
       <Text
+        selectable={false}
         style={{
           color: theme.muted,
-          fontSize: 11,
-          lineHeight: 14,
-          fontWeight: "600",
-          textTransform: "uppercase",
-          letterSpacing: 0.35,
+          fontSize: 12,
+          lineHeight: 16,
+          fontWeight: "500",
         }}
       >
         {label}

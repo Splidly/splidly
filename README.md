@@ -52,6 +52,7 @@ Production server and store configuration is covered in the
 
 ```sh
 pnpm publication:check
+pnpm security:check
 pnpm typecheck
 pnpm test
 pnpm build

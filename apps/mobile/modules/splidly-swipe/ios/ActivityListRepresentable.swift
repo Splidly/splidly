@@ -11,6 +11,9 @@ struct ActivityListRepresentable: UIViewControllerRepresentable {
   let onRefresh: @MainActor (String) -> Void
   let onScroll: @MainActor ([String: Any]) -> Void
   let onHostedLayout: @MainActor (String, CGFloat) -> Void
+  let onPreviewOpen: @MainActor (String) -> Void
+  let onPreviewAction: @MainActor (String, String) -> Void
+  let onRowPress: @MainActor (String) -> Void
 
   func makeUIViewController(context: Context) -> ActivityListController {
     ActivityListController(plain: plain)
@@ -26,7 +29,10 @@ struct ActivityListRepresentable: UIViewControllerRepresentable {
       onDeleteRequested: onDeleteRequested,
       onRefresh: onRefresh,
       onScroll: onScroll,
-      onHostedLayout: onHostedLayout
+      onHostedLayout: onHostedLayout,
+      onPreviewOpen: onPreviewOpen,
+      onPreviewAction: onPreviewAction,
+      onRowPress: onRowPress
     )
   }
 

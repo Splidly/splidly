@@ -27,6 +27,17 @@ export default function ProfileStackLayout() {
         }}
       />
       <Stack.Screen
+        name="edit"
+        options={{
+          title: "Edit profile",
+          ...formSheetOptions(theme.sheet),
+          sheetAllowedDetents: [0.75, 1],
+          sheetInitialDetentIndex: 0,
+          sheetGrabberVisible: true,
+          ...(process.env.EXPO_OS === "android" ? { headerShown: false } : {}),
+        }}
+      />
+      <Stack.Screen
         name="notifications"
         options={{
           title: "Notifications",

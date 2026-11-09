@@ -34,6 +34,7 @@ export function useListAction() {
           await options.perform();
           finish(true);
         } catch (error) {
+          if (finished) return;
           finish(false);
           Alert.alert(
             `Could not ${options.label.toLowerCase()}`,

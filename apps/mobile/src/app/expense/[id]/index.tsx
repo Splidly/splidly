@@ -56,14 +56,14 @@ export default function ExpenseDetailScreen() {
 
   if (detail.isPending) {
     return (
-      <Screen background="sheet">
+      <Screen background="groupedSheet">
         <LoadingState />
       </Screen>
     );
   }
   if (detail.error || !detail.data) {
     return (
-      <Screen background="sheet">
+      <Screen background="groupedSheet">
         <ErrorState
           message={detail.error?.message}
           onRetry={() => void detail.refetch()}
@@ -107,9 +107,9 @@ export default function ExpenseDetailScreen() {
   return (
     <>
       <Screen
-        background="sheet"
+        background="groupedSheet"
         formSheetBottomClearance
-        contentContainerStyle={{ paddingTop: 8, gap: 16 }}
+        contentContainerStyle={{ paddingTop: 8, gap: 20 }}
       >
         <SheetCaption>Expense details</SheetCaption>
         <ExpenseDetailHero
@@ -128,10 +128,10 @@ export default function ExpenseDetailScreen() {
           }
         />
 
-        <Section title="Paid by">
+        <Section title="Paid by" surface="sheet">
           {payers.map((payer, index) => (
             <View key={payer.userId}>
-              {index > 0 ? <RowDivider /> : null}
+              {index > 0 ? <RowDivider inset={60} /> : null}
               <ListRow
                 title={payer.displayName}
                 leading={
@@ -139,6 +139,7 @@ export default function ExpenseDetailScreen() {
                     name={payer.displayName}
                     colorKey={payer.userId}
                     imageUrl={payer.avatarUrl}
+                    size={32}
                   />
                 }
                 trailing={
@@ -155,12 +156,13 @@ export default function ExpenseDetailScreen() {
         </Section>
 
         <Section
+          surface="sheet"
           title={`Split · ${expenseSplitModeLabels[split.mode]}`}
           footer={`${splits.length} ${splits.length === 1 ? "person" : "people"} included`}
         >
           {splits.map((person, index) => (
             <View key={person.userId}>
-              {index > 0 ? <RowDivider /> : null}
+              {index > 0 ? <RowDivider inset={60} /> : null}
               <ListRow
                 title={person.displayName}
                 leading={
@@ -168,6 +170,7 @@ export default function ExpenseDetailScreen() {
                     name={person.displayName}
                     colorKey={person.userId}
                     imageUrl={person.avatarUrl}
+                    size={32}
                   />
                 }
                 trailing={
@@ -184,7 +187,7 @@ export default function ExpenseDetailScreen() {
         </Section>
 
         {split.mode === "itemized" ? (
-          <Section title="Items">
+          <Section title="Items" surface="sheet">
             {split.items.map((item, index) => (
               <View key={item.id}>
                 {index > 0 ? <RowDivider inset={16} /> : null}
@@ -214,20 +217,25 @@ export default function ExpenseDetailScreen() {
         ) : null}
 
         {expense.notes ? (
-          <Section title="Notes">
-            <View style={{ paddingHorizontal: 16, paddingVertical: 13 }}>
-              <Text
-                selectable={false}
-                style={{ color: theme.text, fontSize: 16, lineHeight: 23 }}
-              >
-                {expense.notes}
-              </Text>
-            </View>
-          </Section>
+          <View style={{ paddingHorizontal: 16, gap: 6 }}>
+            <Text
+              selectable={false}
+              style={{ color: theme.muted, fontSize: 13, lineHeight: 18 }}
+            >
+              Notes
+            </Text>
+            <Text
+              selectable={false}
+              style={{ color: theme.text, fontSize: 15, lineHeight: 21 }}
+            >
+              {expense.notes}
+            </Text>
+          </View>
         ) : null}
 
         {rates.some((rate) => rate.base !== rate.quote) ? (
           <Section
+            surface="sheet"
             title="Exchange rate"
             footer="The saved rate keeps this expense and its balances stable."
           >
@@ -246,18 +254,18 @@ export default function ExpenseDetailScreen() {
           </Section>
         ) : null}
 
-          <Section>
-            <ListRow
-              title={remove.isPending ? "Deleting…" : "Delete expense"}
-              destructive
-              showsDisclosureIndicator={false}
-              {...(remove.isPending ? {} : { onPress: confirmDelete })}
-            />
-          </Section>
-        <Section>
+        <Section surface="sheet">
+          <ListRow
+            title={remove.isPending ? "Deleting…" : "Delete expense"}
+            destructive
+            showsDisclosureIndicator={false}
+            {...(remove.isPending ? {} : { onPress: confirmDelete })}
+          />
+          <RowDivider inset={16} />
           <ListRow
             title="Report this expense"
-            subtitle="Report illegal content or abusive behavior"
+            titleColor={theme.muted}
+            accessibilityHint="Report illegal content or abusive behavior"
             showsDisclosureIndicator={false}
             onPress={() =>
               void Linking.openURL(

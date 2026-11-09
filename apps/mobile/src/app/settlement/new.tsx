@@ -11,7 +11,6 @@ import * as Crypto from "expo-crypto";
 import { router, Stack, useLocalSearchParams, type Href } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
   Pressable,
   ScrollView,
   Text,
@@ -30,13 +29,13 @@ import {
   type SettlementMember,
 } from "../../components/settlement-composer";
 import { DateField } from "../../components/date-field";
+import { ComposerSectionHeader } from "../../components/expense-composer-ui";
 import {
   ErrorState,
   HeaderButton,
-  ListRow,
   LoadingState,
+  RowDivider,
   Screen,
-  Section,
   SheetCaption,
   useKeyboardFocusScroll,
 } from "../../components/ui";
@@ -62,6 +61,7 @@ export default function NewSettlementScreen() {
     canonicalMinor?: string;
     settlementId?: string;
     returnTo?: "balances" | "settings";
+    returnToDetail?: string;
   }>();
   const editing = Boolean(params.settlementId);
   const theme = useTheme();
@@ -128,7 +128,11 @@ export default function NewSettlementScreen() {
   ) as Href;
 
   function closePayment() {
-    router.dismissTo(closeHref);
+    router.dismissTo(
+      editing && params.returnToDetail === "true"
+        ? `/settlement/${params.settlementId}` as Href
+        : closeHref,
+    );
   }
 
   useEffect(() => {
@@ -141,12 +145,12 @@ export default function NewSettlementScreen() {
   async function finishSaving() {
     await Promise.all([
       utils.friends.list.invalidate(),
+      // Group repayments can change the group ledgers shown in any friend detail.
+      utils.friends.detail.invalidate(),
       utils.groups.list.invalidate(),
       params.type === "group"
         ? utils.groups.detail.invalidate({ groupId: params.id })
-        : utils.friends.detail.invalidate({
-            friendshipId: params.friendshipId ?? params.id,
-          }),
+        : Promise.resolve(),
       params.type === "group"
         ? utils.groups.balances.invalidate({ groupId: params.id })
         : Promise.resolve(),
@@ -160,14 +164,12 @@ export default function NewSettlementScreen() {
   }
 
   const create = api.settlements.create.useMutation({
-    onSuccess: finishSaving,
+    onSuccess: () => finishSaving(),
   });
   const update = api.settlements.update.useMutation({
-    onSuccess: finishSaving,
+    onSuccess: () => finishSaving(),
   });
-  const remove = api.settlements.remove.useMutation({
-    onSuccess: finishSaving,
-  });
+
 
   const contextMembers = useMemo(() => {
     const candidates =
@@ -469,27 +471,6 @@ export default function NewSettlementScreen() {
     }
   }
 
-  function confirmDelete() {
-    const settlement = settlementDetail.data?.settlement;
-    if (!params.settlementId || !settlement) return;
-    Alert.alert(
-      "Delete payment?",
-      "This payment will be removed and its balances will be reversed.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () =>
-            remove.mutate({
-              settlementId: params.settlementId!,
-              expectedVersion: settlement.version,
-            }),
-        },
-      ],
-    );
-  }
-
   const convertedCanonical = useMemo(() => {
     if (
       sourceMinor === undefined ||
@@ -550,7 +531,7 @@ export default function NewSettlementScreen() {
   } else {
     const conversionMetadata =
       rateStatus === "loading" ? (
-        <Text style={{ color: theme.muted, fontSize: 13 }}>
+        <Text selectable={false} style={{ color: theme.muted, fontSize: 13 }}>
           Updating conversion…
         </Text>
       ) : rateStatus === "error" ? (
@@ -574,40 +555,62 @@ export default function NewSettlementScreen() {
         </Text>
       ) : null;
 
+    const paymentCardStyle = {
+      borderRadius: 24,
+      borderCurve: "continuous" as const,
+      backgroundColor: theme.surface,
+      boxShadow: "0 8px 28px rgba(0, 0, 0, 0.08)",
+    };
+    const amountCard = (
+      <SettlementAmountCard
+        amount={amount}
+        currency={currency}
+        onAmountChange={setAmount}
+        onAmountBlur={formatAmountOnBlur}
+        onAmountFocus={focusBottomInput}
+        onAmountBlurInput={blurBottomInput}
+        onCurrencyPress={openCurrency}
+        {...(conversionMetadata ? { metadata: conversionMetadata } : {})}
+      />
+    );
+    const directionCard = (
+      <SettlementDirectionCard
+        compact={editing}
+        from={fromMember}
+        to={toMember}
+        viewerId={profile.data?.userId}
+        members={contextMembers}
+        onFromChange={selectFrom}
+        onToChange={selectTo}
+        locked={params.type === "friend"}
+      />
+    );
     content = (
       <>
-        <SettlementDirectionCard
-          from={fromMember}
-          to={toMember}
-          viewerId={profile.data?.userId}
-          members={contextMembers}
-          onFromChange={selectFrom}
-          onToChange={selectTo}
-          locked={params.type === "friend"}
-        />
-        <SettlementAmountCard
-          amount={amount}
-          currency={currency}
-          onAmountChange={setAmount}
-          onAmountBlur={formatAmountOnBlur}
-          onAmountFocus={focusBottomInput}
-          onAmountBlurInput={blurBottomInput}
-          onCurrencyPress={openCurrency}
-          {...(conversionMetadata ? { metadata: conversionMetadata } : {})}
-        />
+        {editing ? (
+          <>
+            <View style={paymentCardStyle}>{amountCard}</View>
+            <View style={{ gap: 10 }}>
+              <ComposerSectionHeader
+                title="Payment plan"
+                subtitle="Review who paid and who received the payment."
+              />
+              <View style={paymentCardStyle}>{directionCard}</View>
+            </View>
+          </>
+        ) : (
+          <View testID="settlement-payment-card" style={paymentCardStyle}>
+            {directionCard}
+            <RowDivider inset={18} />
+            {amountCard}
+          </View>
+        )}
 
         <View style={{ gap: 10 }}>
-          <Text
-            style={{
-              color: theme.text,
-              paddingHorizontal: 4,
-              fontSize: 20,
-              fontWeight: "700",
-              letterSpacing: -0.3,
-            }}
-          >
-            Details
-          </Text>
+          <ComposerSectionHeader
+            title="Details"
+            {...(editing ? { subtitle: "Set the date and add anything worth remembering." } : {})}
+          />
           <View
             style={{
               overflow: "hidden",
@@ -629,13 +632,8 @@ export default function NewSettlementScreen() {
                 style={{ paddingHorizontal: 16, paddingVertical: 13, gap: 6 }}
               >
                 <Text
-                  style={{
-                    color: theme.muted,
-                    fontSize: 12,
-                    fontWeight: "600",
-                    textTransform: "uppercase",
-                    letterSpacing: 0.4,
-                  }}
+                  selectable={false}
+                  style={{ color: theme.muted, fontSize: 12, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.4 }}
                 >
                   Note
                 </Text>
@@ -653,7 +651,7 @@ export default function NewSettlementScreen() {
                   textAlignVertical="top"
                   style={{
                     color: theme.text,
-                    minHeight: 72,
+                    minHeight: 48,
                     padding: 0,
                     fontSize: 16,
                     lineHeight: 21,
@@ -674,12 +672,14 @@ export default function NewSettlementScreen() {
                 })}
               >
                 <Text
+                  selectable={false}
                   accessibilityElementsHidden
                   style={{ color: theme.primary, fontSize: 20 }}
                 >
                   ＋
                 </Text>
                 <Text
+                  selectable={false}
                   style={{
                     color: theme.primary,
                     fontSize: 16,
@@ -693,22 +693,11 @@ export default function NewSettlementScreen() {
           </View>
         </View>
 
-        {editing ? (
-          <Section>
-            <ListRow
-              title={remove.isPending ? "Deleting…" : "Delete payment"}
-              destructive
-              showsDisclosureIndicator={false}
-              {...(remove.isPending ? {} : { onPress: confirmDelete })}
-            />
-          </Section>
-        ) : null}
-
         {formError ? <ErrorState message={formError} /> : null}
-        {create.error || update.error || remove.error ? (
+        {create.error || update.error ? (
           <ErrorState
             message={
-              (create.error ?? update.error ?? remove.error)?.message ??
+              (create.error ?? update.error)?.message ??
               "Could not save payment"
             }
           />
@@ -723,8 +712,10 @@ export default function NewSettlementScreen() {
         scrollViewRef={screenRef}
         onScroll={onBottomScroll}
         transientBottomClearance={keyboardClearance}
-        background="sheet"
-        contentContainerStyle={{ paddingTop: 16, gap: 20 }}
+        background={editing ? "default" : "sheet"}
+        underlapsHeader={false}
+        formSheetBottomClearance={editing}
+        contentContainerStyle={editing ? { paddingTop: 16, gap: 22 } : { paddingTop: 8, gap: 16 }}
         {...(!contextPending && !contextError && contextMembers.length >= 2
           ? {
               bottomOverlay: (
@@ -740,7 +731,6 @@ export default function NewSettlementScreen() {
                   disabled={
                     create.isPending ||
                     update.isPending ||
-                    remove.isPending ||
                     !conversionReady
                   }
                 />
@@ -757,6 +747,8 @@ export default function NewSettlementScreen() {
       <Stack.Screen
         options={{
           title: editing ? "Edit Payment" : "Record Payment",
+          headerStyle: { backgroundColor: editing ? theme.background : theme.sheet },
+          contentStyle: { backgroundColor: editing ? theme.background : theme.sheet },
           headerTitleAlign: "center",
           ...(process.env.EXPO_OS !== "ios" && {
             headerLeft: () => (
@@ -764,7 +756,7 @@ export default function NewSettlementScreen() {
                 label="Cancel payment"
                 glyph="×"
                 disabled={
-                  create.isPending || update.isPending || remove.isPending
+                  create.isPending || update.isPending
                 }
                 onPress={closePayment}
               />
@@ -776,7 +768,7 @@ export default function NewSettlementScreen() {
         <Stack.Toolbar.Button
           icon={toolbarIcons.close}
           accessibilityLabel="Cancel payment"
-          disabled={create.isPending || update.isPending || remove.isPending}
+          disabled={create.isPending || update.isPending}
           onPress={closePayment}
         />
       </Stack.Toolbar>

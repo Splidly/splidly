@@ -1,4 +1,6 @@
+import { groupWriteProcedure } from "../domain/group-write";
 import {
+  type Database,
   and,
   count,
   eq,
@@ -43,6 +45,7 @@ import {
   viewerRepaymentBalances,
 } from "../domain/debt-simplification";
 import { expenseActivitySummary } from "../domain/expense-activity";
+import { loadExpensePreviewDebts } from "../domain/expense-preview-debts";
 import { allocateByUser } from "../domain/expense-allocation";
 import {
   buildGroupStatistics,
@@ -65,7 +68,7 @@ function groupBalance(
 }
 
 async function removeGroupMember(input: {
-  ctx: Parameters<typeof requireActiveGroupMember> extends never ? never : any;
+  ctx: { db: Database; session: { user: { id: string } } };
   groupId: string;
   userId: string;
 }) {
@@ -732,6 +735,7 @@ export const groupsRouter = router({
         settlementProfiles.map((profile) => [profile.userId, profile]),
       );
       const activityIds = activity.map((expense) => expense.id);
+      const previewDebts = await loadExpensePreviewDebts(ctx.db, activityIds, ctx.session.user.id);
       const [activityRates, activityPayments, viewerSplits, legacyPayers] =
         activity.length === 0
           ? [[], [], [], []]
@@ -891,6 +895,7 @@ export const groupsRouter = router({
           canonicalAmount,
           ...summary,
           viewerInvolvement,
+          previewDebts: previewDebts.get(expense.id) ?? [],
         };
       });
       const settlementActivity = settlementRecords
@@ -933,7 +938,7 @@ export const groupsRouter = router({
       };
     }),
 
-  setNotificationPreference: protectedProcedure
+  setNotificationPreference: groupWriteProcedure
     .input(z.object({ groupId: z.uuid(), enabled: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       await requireActiveGroupMember(
@@ -971,7 +976,7 @@ export const groupsRouter = router({
       return input;
     }),
 
-  update: protectedProcedure
+  update: groupWriteProcedure
     .input(
       z.object({
         groupId: z.uuid(),
@@ -1045,7 +1050,7 @@ export const groupsRouter = router({
       return updated;
     }),
 
-  removeMember: protectedProcedure
+  removeMember: groupWriteProcedure
     .input(z.object({ groupId: z.uuid(), userId: z.string() }))
     .mutation(({ ctx, input }) =>
       removeGroupMember({
@@ -1055,7 +1060,7 @@ export const groupsRouter = router({
       }),
     ),
 
-  leave: protectedProcedure
+  leave: groupWriteProcedure
     .input(z.object({ groupId: z.uuid() }))
     .mutation(({ ctx, input }) =>
       removeGroupMember({
@@ -1072,7 +1077,7 @@ export const groupsRouter = router({
     return result?.count ?? 0;
   }),
 
-  archive: protectedProcedure
+  archive: groupWriteProcedure
     .input(z.object({ groupId: z.uuid(), expectedVersion: z.number().int() }))
     .mutation(async ({ ctx, input }) => {
       await requireActiveGroupMember(
@@ -1109,7 +1114,7 @@ export const groupsRouter = router({
       return { archived: true };
     }),
 
-  restore: protectedProcedure
+  restore: groupWriteProcedure
     .input(z.object({ groupId: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       await requireActiveGroupMember(
@@ -1129,7 +1134,7 @@ export const groupsRouter = router({
       return { restored: true };
     }),
 
-  delete: protectedProcedure
+  delete: groupWriteProcedure
     .input(z.object({ groupId: z.uuid(), expectedVersion: z.number().int() }))
     .mutation(async ({ ctx, input }) => {
       const [membership] = await ctx.db

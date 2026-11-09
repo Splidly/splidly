@@ -27,6 +27,8 @@ function context(userId: string, results: unknown[][]) {
   }[] = [];
   const filters: string[] = [];
   const db = {
+    transaction: async (run: (tx: Database) => Promise<unknown>) => run(db),
+    execute: async () => [],
     select: () => {
       const result = results.shift() ?? [];
       const query = {
@@ -239,6 +241,39 @@ describe("personal archives", () => {
     await caller.list({ archived: true });
     expect(filters[0]).toContain('"group_member"."archived_at" is null');
     expect(filters[1]).toContain('"group_member"."archived_at" is not null');
+  });
+
+  it("includes previously archived contacts without including removed or unrelated friendships", async () => {
+    const { ctx, filters } = context("alice", [[], []]);
+    await friendsRouter.createCaller(ctx).list({ includeArchived: true });
+    expect(filters[0]).toContain('"friendship"."removed_at" is null');
+    expect(filters[0]).toContain('"friendship"."user_low_id" =');
+    expect(filters[0]).toContain('"friendship"."user_high_id" =');
+    expect(filters[0]).not.toContain('"archived_by_low_at"');
+    expect(filters[0]).not.toContain('"archived_by_high_at"');
+  });
+
+  it.each([
+    { separateContexts: false, rounded: false, settled: true },
+    { separateContexts: true, rounded: false, settled: false },
+    { separateContexts: false, rounded: true, settled: false },
+  ])("classifies balances across contexts and preserves rounding remainders: %j", async ({ separateContexts, rounded, settled }) => {
+    const entries = [
+      { id: "entry-a", contextType: "friend", contextId: id, debtorId: "bob", creditorId: "alice", canonicalCurrency: "EUR", canonicalAmountMinor: 100n },
+      { id: "entry-b", contextType: separateContexts ? "group" : "friend", contextId: separateContexts ? "group-id" : id, debtorId: "alice", creditorId: "bob", canonicalCurrency: "EUR", canonicalAmountMinor: rounded ? 99n : 100n },
+    ];
+    const valuations = entries.flatMap((entry) => [
+      { ledgerEntryId: entry.id, userId: "alice", currency: "JPY", amountMinor: 100n },
+      { ledgerEntryId: entry.id, userId: "bob", currency: "EUR", amountMinor: entry.canonicalAmountMinor },
+    ]);
+    const { ctx } = context("alice", [[{ ...friendship, archivedByLowAt: new Date() }], [], [], entries, valuations]);
+    const result = await friendsRouter.createCaller(ctx).list({ includeArchived: true });
+    expect(result[0]?.canArchive).toBe(settled);
+    expect(result[0]?.balances).toHaveLength(settled ? 0 : separateContexts ? 2 : 1);
+    if (rounded) {
+      expect(result[0]?.balances[0]?.viewerAmount.minor).toBe("0");
+      expect(result[0]?.balances[0]?.canonicalAmount.minor).toBe("1");
+    }
   });
 });
 

@@ -1,3 +1,4 @@
+import { settlementWriteProcedure, groupContextWriteProcedure } from "../domain/group-write";
 import {
   and,
   type Database,
@@ -153,7 +154,7 @@ export const settlementsRouter = router({
       };
     }),
 
-  create: protectedProcedure
+  create: groupContextWriteProcedure
     .input(settlementMutationSchema)
     .mutation(async ({ ctx, input }) => {
       if (input.fromUserId === input.toUserId) {
@@ -346,7 +347,7 @@ export const settlementsRouter = router({
       });
     }),
 
-  update: protectedProcedure
+  update: settlementWriteProcedure
     .input(
       settlementMutationSchema.and(
         z.object({
@@ -558,7 +559,7 @@ export const settlementsRouter = router({
       });
     }),
 
-  remove: protectedProcedure
+  remove: settlementWriteProcedure
     .input(
       z.object({
         settlementId: z.uuid(),

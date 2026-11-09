@@ -4,7 +4,7 @@ import {
   type Money,
 } from "@splidly/shared";
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import {
   groupListBalanceLines,
   type GroupMemberBalance,
@@ -55,7 +55,11 @@ export function GroupListRow({
   contained?: boolean;
 }) {
   const theme = useTheme();
+  const { width, fontScale } = useWindowDimensions();
+  const [rowWidth, setRowWidth] = useState(width);
   const [trailingWidth, setTrailingWidth] = useState(96);
+  const copyWidth = rowWidth - 2 * (spacing.md + spacing.xs) - 52 - 12;
+  const stacked = fontScale > 1.2 || copyWidth - trailingWidth - 8 < 120;
   const lines = groupListBalanceLines(memberBalances);
   const visibleLines = lines.length > 3 ? lines.slice(0, 2) : lines;
   const hiddenLineCount = lines.length - visibleLines.length;
@@ -79,19 +83,21 @@ export function GroupListRow({
   );
   const trailing = (
     <View
+      testID={`group-total-${id}`}
       onLayout={
-        isSettled
+        isSettled || stacked
           ? undefined
           : (event) => setTrailingWidth(event.nativeEvent.layout.width)
       }
       style={[
         styles.trailing,
-        isSettled ? null : styles.trailingOverlay,
+        stacked ? styles.trailingStacked : null,
+        isSettled || stacked ? null : styles.trailingOverlay,
       ]}
     >
       <Text
         selectable={false}
-        numberOfLines={1}
+        numberOfLines={stacked ? undefined : 1}
         style={[
           styles.status,
           {
@@ -109,7 +115,7 @@ export function GroupListRow({
       {hasOpenPayments || minor !== 0n ? (
         <Text
         selectable={false}
-          numberOfLines={1}
+          numberOfLines={stacked ? undefined : 1}
           style={[
             styles.amount,
             {
@@ -130,11 +136,13 @@ export function GroupListRow({
 
   return (
     <Pressable
+      testID={`activity-group-${id}`}
       accessibilityRole="button"
       accessibilityLabel={`${name}, ${status}${
         !hasOpenPayments && minor === 0n ? "" : ` ${amount}`
       }`}
       onPress={onPress}
+      onLayout={(event) => setRowWidth(event.nativeEvent.layout.width)}
       style={({ pressed }) => [
         styles.row,
         contained ? { marginHorizontal: 0 } : null,
@@ -151,24 +159,24 @@ export function GroupListRow({
         imageUrl={imageUrl}
         size={52}
       />
-      <View style={[styles.copy, isSettled ? styles.copyCentered : null]}>
+      <View style={[styles.copy, isSettled && !stacked ? styles.copyCentered : null]}>
         <View
-          style={[styles.heading, isSettled ? styles.headingCentered : null]}
+          style={[styles.heading, isSettled && !stacked ? styles.headingCentered : null]}
         >
           <Text
         selectable={false}
-            numberOfLines={1}
+            numberOfLines={stacked ? undefined : 2}
             style={[
               styles.name,
               { color: theme.text },
-              isSettled ? null : { paddingRight: trailingWidth + 8 },
+              isSettled || stacked ? null : { paddingRight: trailingWidth + 8 },
             ]}
           >
             {name}
           </Text>
-          {isSettled ? trailing : null}
+          {isSettled && !stacked ? trailing : null}
         </View>
-        {isSettled ? null : trailing}
+        {stacked || !isSettled ? trailing : null}
         <View style={styles.subtitles}>
           {visibleLines.map((line, index) => (
             <BalanceSummaryLine
@@ -176,12 +184,12 @@ export function GroupListRow({
               line={line}
               style={[
                 styles.subtitle,
-                index === 0 ? { paddingRight: trailingWidth + 8 } : null,
+                !stacked && index === 0 ? { paddingRight: trailingWidth + 8 } : null,
               ]}
             />
           ))}
           {hiddenLineCount > 0 ? (
-            <Text style={[styles.subtitle, { color: theme.muted }]}>
+            <Text selectable={false} style={[styles.subtitle, { color: theme.muted }]}>
               {hiddenLineCount} more not shown
             </Text>
           ) : null}
@@ -214,6 +222,7 @@ const styles = StyleSheet.create({
   },
   copy: {
     flex: 1,
+    minWidth: 0,
     gap: spacing.xs,
     position: "relative",
   },
@@ -255,6 +264,11 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 0,
     right: 0,
+  },
+  trailingStacked: {
+    maxWidth: "100%",
+    alignSelf: "stretch",
+    alignItems: "flex-start",
   },
   status: {
     fontSize: 10,

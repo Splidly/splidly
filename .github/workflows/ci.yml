@@ -18,6 +18,18 @@ jobs:
     name: Verify
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17.11-alpine3.24
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: splidly-test
+          POSTGRES_DB: splidly_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d splidly_test"
+          --health-interval 3s --health-timeout 3s --health-retries 20
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -25,9 +37,9 @@ jobs:
           fetch-depth: 0
 
       - name: Install pnpm
-        uses: pnpm/action-setup@9bbca1e9dc2902adb87e8780fe5c98796985a62d # v6.1.1
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
-          version: 12.16.1
+          version: 12.18.0
           run_install: false
 
       - name: Install Node.js
@@ -42,11 +54,19 @@ jobs:
       - name: Validate publication boundary
         run: pnpm publication:check
 
+      - name: Verify dependency security backports
+        run: pnpm security:check
+
       - name: Typecheck
         run: pnpm typecheck
 
       - name: Test
         run: pnpm test
+
+      - name: PostgreSQL concurrency tests
+        run: pnpm test:integration
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:splidly-test@127.0.0.1:5432/splidly_test
 
       - name: Build
         run: pnpm build
@@ -65,9 +85,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install pnpm
-        uses: pnpm/action-setup@9bbca1e9dc2902adb87e8780fe5c98796985a62d # v6.1.1
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
-          version: 12.16.1
+          version: 12.18.0
           run_install: false
 
       - name: Install Node.js

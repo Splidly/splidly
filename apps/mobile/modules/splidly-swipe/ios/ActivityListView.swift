@@ -31,7 +31,11 @@ struct ActivityListView: ExpoSwiftUI.View {
             deletionDisabled: row.deletionDisabled,
             actionTitle: row.actionTitle,
             actionColor: row.actionColor,
-            actionIcon: row.actionIcon
+            actionIcon: row.actionIcon,
+            preview: row.preview,
+            previewActions: row.previewActions,
+            selectable: row.selectable,
+            settings: row.settings
           )
         },
         footer: section.footerIndex.flatMap {
@@ -39,7 +43,9 @@ struct ActivityListView: ExpoSwiftUI.View {
           return ActivityHostedContent(
             key: "footer:\(section.key)", view: view, height: section.footerHeight
           )
-        }
+        },
+        headerTitle: section.headerTitle,
+        footerTitle: section.footerTitle
       )
     }
     ActivityListRepresentable(
@@ -58,6 +64,15 @@ struct ActivityListView: ExpoSwiftUI.View {
       onScroll: { props.onScroll($0) },
       onHostedLayout: { key, width in
         props.onHostedLayout(["key": key, "width": width])
+      },
+      onPreviewOpen: { key in
+        props.onPreviewOpen(["rowKey": key])
+      },
+      onPreviewAction: { key, actionId in
+        props.onPreviewAction(["rowKey": key, "actionId": actionId])
+      },
+      onRowPress: { key in
+        props.onRowPress(["rowKey": key])
       }
     )
     .id(props.plain)

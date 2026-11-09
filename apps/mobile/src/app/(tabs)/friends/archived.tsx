@@ -1,2 +1,2 @@
 import { FriendsCollection } from "../../../components/friends-collection";
-export default function ArchivedFriendsScreen() { return <FriendsCollection archived />; }
+export default function SettledFriendsScreen() { return <FriendsCollection settled />; }

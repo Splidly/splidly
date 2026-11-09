@@ -1,10 +1,9 @@
 import { ActivityFriendRow } from "./activity-friend-row";
 import { usePushOnce } from "../lib/use-push-once";
 import { ArchiveLink } from "./archive-link";
-import { useListAction } from "../lib/use-list-action";
 import { Stack, useFocusEffect } from "expo-router";
 import { useCallback } from "react";
-import { Text, View } from "react-native";
+import { useColorScheme } from "react-native";
 import {
   Screen,
   EmptyState,
@@ -16,69 +15,37 @@ import {
 import { toolbarIcons } from "../lib/toolbar-icons";
 import { api } from "../lib/trpc";
 import { shareInvite } from "../lib/share-invite";
-import { useTheme } from "../theme";
+import { friendPreview } from "../lib/activity-preview";
+import { friendPreviewActions } from "../lib/activity-preview-actions";
+import type { CurrencyCode } from "@splidly/shared";
 
-export function FriendsCollection({
-  archived = false,
-}: {
-  archived?: boolean;
-}) {
-  const theme = useTheme();
-  const friends = api.friends.list.useQuery(
-    archived ? { archived: true } : undefined,
-  );
-  const archivedCount = api.friends.archivedCount.useQuery(undefined, {
-    enabled: !archived,
-  });
+export function FriendsCollection({ settled = false }: { settled?: boolean }) {
+  const scheme = useColorScheme() === "dark" ? "dark" : "light";
+  const friends = api.friends.list.useQuery({ includeArchived: true });
   useFocusEffect(
     useCallback(() => {
       void friends.refetch();
-      if (!archived) void archivedCount.refetch();
-    }, [friends.refetch, archivedCount.refetch, archived]),
+    }, [friends.refetch]),
   );
-  const utils = api.useUtils();
-  const confirm = useListAction();
   const push = usePushOnce();
-  const archive = api.friends.archive.useMutation({
-    onSuccess: () =>
-      Promise.all([
-        utils.friends.list.invalidate(),
-        utils.friends.archivedCount.invalidate(),
-      ]),
-  });
-  const restore = api.friends.restore.useMutation({
-    onSuccess: () =>
-      Promise.all([
-        utils.friends.list.invalidate(),
-        utils.friends.archivedCount.invalidate(),
-      ]),
-  });
   const createInvite = api.invites.create.useMutation({
     onSuccess: (invite) => void shareInvite(invite.url),
   });
 
-  const rows = (friends.data ?? []).map(({ friendship, friend, balances }) => {
+  const settledFriends = (friends.data ?? []).filter((friend) => friend.canArchive);
+  const visibleFriends = (friends.data ?? []).filter((friend) => friend.canArchive === settled);
+  const rows = visibleFriends.map(({ friendship, friend, balances }) => {
     const name = friend?.displayName ?? "Deleted user";
     return {
       key: friendship.id,
-      actionTitle: archived ? "Restore" : "Archive",
-      deleteLabel: archived ? "Restore friend" : "Archive friend",
-      actionColor: "#FF9500",
-      actionIcon: archived ? "arrow.uturn.backward" : "archivebox",
-      deletionDisabled: archive.isPending || restore.isPending,
-      onDelete: () =>
-        confirm({
-          confirmation: false,
-          title: archived ? "Restore friend?" : "Archive friend?",
-          message: archived
-            ? "This friend will return to your active list."
-            : "This hides the friend only for you. All balances must be settled. You can restore them from Archived Friends.",
-          label: archived ? "Restore" : "Archive",
-          perform: () =>
-            archived
-              ? restore.mutateAsync({ friendshipId: friendship.id })
-              : archive.mutateAsync({ friendshipId: friendship.id }),
-        }),
+      ...(process.env.EXPO_OS === "ios" && {
+        onPress: () => push(`/friends/${friendship.id}`),
+        preview: friendPreview(name, friend?.avatarUrl, balances, { userId: friend?.userId ?? friendship.id, scheme }),
+        onPreviewOpen: () => push(`/friends/${friendship.id}`),
+        previewActions: friendPreviewActions(friendship.id, friend?.userId,
+          (balances.find((balance) => balance.contextType === "friend")?.canonicalAmount.currency ?? friend?.homeCurrency ?? "EUR") as CurrencyCode, push),
+      }),
+      nativeContent: process.env.EXPO_OS === "ios",
       content: (
         <ActivityFriendRow
           name={name}
@@ -93,7 +60,13 @@ export function FriendsCollection({
                   : "Direct ledger"
                 : `${balances.length} open ledgers`
           }
-          balance={balances[0]?.viewerAmount}
+          balance={balances[0] && (
+            BigInt(balances[0].viewerAmount.minor) !== 0n
+              ? balances[0].viewerAmount
+              : BigInt(balances[0].canonicalAmount.minor) !== 0n
+                ? balances[0].canonicalAmount
+                : balances[0].counterpartyAmount
+          )}
           additionalBalances={Math.max(0, balances.length - 1)}
           onPress={() => push(`/friends/${friendship.id}`)}
         />
@@ -105,14 +78,19 @@ export function FriendsCollection({
       <Screen
         activityList={{
           sections: rows.length
-            ? [{ key: "friends", label: "", data: rows }]
+            ? [{
+                key: "friends",
+                label: `${rows.length} ${rows.length === 1 ? "friend" : "friends"}`,
+                data: rows,
+              }]
             : [],
-          ...(!archived
+          ...(!settled && friends.data !== undefined
             ? {
                 footer: (
                   <ArchiveLink
-                    label="Archived Friends"
-                    count={archivedCount.data}
+                    label="Settled Friends"
+                    icon="settled"
+                    count={friends.data ? settledFriends.length : undefined}
                     onPress={() => push("/friends/archived")}
                   />
                 ),
@@ -120,11 +98,7 @@ export function FriendsCollection({
             : {}),
         }}
         refreshing={friends.isRefetching}
-        onRefresh={() =>
-          archived
-            ? friends.refetch()
-            : Promise.all([friends.refetch(), archivedCount.refetch()])
-        }
+        onRefresh={() => friends.refetch()}
       >
         {friends.isPending ? <LoadingState /> : null}
         {friends.error ? (
@@ -133,18 +107,24 @@ export function FriendsCollection({
             onRetry={() => void friends.refetch()}
           />
         ) : null}
-        {friends.data?.length === 0 ? (
+        {friends.data && visibleFriends.length === 0 ? (
           <EmptyState
             title={
-              archived ? "No archived friends" : "Your people will appear here"
+              settled
+                ? "No settled friends yet"
+                : settledFriends.length > 0
+                  ? "All settled up"
+                  : "Your people will appear here"
             }
             message={
-              archived
-                ? "Friends you archive will appear here. Swipe left to restore them."
-                : "Invite a friend to start a private ledger, or join a group and connect automatically."
+              settled
+                ? "Friends appear here automatically once all your shared balances are settled."
+                : settledFriends.length > 0
+                  ? "You have no outstanding balances. Find your settled friends below."
+                  : "Invite a friend to start a private ledger, or join a group and connect automatically."
             }
             action={
-              archived ? undefined : (
+              settled ? undefined : (
                 <PrimaryButton
                   label={
                     createInvite.isPending
@@ -162,22 +142,12 @@ export function FriendsCollection({
         {createInvite.error ? (
           <ErrorState message={createInvite.error.message} />
         ) : null}
-        {rows.length > 0 ? (
-          <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
-            <Text
-              selectable={false}
-              style={{ color: theme.muted, fontSize: 14, fontWeight: "600" }}
-            >
-              {rows.length} {rows.length === 1 ? "friend" : "friends"}
-            </Text>
-          </View>
-        ) : null}
       </Screen>
       <Stack.Screen
         options={{
-          title: archived ? "Archived Friends" : "Friends",
+          title: settled ? "Settled Friends" : "Friends",
           ...(process.env.EXPO_OS !== "ios" &&
-            !archived && {
+            !settled && {
               headerRight: () => (
                 <HeaderButton
                   label="Invite a friend"
@@ -189,7 +159,7 @@ export function FriendsCollection({
             }),
         }}
       />
-      {!archived ? (
+      {!settled ? (
         <Stack.Toolbar placement="right">
           <Stack.Toolbar.Button
             icon={toolbarIcons.invite}

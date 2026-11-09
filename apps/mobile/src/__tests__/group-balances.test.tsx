@@ -2,6 +2,13 @@ import { fireEvent, render } from "@testing-library/react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import GroupBalancesScreen from "../app/(tabs)/groups/[id]/balances";
 
+jest.mock("@expo/ui/jetpack-compose", () => {
+  const actual = jest.requireActual("@expo/ui/jetpack-compose");
+  const { View } = require("react-native");
+  // Jest has no native Material palette service for decorative chevrons.
+  return { ...actual, Host: ({ children, ...props }: { children: React.ReactNode; [key: string]: unknown }) => <View {...props}>{children}</View> };
+});
+
 jest.mock("react-native-reanimated", () => {
   const { View } = jest.requireActual(
     "react-native",
@@ -38,7 +45,7 @@ jest.mock("expo-router", () => {
     );
   };
   return {
-    router: { push: jest.fn() },
+    router: { push: jest.fn(), back: jest.fn() },
     useLocalSearchParams: jest.fn(() => ({
       id: "group-1",
     })),
@@ -148,64 +155,48 @@ describe("group balances", () => {
     });
   });
 
-  it("lists every member with owes, lent, and settled statuses", async () => {
+  it("keeps member expansion in the list without presenting another route", async () => {
     const view = await renderScreen(<GroupBalancesScreen />);
+    if (process.env.EXPO_OS === "ios") {
+      const list = view.getByTestId("native-activity-list");
+      const rows = list.props.sections[1].rows;
+      expect(rows.map((row: { settings: { title: string } }) => row.settings.title)).toEqual(["Lasse (You)", "Alex", "Sam"]);
+      expect(rows[1].settings).toMatchObject({
+        disclosure: true, showsDisclosure: false,
+        value: "Owes 10.00 €\nLent 15.00 €",
+        balances: [
+          { label: "Owes", value: "10.00 €", color: expect.any(String) },
+          { label: "Lent", value: "15.00 €", color: expect.any(String) },
+        ],
+        details: [
+          { title: "Owes Sam", value: "10.00 €", tone: "negative" },
+          { title: "Bea owes Alex", value: "15.00 €", tone: "positive" },
+        ],
+      });
+      expect(rows[1].selectable).toBe(false);
+      expect(rows[1].settings.balances[0].color).not.toBe(rows[1].settings.balances[1].color);
+      expect(rows[0].settings.balances[0].label).toBe("You lent");
+      expect(rows[2].settings.balances).toEqual([{ label: "Settled", value: "", color: expect.any(String) }]);
+      expect(rows[2].settings.details).toEqual([{ title: "No outstanding balances.", value: "", tone: "muted" }]);
+    } else {
+      const row = view.getByLabelText("Alex. Owes 10.00 € · Lent 15.00 €");
+      expect(row.props.accessibilityState.expanded).toBe(false);
+      await fireEvent.press(row);
+      expect(view.getByText("Owes Sam")).toBeTruthy();
+      expect(view.getByText("Bea owes Alex")).toBeTruthy();
+      expect(view.getByLabelText("Alex. Owes 10.00 € · Lent 15.00 €").props.accessibilityState.expanded).toBe(true);
+      await fireEvent.press(view.getByLabelText("Sam. Settled up"));
+      expect(view.getByText("No outstanding balances.")).toBeTruthy();
+      expect(view.getByText("Owes Sam")).toBeTruthy();
+      await fireEvent.press(view.getByLabelText("Alex. Owes 10.00 € · Lent 15.00 €"));
+      expect(view.queryByText("Owes Sam")).toBeNull();
+    }
+    expect(mockPush).not.toHaveBeenCalled();
+  });
 
-    expect(view.getByText("Lasse (You)")).toBeTruthy();
-    expect(view.getByText("Lent 5.00 €")).toBeTruthy();
-    expect(view.getByText("Owes 10.00 €")).toBeTruthy();
-    expect(view.getByText("Lent 15.00 €")).toBeTruthy();
-    expect(view.getByText("Settled up")).toBeTruthy();
-    expect(
-      view.getByLabelText("Alex. Owes 10.00 € · Lent 15.00 €"),
-    ).toBeTruthy();
-    expect(
-      view.getByText("Balances preserve who owes whom in this group."),
-    ).toBeTruthy();
+  it("keeps the group settle-up action reachable", async () => {
+    const view = await renderScreen(<GroupBalancesScreen />);
     await fireEvent.press(view.getByLabelText("Settle up Lisbon"));
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: "/settlement/group",
-      params: { id: "group-1", returnTo: "balances" },
-    });
-
-    const alexRow = view.getByLabelText(
-      "Alex. Owes 10.00 € · Lent 15.00 €",
-    );
-    expect(alexRow.props.accessibilityState).toEqual({ expanded: false });
-    expect(
-      view.getByTestId("balance-disclosure-alex-collapsed", {
-        includeHiddenElements: true,
-      }),
-    ).toBeTruthy();
-    expect(view.queryByText("Bea")).toBeNull();
-
-    await fireEvent.press(alexRow);
-    expect(view.getAllByText("10.00 €").length).toBeGreaterThan(0);
-    expect(view.getAllByText("15.00 €").length).toBeGreaterThan(0);
-    expect(view.getByLabelText("Alex owes 10.00 € to Sam")).toBeTruthy();
-    expect(view.getByLabelText("Bea owes 15.00 € to Alex")).toBeTruthy();
-    expect(view.queryByText(/Remind/i)).toBeNull();
-    expect(alexRow.props.accessibilityState).toEqual({ expanded: true });
-    expect(
-      view.getByTestId("balance-disclosure-alex-expanded", {
-        includeHiddenElements: true,
-      }),
-    ).toBeTruthy();
-
-    const lasseRow = view.getByLabelText("Lasse (You). Lent 5.00 €");
-    await fireEvent.press(lasseRow);
-    expect(view.getByLabelText("Alex owes 5.00 € to you")).toBeTruthy();
-    expect(view.getByLabelText("Alex owes 10.00 € to Sam")).toBeTruthy();
-    expect(lasseRow.props.accessibilityState).toEqual({ expanded: true });
-    expect(alexRow.props.accessibilityState).toEqual({ expanded: true });
-
-    await fireEvent.press(alexRow);
-    expect(view.queryByLabelText("Alex owes 10.00 € to Sam")).toBeNull();
-    expect(alexRow.props.accessibilityState).toEqual({ expanded: false });
-
-    const samRow = view.getByLabelText("Sam. Settled up");
-    await fireEvent.press(samRow);
-    expect(view.getByText("No outstanding balances.")).toBeTruthy();
-    expect(samRow.props.accessibilityState).toEqual({ expanded: true });
+    expect(mockPush).toHaveBeenCalledWith({ pathname: "/settlement/group", params: { id: "group-1", returnTo: "balances" } });
   });
 });

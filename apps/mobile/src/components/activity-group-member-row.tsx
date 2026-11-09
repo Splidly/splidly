@@ -1,29 +1,6 @@
-import { View } from "react-native";
-import { GroupBalanceMemberRow, MemberRelationships } from "./group-balances";
 import { ListRow } from "./ui";
-import type {
-  ActivityGroupMemberRowProps,
-  ActivityMemberInviteProps,
-} from "./activity-group-member-row.types";
-export function ActivityGroupMemberRow({
-  member,
-  viewerUserId,
-  expanded,
-  onToggle,
-}: ActivityGroupMemberRowProps) {
-  return (
-    <View>
-      <GroupBalanceMemberRow
-        member={member}
-        expanded={expanded}
-        onPress={onToggle}
-      />
-      {expanded ? (
-        <MemberRelationships member={member} viewerUserId={viewerUserId} />
-      ) : null}
-    </View>
-  );
-}
+import type { ActivityMemberInviteProps } from "./activity-group-member-row.types";
+
 export function ActivityMemberInvite({
   pending,
   onPress,
