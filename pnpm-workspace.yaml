@@ -36,10 +36,8 @@ minimumReleaseAgeExclude:
   - turbo@2.10.6
   - esbuild@0.25.0
   - uuid@11.1.1
-  - brace-expansion@5.0.8
-  - brace-expansion@5.0.9
-  - js-yaml@3.15.2
-  - js-yaml@4.3.2
+  - brace-expansion@5.0.8 || 5.0.9
+  - js-yaml@3.15.2 || 4.3.2
   - nanoid@3.3.18
   - postcss@8.5.23
   - '@expo/inline-modules@0.1.6'
@@ -50,6 +48,10 @@ minimumReleaseAgeExclude:
   - expo-image-manipulator@57.0.11
   - expo-image-picker@57.0.11
   - expo-notifications@57.0.12
+  - '@trpc/client@11.28.3'
+  - '@trpc/react-query@11.28.3'
+  - '@trpc/server@11.28.3'
+  - hono@4.13.19
 
 overrides:
   '@xmldom/xmldom@>=0.7.0 <0.8.15': 0.8.15
@@ -73,7 +75,6 @@ overrides:
 patchedDependencies:
   react-native-screens@4.30.1: patches/react-native-screens@4.30.1.patch
   glob@10.5.0: patches/glob@10.5.0.patch
-  glob@13.0.6: patches/glob@13.0.6.patch
   minimatch@9.0.9: patches/minimatch@9.0.9.patch
   minimatch@10.2.6: patches/minimatch@10.2.6.patch
   deepmerge@4.3.1: patches/deepmerge@4.3.1.patch

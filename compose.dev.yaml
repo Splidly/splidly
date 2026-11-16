@@ -2,7 +2,7 @@ name: splidly-dev
 
 services:
   postgres:
-    image: postgres:17.11-alpine3.24
+    image: postgres:17.12-alpine3.24
     ports:
       - "${POSTGRES_PORT:-5433}:5432"
     environment:

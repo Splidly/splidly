@@ -2,7 +2,7 @@
   "name": "splidly",
   "private": true,
   "version": "1.0.0",
-  "packageManager": "pnpm@12.18.0",
+  "packageManager": "pnpm@12.21.0",
   "engines": {
     "node": ">=22.13.0"
   },
@@ -23,7 +23,7 @@
     "test:integration": "node ops/run-integration-tests.mjs"
   },
   "devDependencies": {
-    "turbo": "2.11.10",
+    "turbo": "2.11.11",
     "typescript": "7.0.2"
   }
 }

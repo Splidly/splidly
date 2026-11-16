@@ -5,11 +5,11 @@ repository-root `.env` is the single environment file for the entire workspace.
 
 ## Local development
 
-Requirements: Node 24, pnpm 12, Docker, Xcode for physical iOS builds, and the
+Requirements: Node 26.13.1, pnpm 12, Docker, Xcode for physical iOS builds, and the
 Android Studio/SDK for Android builds.
 
 ```sh
-npm install --global pnpm@12.18.0
+npm install --global pnpm@12.21.0
 pnpm install
 cp .env.example .env
 docker compose -f compose.dev.yaml up -d
@@ -27,14 +27,15 @@ Concurrency tests use a separate PostgreSQL database, never the development
 application database. CI starts this database automatically. To run them locally:
 
 ```sh
-docker run --rm -d --name splidly-test-db -p 127.0.0.1:5544:5432 -e POSTGRES_PASSWORD=splidly-test -e POSTGRES_DB=splidly_test postgres:17.11-alpine3.24
+docker run --rm -d --name splidly-test-db -p 127.0.0.1:5544:5432 -e POSTGRES_PASSWORD=splidly-test -e POSTGRES_DB=splidly_test postgres:17.12-alpine3.24
 TEST_DATABASE_URL=postgresql://postgres:splidly-test@127.0.0.1:5544/splidly_test pnpm test:integration
 docker stop splidly-test-db
 ```
 
 Run `pnpm security:check` after installation to exercise the installed security
-backports in the Expo/Jest dependency chain. These backports keep compatible
-package versions, so the registry's version-only audit still reports them.
+fixes in the Expo/Jest dependency chain, including upstream glob 13.0.7 and
+local backports for older compatible releases. The registry's version-only
+audit still reports the locally patched versions.
 
 Expo Go is not supported because authentication and linking use native modules.
 Use signed development builds on physical devices; do not use an iOS Simulator.

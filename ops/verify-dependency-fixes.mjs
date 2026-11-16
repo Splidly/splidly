@@ -72,7 +72,7 @@ if (process.argv[2] === "--probe") {
   await probe(process.argv[3], process.argv[4]);
 } else {
   const root = fileURLToPath(new URL("../", import.meta.url));
-  const targets = new Set(["glob@10.5.0", "glob@13.0.6", "minimatch@9.0.9", "minimatch@10.2.6", "deepmerge@4.3.1"]);
+  const targets = new Set(["glob@10.5.0", "glob@13.0.7", "minimatch@9.0.9", "minimatch@10.2.6", "deepmerge@4.3.1"]);
   const pending = ["package.json", "apps/mobile/package.json", "apps/server/package.json", "packages/db/package.json", "packages/shared/package.json"]
     .map(path => resolve(root, path));
   const visited = new Set();
@@ -109,6 +109,6 @@ if (process.argv[2] === "--probe") {
       if (dependency) pending.push(dependency);
     }
   }
-  assert.deepEqual([...found].sort(), [...targets].sort(), "Expected installed security backports were not found");
-  console.log(`Dependency security regressions passed: ${probes} entry points across ${found.size} patched releases`);
+  assert.deepEqual([...found].sort(), [...targets].sort(), "Expected installed security fixes were not found");
+  console.log(`Dependency security regressions passed: ${probes} entry points across ${found.size} fixed releases`);
 }
