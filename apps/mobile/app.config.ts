@@ -16,7 +16,7 @@ const config: ExpoConfig = {
   name: "Splidly",
   slug: "splidly",
   scheme: "splidly",
-  version: "1.0.0",
+  version: "1.0.1",
   orientation: "default",
   userInterfaceStyle: "automatic",
   experiments: { typedRoutes: true },
@@ -50,7 +50,6 @@ const config: ExpoConfig = {
           buildConfig.googleIosReversedClientId,
       },
     ],
-    "./plugins/with-ios-scene-lifecycle",
   ],
   ios: {
     icon: "./assets/icons/splidly.icon",
@@ -81,19 +80,6 @@ const config: ExpoConfig = {
     },
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
-      UIApplicationSceneManifest: {
-        UIApplicationSupportsMultipleScenes: false,
-        UISceneConfigurations: {
-          UIWindowSceneSessionRoleApplication: [
-            {
-              UISceneClassName: "UIWindowScene",
-              UISceneConfigurationName: "Default Configuration",
-              UISceneDelegateClassName:
-                "$(PRODUCT_MODULE_NAME).SceneDelegate",
-            },
-          ],
-        },
-      },
     },
   },
   android: {
