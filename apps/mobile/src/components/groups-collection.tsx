@@ -64,7 +64,7 @@ export function GroupsCollection({ archived = false }: { archived?: boolean }) {
       previewActions: groupPreviewActions(group.id,
         BigInt(group.balance.minor) !== 0n || group.memberBalances.some((member) => BigInt(member.balance.minor) !== 0n), push),
     }),
-    backgroundColor: theme.background,
+    backgroundColor: process.env.EXPO_OS === "android" ? theme.surface : theme.background,
     actionColor: "#FF9500",
     deleteLabel: archived ? "Restore group" : "Archive group",
     actionTitle: archived ? "Restore" : "Archive",

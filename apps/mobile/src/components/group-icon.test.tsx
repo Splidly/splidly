@@ -7,6 +7,15 @@ import {
   normalizeGroupIconKey,
 } from "./group-icon";
 
+jest.mock("@expo/ui", () => {
+  const actual = jest.requireActual("@expo/ui") as typeof import("@expo/ui");
+  const { View } = require("react-native") as typeof import("react-native");
+  return {
+    ...actual,
+    Host: ({ children }: { children: ReactNode }) => <View>{children}</View>,
+  };
+});
+
 jest.mock("@expo/ui/community/menu", () => {
   const { View } = require("react-native") as typeof import("react-native");
   return {
@@ -61,8 +70,8 @@ describe("GroupIconPicker", () => {
     ).toBe("on");
   });
 
-  it("gives the wide default people symbol additional breathing room", () => {
-    expect(groupIconGlyphSize("default", 60)).toBe(25);
-    expect(groupIconGlyphSize("trip", 60)).toBe(29);
+  it("matches visible icon proportions while preserving the iOS symbol sizes", () => {
+    expect(groupIconGlyphSize("default", 60)).toBe(process.env.EXPO_OS === "android" ? 43 : 25);
+    expect(groupIconGlyphSize("trip", 60)).toBe(process.env.EXPO_OS === "android" ? 40 : 29);
   });
 });

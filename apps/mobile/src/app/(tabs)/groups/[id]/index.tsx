@@ -91,6 +91,10 @@ export default function GroupDetailScreen() {
   function openActivity(destination: Href) {
     if (acceptActivityNavigation()) router.push(destination);
   }
+  function openAction(destination: Href) {
+    if (process.env.EXPO_OS === "android") openActivity(destination);
+    else router.push(destination);
+  }
   function renderActivityItem(item: (typeof activity)[number]) {
     if (item.type === "settlement") {
       return (
@@ -204,7 +208,7 @@ export default function GroupDetailScreen() {
               backgroundColor={actionColors.primaryBackground}
               foregroundColor={actionColors.primaryForeground}
               onPress={() =>
-                router.push({
+                openAction({
                   pathname: "/expense/new",
                   params: { type: "group", id: group.id },
                 })
@@ -218,7 +222,7 @@ export default function GroupDetailScreen() {
               backgroundColor={actionColors.secondaryBackground}
               foregroundColor={actionColors.secondaryForeground}
               onPress={() =>
-                router.push({
+                openAction({
                   pathname: "/settlement/group",
                   params: { id: group.id },
                 })
@@ -231,13 +235,13 @@ export default function GroupDetailScreen() {
           currency={group.currency as CurrencyCode}
           totalMinor={outstandingMinor}
           accessibilityLabel={`${group.name} members and balances`}
-          onPress={() => router.push(`/groups/${group.id}/settings`)}
+          onPress={() => openAction(`/groups/${group.id}/settings`)}
         />
         {process.env.EXPO_OS !== "ios" ? emptyActivity : null}
       </Screen>
       <Stack.Screen
         options={{
-          title: process.env.EXPO_OS === "ios" ? "" : group.name,
+          title: process.env.EXPO_OS === "ios" ? "" : "Group",
           ...(process.env.EXPO_OS !== "ios" && {
             headerRight: () => (
               <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -245,13 +249,13 @@ export default function GroupDetailScreen() {
                   label={`${group.name} statistics`}
                   glyph="▥"
                   onPress={() =>
-                    router.push(`/groups/${group.id}/statistics` as Href)
+                    openAction(`/groups/${group.id}/statistics` as Href)
                   }
                 />
                 <HeaderButton
                   label={`${group.name} settings`}
                   glyph="⚙"
-                  onPress={() => router.push(`/groups/${group.id}/settings`)}
+                  onPress={() => openAction(`/groups/${group.id}/settings`)}
                 />
               </View>
             ),
@@ -262,12 +266,12 @@ export default function GroupDetailScreen() {
         <Stack.Toolbar.Button
           icon={toolbarIcons.statistics}
           accessibilityLabel={`${group.name} statistics`}
-          onPress={() => router.push(`/groups/${group.id}/statistics` as Href)}
+          onPress={() => openAction(`/groups/${group.id}/statistics` as Href)}
         />
         <Stack.Toolbar.Button
           icon={toolbarIcons.settings}
           accessibilityLabel={`${group.name} settings`}
-          onPress={() => router.push(`/groups/${group.id}/settings`)}
+          onPress={() => openAction(`/groups/${group.id}/settings`)}
         />
       </Stack.Toolbar>
     </>

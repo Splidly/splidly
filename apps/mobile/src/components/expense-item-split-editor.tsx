@@ -1,3 +1,4 @@
+import { AndroidFormHeader } from "./android-form-header";
 import type { ScrollViewInstance } from "react-native";
 import {
   allocateByWeights,
@@ -31,7 +32,6 @@ import {
   HeaderButton,
   PrimaryButton,
   Screen,
-  SheetCaption,
   useKeyboardFocusScroll,
 } from "./ui";
 
@@ -162,7 +162,7 @@ export function ExpenseItemSplitEditor() {
         }
         bottomOverlayHeight={88}
       >
-        <SheetCaption>Customize item</SheetCaption>
+
         <View style={{ gap: 8 }}>
           <AllocationHeader title="Split this item" />
           <MenuView
@@ -351,6 +351,7 @@ export function ExpenseItemSplitEditor() {
           }),
         }}
       />
+      {process.env.EXPO_OS === "ios" ? <>
       <Stack.Toolbar placement="left">
         <Stack.Toolbar.Button
           icon={toolbarIcons.close}
@@ -360,9 +361,6 @@ export function ExpenseItemSplitEditor() {
       </Stack.Toolbar>
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
-          icon={
-            process.env.EXPO_OS === "android" ? toolbarIcons.done : undefined
-          }
           accessibilityLabel="Save item split"
           disabled={!status.valid}
           onPress={done}
@@ -370,6 +368,13 @@ export function ExpenseItemSplitEditor() {
           {process.env.EXPO_OS === "ios" ? "Save" : null}
         </Stack.Toolbar.Button>
       </Stack.Toolbar>
+      </> : null}
+      <AndroidFormHeader
+        title="Customize item"
+        closeLabel="Cancel item split"
+        onClose={cancel}
+        action={{ label: "Save", accessibilityLabel: "Save item split", onPress: done, disabled: !status.valid }}
+      />
     </>
   );
 }

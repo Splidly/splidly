@@ -1,3 +1,4 @@
+import { AndroidMenuTrigger } from "./android-menu-trigger";
 import {
   groupIconKeys,
   type GroupIconKey,
@@ -163,6 +164,11 @@ export function groupIconImage(iconKey: GroupIconKey) {
 }
 
 export function groupIconGlyphSize(iconKey: GroupIconKey, size: number) {
+  // SF Symbols use a font size, while Material Symbols use a square viewport.
+  // Match their visible proportions without enlarging the surrounding tile.
+  if (process.env.EXPO_OS === "android") {
+    return Math.round(size * (iconKey === "default" ? 0.72 : 0.66));
+  }
   return Math.round(size * (iconKey === "default" ? 0.41 : 0.49));
 }
 
@@ -274,15 +280,17 @@ export function GroupIconPicker({
         onValueChange(nextValue);
       }}
     >
-      <GroupIcon
-        iconKey={value}
-        name={name}
-        colorKey={colorKey}
-        color={color}
-        size={size}
-        accessibilityRole="button"
-        accessibilityLabel="Change group icon"
-      />
+      <AndroidMenuTrigger>
+        <GroupIcon
+          iconKey={value}
+          name={name}
+          colorKey={colorKey}
+          color={color}
+          size={size}
+          accessibilityRole="button"
+          accessibilityLabel="Change group icon"
+        />
+      </AndroidMenuTrigger>
     </MenuView>
   );
 }

@@ -1,3 +1,4 @@
+import { AndroidFormHeader } from "./android-form-header";
 import type { ScrollViewInstance, TextInputInstance } from "react-native";
 import {
   convertMinor,
@@ -51,7 +52,6 @@ import {
   HeaderButton,
   LoadingState,
   Screen,
-  SheetCaption,
   useKeyboardFocusScroll,
 } from "./ui";
 
@@ -681,7 +681,7 @@ export function ExpenseEditor({
     ? "Saving…"
     : editing
       ? "Save changes"
-      : "Save expense";
+      : process.env.EXPO_OS === "android" ? "Add expense" : "Save expense";
 
   const conversionMetadata = (
     <View accessibilityLiveRegion="polite" style={{ gap: 3 }}>
@@ -750,6 +750,7 @@ export function ExpenseEditor({
         underlapsHeader={false}
         formSheetBottomClearance
         bottomOverlay={
+          process.env.EXPO_OS === "android" ? undefined :
           <ExpenseSaveControl
             label={saveLabel}
             onPress={submit}
@@ -759,9 +760,7 @@ export function ExpenseEditor({
         bottomOverlayHeight={expenseOverlayHeight}
         contentContainerStyle={{ paddingTop: 16, gap: 22 }}
       >
-        <SheetCaption>
-          {editing ? "Edit expense" : "Add expense"}
-        </SheetCaption>
+
         <ExpenseEntryCard
           icon={
             <ExpenseIconPicker
@@ -965,6 +964,7 @@ export function ExpenseEditor({
           }),
         }}
       />
+      {process.env.EXPO_OS === "ios" ? <>
       <Stack.Toolbar placement="left">
         <Stack.Toolbar.Button
           icon={toolbarIcons.close}
@@ -974,6 +974,14 @@ export function ExpenseEditor({
           onPress={() => router.back()}
         />
       </Stack.Toolbar>
+      </> : null}
+      <AndroidFormHeader
+        title={editing ? "Edit expense" : "Add expense"}
+        closeLabel="Close expense editor"
+        onClose={() => router.back()}
+        disabled={saving}
+        action={{ label: editing ? "Save" : "Add", accessibilityLabel: saveLabel, onPress: submit, disabled: saveDisabled }}
+      />
     </>
   );
 }

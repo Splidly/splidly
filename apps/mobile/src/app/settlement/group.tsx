@@ -1,3 +1,4 @@
+import { AndroidFormHeader } from "../../components/android-form-header";
 import type { CurrencyCode } from "@splidly/shared";
 import { Host, Icon } from "@expo/ui";
 import { router, Stack, useLocalSearchParams, type Href } from "expo-router";
@@ -11,7 +12,6 @@ import {
   ListRow,
   LoadingState,
   Screen,
-  SheetCaption,
 } from "../../components/ui";
 import type { ActivityListRow, ActivityListSection } from "../../components/native-activity-list.types";
 import { nativeUserAvatar } from "../../components/native-avatar";
@@ -169,7 +169,7 @@ export default function SettleGroupScreen() {
     <>
       {process.env.EXPO_OS === "ios" ? <Screen background="sheet" activityList={{ sections }} /> : (
         <Screen background="sheet">
-          <SheetCaption>Settle up</SheetCaption>
+
           <Intro>{group.name}</Intro>
           <FormSection title="Suggested payments">
             {payments.length ? payments.map(payment => <ListRow
@@ -204,6 +204,7 @@ export default function SettleGroupScreen() {
           }),
         }}
       />
+      {process.env.EXPO_OS === "ios" ? <>
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
           icon={toolbarIcons.close}
@@ -211,6 +212,12 @@ export default function SettleGroupScreen() {
           onPress={close}
         />
       </Stack.Toolbar>
+      </> : null}
+      <AndroidFormHeader
+        title="Settle up"
+        closeLabel="Close settle up"
+        onClose={close}
+      />
     </>
   );
 }

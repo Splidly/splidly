@@ -20,6 +20,7 @@ import { DateField } from "./date-field";
 import { ExpenseIcon, expenseIconLabel } from "./expense-icon";
 import { MemberSortButton } from "./member-sort-button";
 import type { MemberSort } from "./member-sort-button.types";
+import { AndroidStatisticsRangeControl } from "./android-statistics-range-control";
 
 export type StatisticsRange = "all" | "12-months" | "30-days" | "custom";
 export type StatisticsTimelineBucket = "day" | "week" | "month" | "year";
@@ -183,7 +184,13 @@ function RangeSelector({
 
   return (
     <View testID="statistics-range-selector" style={styles.rangeControl}>
-      <SegmentedControl
+      {process.env.EXPO_OS === "android" ? (
+        <AndroidStatisticsRangeControl
+          labels={rangeOptions.map((option) => option.label)}
+          selectedIndex={selectedIndex}
+          onSelect={selectRange}
+        />
+      ) : <SegmentedControl
         testID="statistics-range-control"
         values={rangeOptions.map((option) => option.label)}
         selectedIndex={selectedIndex}
@@ -191,7 +198,7 @@ function RangeSelector({
           selectRange(nativeEvent.selectedSegmentIndex)
         }
         style={styles.segmentedControl}
-      />
+      />}
 
       {selection.range === "custom" ? (
         <View

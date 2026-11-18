@@ -1002,7 +1002,7 @@ final class ActivityListController: UICollectionViewController {
     delete.image = UIImage(systemName: row.actionIcon)
     if let color = row.actionColor { delete.backgroundColor = color }
     let configuration = UISwipeActionsConfiguration(actions: [delete])
-    configuration.performsFirstActionWithFullSwipe = true
+    configuration.performsFirstActionWithFullSwipe = false
     return configuration
   }
 

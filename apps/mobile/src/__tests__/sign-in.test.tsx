@@ -86,3 +86,19 @@ if (process.env.EXPO_OS === "ios") {
     await waitFor(() => expect(mockSessionRefetch).toHaveBeenCalledTimes(1));
   });
 }
+
+if (process.env.EXPO_OS === "android") {
+  it("exposes provider labels and prevents repeated sign-in while busy", async () => {
+    let finish!: (value: { data: { idToken: string } }) => void;
+    mockGoogleSignIn.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    const view = await render(fixture());
+    expect(view.getByLabelText("Continue with Apple")).toBeTruthy();
+    const press = view.getByLabelText("Sign in with Google").props.onPress;
+    await act(async () => { press(); press(); });
+    expect(mockGoogleSignIn).toHaveBeenCalledTimes(1);
+    expect(view.getByLabelText("Signing in")).toBeTruthy();
+    expect(view.getByTestId("sign-in-apple").props.accessibilityState.disabled).toBe(true);
+    await act(async () => finish({ data: { idToken: "google-token" } }));
+    await waitFor(() => expect(mockSessionRefetch).toHaveBeenCalledTimes(1));
+  });
+}

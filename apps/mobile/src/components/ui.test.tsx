@@ -304,7 +304,7 @@ describe("Screen", () => {
     );
 
     expect(StyleSheet.flatten(scrollView?.props.style).backgroundColor).toBe(
-      "#FFFFFF",
+      process.env.EXPO_OS === "android" ? "#F2F2F7" : "#FFFFFF",
     );
     expect(scrollView?.props.contentInsetAdjustmentBehavior).toBe("automatic");
     expect(scrollView?.props.alwaysBounceVertical).toBe(true);
@@ -411,7 +411,7 @@ describe("Screen", () => {
       resizedScrollView?.props.contentContainerStyle,
     );
 
-    expect(contentStyle.minHeight).toBe(660);
+    expect(contentStyle.minHeight).toBe(process.env.EXPO_OS === "android" ? 780 : 660);
     expect(contentStyle.paddingBottom).toBeUndefined();
   });
 

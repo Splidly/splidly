@@ -8,6 +8,7 @@ import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppIcon } from "../components/app-icon";
+import { AndroidSignInButton } from "../components/android-sign-in-button";
 import {
   ErrorState,
   PrimaryButton,
@@ -168,7 +169,9 @@ export default function SignInScreen() {
     }
   }
 
-  const googleButton = (
+  const googleButton = process.env.EXPO_OS === "android" ? (
+    <AndroidSignInButton provider="google" disabled={busy} onPress={() => void signInGoogle()} />
+  ) : (
     <GoogleSigninButton
       testID="sign-in-google"
       size={GoogleSigninButton.Size.Wide}
@@ -197,6 +200,8 @@ export default function SignInScreen() {
         onPress={() => void signInApple()}
       />
     </View>
+  ) : process.env.EXPO_OS === "android" ? (
+    <AndroidSignInButton provider="apple" disabled={busy} onPress={() => void signInApple()} />
   ) : (
     <PrimaryButton
       label="Continue with Apple"
@@ -234,8 +239,8 @@ export default function SignInScreen() {
               accessibilityElementsHidden={busy}
               importantForAccessibility={busy ? "no-hide-descendants" : "auto"}
             >
-              {process.env.EXPO_OS === "ios" ? googleButton : appleButton}
-              {process.env.EXPO_OS === "ios" ? appleButton : googleButton}
+              {googleButton}
+              {appleButton}
             </View>
             {busy ? (
               <View

@@ -1,3 +1,4 @@
+import { AndroidFormHeader } from "../../components/android-form-header";
 import type { ScrollViewInstance, TextInputInstance } from "react-native";
 import {
   convertMinor,
@@ -36,7 +37,6 @@ import {
   LoadingState,
   RowDivider,
   Screen,
-  SheetCaption,
   useKeyboardFocusScroll,
 } from "../../components/ui";
 import { useTheme } from "../../theme";
@@ -716,7 +716,7 @@ export default function NewSettlementScreen() {
         underlapsHeader={false}
         formSheetBottomClearance={editing}
         contentContainerStyle={editing ? { paddingTop: 16, gap: 22 } : { paddingTop: 8, gap: 16 }}
-        {...(!contextPending && !contextError && contextMembers.length >= 2
+        {...(process.env.EXPO_OS !== "android" && !contextPending && !contextError && contextMembers.length >= 2
           ? {
               bottomOverlay: (
                 <SettlementSaveControl
@@ -739,9 +739,7 @@ export default function NewSettlementScreen() {
             }
           : {})}
       >
-        <SheetCaption>
-          {editing ? "Edit payment" : "Record payment"}
-        </SheetCaption>
+
         {content}
       </Screen>
       <Stack.Screen
@@ -764,6 +762,7 @@ export default function NewSettlementScreen() {
           }),
         }}
       />
+      {process.env.EXPO_OS === "ios" ? <>
       <Stack.Toolbar placement="left">
         <Stack.Toolbar.Button
           icon={toolbarIcons.close}
@@ -772,6 +771,14 @@ export default function NewSettlementScreen() {
           onPress={closePayment}
         />
       </Stack.Toolbar>
+      </> : null}
+      <AndroidFormHeader
+        title={editing ? "Edit payment" : "Record payment"}
+        closeLabel="Cancel payment"
+        onClose={closePayment}
+        disabled={create.isPending || update.isPending}
+        action={{ label: "Save", accessibilityLabel: editing ? "Save payment changes" : "Record payment", onPress: submit, disabled: contextPending || Boolean(contextError) || contextMembers.length < 2 || create.isPending || update.isPending || !conversionReady }}
+      />
     </>
   );
 }

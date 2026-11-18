@@ -1,3 +1,4 @@
+import { AndroidFormHeader } from "./android-form-header";
 import type { ScrollViewInstance, TextInputInstance } from "react-native";
 import { allocateByWeights, formatMinor } from "@splidly/shared";
 import {
@@ -901,6 +902,7 @@ export function ExpenseSplitEditor() {
           }),
         }}
       />
+      {process.env.EXPO_OS === "ios" ? <>
       <Stack.Toolbar placement="left">
         <Stack.Toolbar.Button
           icon={toolbarIcons.close}
@@ -910,9 +912,6 @@ export function ExpenseSplitEditor() {
       </Stack.Toolbar>
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
-          icon={
-            process.env.EXPO_OS === "android" ? toolbarIcons.done : undefined
-          }
           accessibilityLabel="Save split"
           disabled={!status.valid}
           onPress={done}
@@ -920,6 +919,13 @@ export function ExpenseSplitEditor() {
           {process.env.EXPO_OS === "ios" ? "Save" : null}
         </Stack.Toolbar.Button>
       </Stack.Toolbar>
+      </> : null}
+      <AndroidFormHeader
+        title="Split expense"
+        closeLabel="Cancel split"
+        onClose={cancel}
+        action={{ label: "Save", accessibilityLabel: "Save split", onPress: done, disabled: !status.valid }}
+      />
     </>
   );
 }

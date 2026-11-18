@@ -1,3 +1,4 @@
+import { AndroidFormHeader } from "./android-form-header";
 import type { ScrollViewInstance } from "react-native";
 import { router, Stack } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -243,6 +244,7 @@ export function ExpensePaymentEditor() {
           }),
         }}
       />
+      {process.env.EXPO_OS === "ios" ? <>
       <Stack.Toolbar placement="left">
         <Stack.Toolbar.Button
           icon={toolbarIcons.close}
@@ -252,9 +254,6 @@ export function ExpensePaymentEditor() {
       </Stack.Toolbar>
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
-          icon={
-            process.env.EXPO_OS === "android" ? toolbarIcons.done : undefined
-          }
           accessibilityLabel="Save payment allocation"
           disabled={!status.valid}
           onPress={done}
@@ -262,6 +261,13 @@ export function ExpensePaymentEditor() {
           {process.env.EXPO_OS === "ios" ? "Save" : null}
         </Stack.Toolbar.Button>
       </Stack.Toolbar>
+      </> : null}
+      <AndroidFormHeader
+        title="Paid by"
+        closeLabel="Cancel payment allocation"
+        onClose={cancel}
+        action={{ label: "Save", accessibilityLabel: "Save payment allocation", onPress: done, disabled: !status.valid }}
+      />
     </>
   );
 }

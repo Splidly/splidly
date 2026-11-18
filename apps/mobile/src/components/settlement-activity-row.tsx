@@ -2,6 +2,7 @@ import { Pressable, Text, View } from "react-native";
 import { settlementPaymentSummary } from "../lib/settlement-activity";
 import { useTheme } from "../theme";
 import { Avatar } from "./ui";
+import { AndroidPaymentArrow } from "./android-payment-arrow";
 import type { SettlementActivityRowProps } from "./settlement-activity-row.types";
 
 export function SettlementActivityRow({
@@ -61,7 +62,9 @@ export function SettlementActivityRow({
             backgroundColor: theme.primary,
           }}
         >
-          <Text
+          {process.env.EXPO_OS === "android" ? (
+            <AndroidPaymentArrow size={18} color={theme.primaryText} />
+          ) : <Text
             selectable={false}
             style={{
               color: theme.primaryText,
@@ -71,7 +74,7 @@ export function SettlementActivityRow({
             }}
           >
             →
-          </Text>
+          </Text>}
         </View>
       </View>
 

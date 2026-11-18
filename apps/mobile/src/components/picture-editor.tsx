@@ -62,7 +62,9 @@ export function PictureEditor({
           { opacity: disabled ? 0.5 : pressed ? 0.72 : 1 },
         ]}
       >
-        {preview}
+        {process.env.EXPO_OS === "android" ? (
+          <View pointerEvents="none">{preview}</View>
+        ) : preview}
         <View
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"

@@ -2,7 +2,8 @@ import type { CurrencyCode, CustomImageDataUrl } from "@splidly/shared";
 import { router, Stack } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { ErrorState, LoadingState, Screen } from "../../../components/ui";
-import { ProfileEditForm, ProfileEditAndroidActions } from "../../../components/profile-edit-form";
+import { ProfileEditForm } from "../../../components/profile-edit-form";
+import { AndroidFormHeader } from "../../../components/android-form-header";
 import { useConnectivity } from "../../../lib/connectivity";
 import { api } from "../../../lib/trpc";
 import { toolbarIcons } from "../../../lib/toolbar-icons";
@@ -60,9 +61,6 @@ export default function EditProfileScreen() {
   return (
     <>
       <Screen background="sheet">
-        {process.env.EXPO_OS === "android" ? (
-          <ProfileEditAndroidActions onCancel={() => router.back()} onSave={() => void save()} disabled={update.isPending} canSave={canSave} />
-        ) : null}
         {profile.isPending ? <LoadingState /> : profile.data ? (
           <ProfileEditForm
             name={name}
@@ -79,6 +77,12 @@ export default function EditProfileScreen() {
         {update.error ? <ErrorState message={update.error.message} /> : null}
       </Screen>
       <Stack.Screen options={{ title: "Edit profile", gestureEnabled: !update.isPending }} />
+      <AndroidFormHeader
+        title="Edit profile"
+        closeLabel="Cancel profile changes"
+        disabled={update.isPending}
+        action={{ label: "Save", accessibilityLabel: "Save profile", onPress: () => void save(), disabled: !canSave }}
+      />
       {process.env.EXPO_OS === "ios" ? (
         <>
           <Stack.Toolbar placement="left">

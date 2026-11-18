@@ -1,3 +1,4 @@
+import { AndroidFormHeader } from "../components/android-form-header";
 import type { CurrencyCode } from "@splidly/shared";
 import { router, Stack } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -152,6 +153,7 @@ export default function CurrencyPickerScreen() {
           onPress={close}
         />
       </Stack.Toolbar>
+      <AndroidFormHeader title="Currency" closeLabel="Close currency selector" onClose={close} />
     </>
   );
 }

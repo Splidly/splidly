@@ -1,3 +1,4 @@
+import { AndroidFormHeader } from "../../../components/android-form-header";
 import { Stack, router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Switch } from "react-native";
@@ -9,7 +10,6 @@ import {
   RowDivider,
   Screen,
   Section,
-  SheetCaption,
 } from "../../../components/ui";
 import { api } from "../../../lib/trpc";
 import { toolbarIcons } from "../../../lib/toolbar-icons";
@@ -87,7 +87,7 @@ export default function NotificationSettingsScreen() {
   return (
     <>
       <Screen background="sheet" contentContainerStyle={{ paddingTop: 12 }}>
-        <SheetCaption>Notifications</SheetCaption>
+
         <Section
           footer="Smart summaries wait up to 5 minutes. One or two updates still arrive separately; three or more from the same group are combined."
         >
@@ -162,6 +162,7 @@ export default function NotificationSettingsScreen() {
           onPress={() => router.back()}
         />
       </Stack.Toolbar>
+      <AndroidFormHeader title="Notifications" closeLabel="Close notification settings" />
     </>
   );
 }

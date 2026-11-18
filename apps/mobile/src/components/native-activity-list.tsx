@@ -12,6 +12,7 @@ export function NativeActivityList({
 }: NativeActivityListProps) {
   const theme = useTheme();
   const plain = appearance === "plain";
+  const androidCollection = process.env.EXPO_OS === "android" && plain;
   return (
     <SectionList
       {...scrollProps}
@@ -25,6 +26,7 @@ export function NativeActivityList({
         <View
           style={{
             gap: spacing.lg,
+            ...(androidCollection ? { marginBottom: spacing.md } : {}),
             ...(plain ? { paddingHorizontal: spacing.md } : {}),
           }}
         >
@@ -64,16 +66,17 @@ export function NativeActivityList({
       renderItem={({ item, index, section }) => (
         <View
           style={{
-            backgroundColor: plain ? "transparent" : theme.surface,
+            backgroundColor: plain && !androidCollection ? "transparent" : theme.surface,
+            ...(androidCollection ? { marginHorizontal: spacing.md } : {}),
             borderTopWidth: plain || index === 0 ? 0 : StyleSheet.hairlineWidth,
             borderTopColor: theme.border,
             overflow: "hidden",
-            borderTopLeftRadius: !plain && index === 0 ? 16 : 0,
-            borderTopRightRadius: !plain && index === 0 ? 16 : 0,
+            borderTopLeftRadius: (!plain || androidCollection) && index === 0 ? 16 : 0,
+            borderTopRightRadius: (!plain || androidCollection) && index === 0 ? 16 : 0,
             borderBottomLeftRadius:
-              !plain && index === section.data.length - 1 ? 16 : 0,
+              (!plain || androidCollection) && index === section.data.length - 1 ? 16 : 0,
             borderBottomRightRadius:
-              !plain && index === section.data.length - 1 ? 16 : 0,
+              (!plain || androidCollection) && index === section.data.length - 1 ? 16 : 0,
           }}
         >
           {plain && index > 0 ? (

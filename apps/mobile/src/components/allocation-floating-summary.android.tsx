@@ -33,10 +33,9 @@ export function AllocationFloatingSummary({
         paddingVertical: 13,
         justifyContent: "center",
         gap: 9,
-        borderRadius: 24,
+        borderRadius: 16,
         borderCurve: "continuous",
         backgroundColor: theme.surface,
-        boxShadow: "0 8px 24px rgba(0, 0, 0, 0.22)",
       }}
     >
       <View
@@ -48,6 +47,7 @@ export function AllocationFloatingSummary({
         }}
       >
         <Text
+          selectable={false}
           numberOfLines={1}
           style={{
             color: theme.text,
@@ -60,6 +60,7 @@ export function AllocationFloatingSummary({
           {title}
         </Text>
         <Text
+          selectable={false}
           style={{
             color: complete ? theme.positive : theme.warning,
             fontSize: 13,

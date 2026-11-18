@@ -14,6 +14,7 @@ import {
 import { useTheme } from "../theme";
 import { DropdownChevron } from "./dropdown-chevron";
 import { Avatar, PrimaryButton, RowDivider } from "./ui";
+import { AndroidPaymentArrow } from "./android-payment-arrow";
 
 export type SettlementMember = {
   userId: string;
@@ -267,7 +268,9 @@ export function SettlementDirectionCard({
           backgroundColor: theme.elevated,
         }}
       >
-        <Text selectable={false}
+        {process.env.EXPO_OS === "android" ? (
+          <AndroidPaymentArrow size={22} color={theme.primary} />
+        ) : <Text selectable={false}
           style={{
             color: theme.primary,
             fontSize: 21,
@@ -276,7 +279,7 @@ export function SettlementDirectionCard({
           }}
         >
           →
-        </Text>
+        </Text>}
       </View>
       <View testID="settlement-paid-to-slot" style={{ flex: 1, minWidth: 0, alignItems: "center" }}>
         <PartyChoice
@@ -412,11 +415,11 @@ export function SettlementSaveControl({
       style={{
         width: "100%",
         maxWidth: 768,
-        padding: 6,
+        padding: process.env.EXPO_OS === "android" ? 0 : 6,
         borderRadius: 20,
         borderCurve: "continuous",
         backgroundColor: theme.surface,
-        boxShadow: "0 10px 30px rgba(0, 0, 0, 0.2)",
+        boxShadow: process.env.EXPO_OS === "android" ? undefined : "0 10px 30px rgba(0, 0, 0, 0.2)",
       }}
     >
       <PrimaryButton label={label} onPress={onPress} disabled={disabled} />

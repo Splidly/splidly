@@ -1,3 +1,4 @@
+import { AndroidFormHeader } from "../../components/android-form-header";
 import type { CurrencyCode } from "@splidly/shared";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { Alert, Text, View } from "react-native";
@@ -10,7 +11,6 @@ import {
   RowDivider,
   Screen,
   Section,
-  SheetCaption,
 } from "../../components/ui";
 import { expenseTotalInCurrency } from "../../lib/expense-detail";
 import { formatMoney } from "../../lib/money-display";
@@ -147,19 +147,12 @@ export default function SettlementDetailScreen() {
   return (
     <>
       <Screen background="groupedSheet" formSheetBottomClearance contentContainerStyle={{ paddingTop: 8, gap: 16 }}>
-        {process.env.EXPO_OS === "android" ? (
-          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-            <HeaderButton label="Close payment details" glyph="×" onPress={() => router.back()} />
-            <HeaderButton label="Edit payment" glyph="Edit" disabled={!data || !profile.data || remove.isPending} onPress={editPayment} />
-          </View>
-        ) : null}
-        <SheetCaption>Payment details</SheetCaption>
+
         {content}
         {profile.error ? <ErrorState message={profile.error.message} /> : null}
       </Screen>
       <Stack.Screen options={{
         title: "Payment",
-        ...(process.env.EXPO_OS === "android" ? { headerShown: false } : {}),
       }} />
       {process.env.EXPO_OS !== "android" ? <Stack.Toolbar placement="left">
         <Stack.Toolbar.Button icon={toolbarIcons.close} accessibilityLabel="Close payment details" onPress={() => router.back()} />
@@ -167,6 +160,8 @@ export default function SettlementDetailScreen() {
       {process.env.EXPO_OS !== "android" ? <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button icon={toolbarIcons.edit} accessibilityLabel="Edit payment" disabled={!data || !profile.data || remove.isPending} onPress={editPayment} />
       </Stack.Toolbar> : null}
+      <AndroidFormHeader title="Payment details" closeLabel="Close payment details"
+        action={{ label: "Edit", accessibilityLabel: "Edit payment", onPress: editPayment, disabled: !data || !profile.data || remove.isPending }} />
     </>
   );
 }

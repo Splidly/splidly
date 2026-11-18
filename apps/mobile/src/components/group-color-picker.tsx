@@ -37,7 +37,7 @@ export function GroupColorPicker({
     : groupColorPresets;
   const canScrollForward =
     contentWidth - viewportWidth - scrollOffset > 4;
-  const sheetColor = String(theme.sheet);
+  const sheetColor = String(process.env.EXPO_OS === "android" ? theme.background : theme.sheet);
   const customPicker = (
     <CustomGroupColorPicker
       value={value}
@@ -48,7 +48,7 @@ export function GroupColorPicker({
 
   return (
     <View style={styles.section} testID="group-color-picker">
-      <Text style={[styles.label, { color: theme.muted }]}>Color</Text>
+      <Text selectable={false} style={[styles.label, { color: theme.muted }, process.env.EXPO_OS === "android" ? { textTransform: "none", letterSpacing: 0, fontSize: 14 } : null]}>Color</Text>
       <View
         testID="group-color-palette"
         onLayout={(event) =>

@@ -295,7 +295,7 @@ export function Screen({
     background === "groupedSheet"
       ? theme.groupedSheet
       : background === "sheet"
-        ? theme.sheet
+        ? process.env.EXPO_OS === "android" ? theme.background : theme.sheet
         : theme.background;
   const { fillStyle, onLayout, onContentSizeChange } = useScrollViewportFill({
     accountForTopInset,
@@ -409,6 +409,7 @@ function ScreenBottomOverlay({
   children,
 }: PropsWithChildren<{ height: number }>) {
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
   return (
     <View
       testID="screen-bottom-overlay"
@@ -422,7 +423,7 @@ function ScreenBottomOverlay({
         paddingBottom: insets.bottom,
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "transparent",
+        backgroundColor: process.env.EXPO_OS === "android" ? theme.background : "transparent",
       }}
     >
       {children}
@@ -499,6 +500,22 @@ export function SheetCaption({ children }: PropsWithChildren) {
   );
 }
 
+export function AndroidSheetActions({ children }: PropsWithChildren) {
+  if (process.env.EXPO_OS !== "android") return null;
+
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+      }}
+    >
+      {children}
+    </View>
+  );
+}
+
 export function SectionFooter({ children }: PropsWithChildren) {
   const theme = useTheme();
   return (
@@ -522,7 +539,7 @@ export function Section({
   return (
     <View style={styles.section}>
       {title ? (
-        <Text selectable={false} style={[styles.sectionTitle, { color: theme.muted }]}>
+        <Text selectable={false} style={[styles.sectionTitle, { color: theme.muted }, process.env.EXPO_OS === "android" ? { textTransform: "none", letterSpacing: 0, fontSize: 14 } : null]}>
           {title}
         </Text>
       ) : null}
@@ -809,6 +826,7 @@ export function PrimaryButton({
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
+        process.env.EXPO_OS === "android" ? { alignSelf: "stretch" } : null,
         compact ? styles.buttonCompact : null,
         {
           backgroundColor,
@@ -834,6 +852,7 @@ export function HeaderButton({
 }) {
   const theme = useTheme();
   const isWord = glyph.length > 2;
+  const android = process.env.EXPO_OS === "android";
   return (
     <Pressable
       accessibilityRole="button"
@@ -843,17 +862,20 @@ export function HeaderButton({
       hitSlop={8}
       onPress={onPress}
       style={({ pressed }) => ({
-        minWidth: 36,
-        minHeight: 36,
-        paddingHorizontal: 6,
+        minWidth: process.env.EXPO_OS === "android" ? 48 : 36,
+        minHeight: process.env.EXPO_OS === "android" ? 48 : 36,
+        paddingHorizontal: android && isWord ? 16 : 6,
+        borderRadius: android ? 24 : 0,
+        backgroundColor: android && isWord ? theme.primary : "transparent",
         alignItems: "center",
         justifyContent: "center",
         opacity: disabled ? 0.4 : pressed ? 0.65 : 1,
       })}
     >
       <Text
+        selectable={false}
         style={{
-          color: theme.primary,
+          color: android ? isWord ? theme.primaryText : theme.text : theme.primary,
           fontSize: isWord ? 16 : 25,
           fontWeight: isWord ? "600" : "500",
         }}
@@ -925,6 +947,7 @@ export function Field({
       ) : null}
       <TextInput
         {...props}
+        {...(process.env.EXPO_OS === "android" ? { underlineColorAndroid: "transparent" } : {})}
         accessibilityLabel={
           props.accessibilityLabel ?? label ?? props.placeholder
         }

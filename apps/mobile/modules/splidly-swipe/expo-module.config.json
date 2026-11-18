@@ -5,6 +5,9 @@
     "modules": ["SplidlySwipeModule"]
   },
   "android": {
-    "modules": ["expo.modules.splidlyswipe.SplidlySwipeModule"]
+    "modules": [
+      "expo.modules.splidlyswipe.SplidlySwipeModule",
+      "expo.modules.splidlyswipe.GroupColorPickerModule"
+    ]
   }
 }

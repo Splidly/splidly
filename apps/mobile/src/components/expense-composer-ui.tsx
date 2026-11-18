@@ -49,7 +49,7 @@ export function ExpenseEntryCard({
         borderRadius: 24,
         borderCurve: "continuous",
         backgroundColor: theme.surface,
-        boxShadow: "0 8px 28px rgba(0, 0, 0, 0.08)",
+        boxShadow: process.env.EXPO_OS === "android" ? undefined : "0 8px 28px rgba(0, 0, 0, 0.08)",
       }}
     >
       <View
@@ -65,6 +65,7 @@ export function ExpenseEntryCard({
         {icon}
         <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
           <TextInput
+            underlineColorAndroid="transparent"
             autoFocus={autoFocusDescription}
             accessibilityLabel="Description"
             value={description}
@@ -79,13 +80,14 @@ export function ExpenseEntryCard({
               color: theme.text,
               minHeight: 36,
               padding: 0,
-              fontSize: 23,
+              fontSize: process.env.EXPO_OS === "android" ? 19 : 23,
               lineHeight: 29,
               fontWeight: "700",
               letterSpacing: -0.4,
             }}
           />
           <Text
+            selectable={false}
             numberOfLines={1}
             style={{ color: theme.muted, fontSize: 12, lineHeight: 16 }}
           >
@@ -111,6 +113,7 @@ export function ExpenseEntryCard({
           }}
         >
           <TextInput
+            underlineColorAndroid="transparent"
             accessibilityLabel="Amount"
             value={amount}
             onChangeText={onAmountChange}
@@ -125,7 +128,7 @@ export function ExpenseEntryCard({
               flex: 1,
               minWidth: 0,
               padding: 0,
-              fontSize: 42,
+              fontSize: process.env.EXPO_OS === "android" ? 40 : 42,
               lineHeight: 50,
               fontWeight: "700",
               letterSpacing: -1.5,
@@ -138,7 +141,7 @@ export function ExpenseEntryCard({
             accessibilityHint={`Currently ${currency}`}
             onPress={onCurrencyPress}
             style={({ pressed }) => ({
-              minHeight: 42,
+              minHeight: process.env.EXPO_OS === "android" ? 48 : 42,
               paddingHorizontal: 14,
               borderRadius: 21,
               alignItems: "center",
@@ -151,6 +154,7 @@ export function ExpenseEntryCard({
               style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
             >
               <Text
+                selectable={false}
                 style={{
                   color: theme.primary,
                   fontSize: 16,
@@ -208,7 +212,7 @@ export function AllocationChoiceCard({
       style={({ pressed }) => ({
         flex: 1,
         minWidth: 0,
-        minHeight: 144,
+        minHeight: process.env.EXPO_OS === "android" ? 112 : 144,
         padding: 14,
         borderRadius: 20,
         borderCurve: "continuous",
@@ -239,6 +243,7 @@ export function AllocationChoiceCard({
           }}
         >
           <Text
+            selectable={false}
             accessibilityElementsHidden
             style={{
               color: enabled ? theme.primary : theme.muted,
@@ -260,12 +265,13 @@ export function AllocationChoiceCard({
             }}
           />
           <Text
+            selectable={false}
             style={{
               color: statusColor,
               fontSize: 10,
               fontWeight: "700",
-              textTransform: "uppercase",
-              letterSpacing: 0.4,
+              textTransform: process.env.EXPO_OS === "android" ? "none" : "uppercase",
+              letterSpacing: process.env.EXPO_OS === "android" ? 0 : 0.4,
             }}
           >
             {statusLabel}
@@ -274,6 +280,7 @@ export function AllocationChoiceCard({
       </View>
       <View style={{ gap: 3 }}>
         <Text
+          selectable={false}
           style={{
             color: theme.text,
             fontSize: 17,
@@ -284,6 +291,7 @@ export function AllocationChoiceCard({
         </Text>
         {subtitle ? (
           <Text
+            selectable={false}
             numberOfLines={2}
             style={{ color: theme.muted, fontSize: 13, lineHeight: 17 }}
           >
@@ -306,9 +314,10 @@ export function ComposerSectionHeader({
   return (
     <View style={{ paddingHorizontal: 4, gap: 2 }}>
       <Text
+        selectable={false}
         style={{
           color: theme.text,
-          fontSize: 20,
+          fontSize: process.env.EXPO_OS === "android" ? 17 : 20,
           fontWeight: "700",
           letterSpacing: -0.3,
         }}
@@ -316,7 +325,7 @@ export function ComposerSectionHeader({
         {title}
       </Text>
       {subtitle ? (
-        <Text style={{ color: theme.muted, fontSize: 13, lineHeight: 18 }}>
+        <Text selectable={false} style={{ color: theme.muted, fontSize: 13, lineHeight: 18 }}>
           {subtitle}
         </Text>
       ) : null}
@@ -343,11 +352,11 @@ export function ExpenseSaveControl({
       style={{
         width: "100%",
         maxWidth: 768,
-        padding: 6,
+        padding: process.env.EXPO_OS === "android" ? 0 : 6,
         borderRadius: 20,
         borderCurve: "continuous",
         backgroundColor: theme.surface,
-        boxShadow: "0 10px 30px rgba(0, 0, 0, 0.2)",
+        boxShadow: process.env.EXPO_OS === "android" ? undefined : "0 10px 30px rgba(0, 0, 0, 0.2)",
       }}
     >
       <PrimaryButton

@@ -5,6 +5,15 @@ import {
   GroupListSummary,
 } from "./group-list-row";
 
+jest.mock("@expo/ui", () => {
+  const actual = jest.requireActual("@expo/ui");
+  const { View } = require("react-native");
+  return {
+    ...actual,
+    Host: ({ children }: { children: React.ReactNode }) => <View>{children}</View>,
+  };
+});
+
 describe("GroupListRow", () => {
   beforeEach(() => {
     jest.spyOn(Dimensions, "get").mockReturnValue({

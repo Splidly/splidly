@@ -1,3 +1,4 @@
+import { AndroidMenuTrigger } from "./android-menu-trigger";
 import {
   expenseIconKeys,
   normalizeExpenseIconKey,
@@ -344,16 +345,18 @@ export function ExpenseIconPicker({
         }
       }}
     >
-      <ExpenseIcon
-        iconKey={value}
-        name={name}
-        size={size}
-        useNameFallback={automatic}
-        accessibilityRole="button"
-        accessibilityLabel={`Change expense category. ${
-          automatic ? `Automatic: ${option.label}` : option.label
-        }`}
-      />
+      <AndroidMenuTrigger>
+        <ExpenseIcon
+          iconKey={value}
+          name={name}
+          size={size}
+          useNameFallback={automatic}
+          accessibilityRole="button"
+          accessibilityLabel={`Change expense category. ${
+            automatic ? `Automatic: ${option.label}` : option.label
+          }`}
+        />
+      </AndroidMenuTrigger>
     </MenuView>
   );
 }

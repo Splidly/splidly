@@ -1,3 +1,4 @@
+import { AndroidFormHeader } from "../../../components/android-form-header";
 import type {
   CurrencyCode,
   CustomImageDataUrl,
@@ -48,27 +49,51 @@ export default function NewGroupScreen() {
     "EUR"
   ) as CurrencyCode;
 
+  const submit = () =>
+    create.mutate({
+      name: name.trim(),
+      iconKey,
+      color,
+      imageUrl,
+      currency: selectedCurrency,
+    });
+
+  const saveControl = (
+    <PrimaryButton
+      label={create.isPending ? "Creating…" : "Create group"}
+      disabled={create.isPending || preparingImage || name.trim().length === 0}
+      onPress={submit}
+    />
+  );
+
   return (
     <Screen
       background="sheet"
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, process.env.EXPO_OS === "android" ? { paddingTop: 16, gap: 20 } : null]}
     >
-      <SheetCloseButton
-        label="Close new group"
-        disabled={create.isPending}
-        onPress={() => router.back()}
-      />
+      {process.env.EXPO_OS !== "android" ? (
+        <SheetCloseButton
+          label="Close new group"
+          disabled={create.isPending}
+          onPress={() => router.back()}
+        />
+      ) : null}
 
-      <View style={styles.hero}>
-        <View style={styles.heroCopy}>
-          <Text style={[styles.title, { color: theme.text }]}>
-            Create a group
-          </Text>
-          <Text style={[styles.subtitle, { color: theme.muted }]}>
-            Set up a shared ledger for your next plan.
-          </Text>
+      <AndroidFormHeader title="New group" closeLabel="Close new group" disabled={create.isPending} action={{ label: "Create", accessibilityLabel: "Create group", onPress: submit, disabled: create.isPending || preparingImage || name.trim().length === 0 }} />
+      {process.env.EXPO_OS === "android" ? (
+        <Text selectable={false} style={{ color: theme.muted, fontSize: 15, lineHeight: 21 }}>Choose a name and a look for your shared ledger.</Text>
+      ) : (
+        <View style={styles.hero}>
+          <View style={styles.heroCopy}>
+            <Text style={[styles.title, { color: theme.text }]}>
+              Create a group
+            </Text>
+            <Text style={[styles.subtitle, { color: theme.muted }]}>
+              Set up a shared ledger for your next plan.
+            </Text>
+          </View>
         </View>
-      </View>
+      )}
 
       <PictureEditor
         label="group photo"
@@ -129,19 +154,7 @@ export default function NewGroupScreen() {
       </FormSection>
 
       <View style={styles.footer}>
-        <PrimaryButton
-          label={create.isPending ? "Creating…" : "Create group"}
-          disabled={create.isPending || preparingImage || name.trim().length === 0}
-          onPress={() =>
-            create.mutate({
-              name: name.trim(),
-              iconKey,
-              color,
-              imageUrl,
-              currency: selectedCurrency,
-            })
-          }
-        />
+        {process.env.EXPO_OS !== "android" ? saveControl : null}
         {create.error ? <ErrorState message={create.error.message} /> : null}
         {profile.error ? (
           <ErrorState

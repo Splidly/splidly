@@ -1,3 +1,4 @@
+import { AndroidFormHeader } from "../../../../components/android-form-header";
 import type {
   CurrencyCode,
   CustomImageDataUrl,
@@ -64,6 +65,7 @@ export default function EditGroupScreen() {
   if (detail.isPending) {
     return (
       <Screen scroll={false} background="sheet">
+        <AndroidFormHeader title="Edit group" closeLabel="Close edit group" />
         <LoadingState />
       </Screen>
     );
@@ -71,6 +73,7 @@ export default function EditGroupScreen() {
   if (detail.error || !group) {
     return (
       <Screen scroll={false} background="sheet">
+        <AndroidFormHeader title="Edit group" closeLabel="Close edit group" />
         <SheetCloseButton
           label="Close edit group"
           onPress={() => router.back()}
@@ -83,20 +86,47 @@ export default function EditGroupScreen() {
     );
   }
 
-  return (
-    <Screen background="sheet" contentContainerStyle={styles.content}>
-      <SheetCloseButton
-        label="Close edit group"
-        disabled={update.isPending}
-        onPress={() => router.back()}
-      />
+  const submit = () =>
+    update.mutate({
+      groupId: id,
+      expectedVersion: group.version,
+      name: name.trim(),
+      iconKey,
+      color,
+      imageUrl,
+      currency,
+      simplifyDebts: group.simplifyDebts,
+    });
 
-      <View style={styles.hero}>
-        <Text style={[styles.title, { color: theme.text }]}>Edit group</Text>
-        <Text style={[styles.subtitle, { color: theme.muted }]}>
-          Update how this group appears.
-        </Text>
-      </View>
+  const saveControl = (
+    <PrimaryButton
+      label={update.isPending ? "Saving…" : "Save changes"}
+      disabled={update.isPending || preparingImage || name.trim().length === 0}
+      onPress={submit}
+    />
+  );
+
+  return (
+    <Screen background="sheet" contentContainerStyle={[styles.content, process.env.EXPO_OS === "android" ? { paddingTop: 16, gap: 20 } : null]}>
+      {process.env.EXPO_OS !== "android" ? (
+        <SheetCloseButton
+          label="Close edit group"
+          disabled={update.isPending}
+          onPress={() => router.back()}
+        />
+      ) : null}
+
+      <AndroidFormHeader title="Edit group" closeLabel="Close edit group" disabled={update.isPending} action={{ label: "Save", accessibilityLabel: "Save group changes", onPress: submit, disabled: update.isPending || preparingImage || name.trim().length === 0 }} />
+      {process.env.EXPO_OS === "android" ? (
+        <Text selectable={false} style={{ color: theme.muted, fontSize: 15, lineHeight: 21 }}>Update how this group appears.</Text>
+      ) : (
+        <View style={styles.hero}>
+          <Text style={[styles.title, { color: theme.text }]}>Edit group</Text>
+          <Text style={[styles.subtitle, { color: theme.muted }]}>
+            Update how this group appears.
+          </Text>
+        </View>
+      )}
 
       <PictureEditor
         label="group photo"
@@ -157,22 +187,7 @@ export default function EditGroupScreen() {
       </FormSection>
 
       <View style={styles.footer}>
-        <PrimaryButton
-          label={update.isPending ? "Saving…" : "Save changes"}
-          disabled={update.isPending || preparingImage || name.trim().length === 0}
-          onPress={() =>
-            update.mutate({
-              groupId: id,
-              expectedVersion: group.version,
-              name: name.trim(),
-              iconKey,
-              color,
-              imageUrl,
-              currency,
-              simplifyDebts: group.simplifyDebts,
-            })
-          }
-        />
+        {process.env.EXPO_OS !== "android" ? saveControl : null}
         {update.error ? <ErrorState message={update.error.message} /> : null}
       </View>
     </Screen>

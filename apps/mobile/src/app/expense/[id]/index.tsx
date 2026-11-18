@@ -1,3 +1,4 @@
+import { AndroidFormHeader } from "../../../components/android-form-header";
 import type { CurrencyCode } from "@splidly/shared";
 import { router, Stack, useLocalSearchParams, type Href } from "expo-router";
 import { Alert, Linking, Text, View } from "react-native";
@@ -6,6 +7,7 @@ import { ExpenseParticipantAmount } from "../../../components/expense-participan
 import {
   Avatar,
   ErrorState,
+  AndroidSheetActions,
   HeaderButton,
   ListRow,
   LoadingState,
@@ -13,7 +15,6 @@ import {
   RowDivider,
   Screen,
   Section,
-  SheetCaption,
 } from "../../../components/ui";
 import {
   expenseItemAllocationModeLabels,
@@ -24,11 +25,13 @@ import { toolbarIcons } from "../../../lib/toolbar-icons";
 import { formatExchangeRate } from "../../../lib/money-display";
 import { api } from "../../../lib/trpc";
 import { APP_URL } from "../../../lib/env";
+import { useNavigationPressGuard } from "../../../lib/use-navigation-press-guard";
 import { useTheme } from "../../../theme";
 
 export default function ExpenseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const theme = useTheme();
+  const acceptEdit = useNavigationPressGuard();
   const detail = api.expenses.detail.useQuery({ expenseId: id });
   const profile = api.profile.me.useQuery();
   const utils = api.useUtils();
@@ -57,6 +60,9 @@ export default function ExpenseDetailScreen() {
   if (detail.isPending) {
     return (
       <Screen background="groupedSheet">
+        <AndroidSheetActions>
+          <HeaderButton label="Close expense details" glyph="×" onPress={() => router.back()} />
+        </AndroidSheetActions>
         <LoadingState />
       </Screen>
     );
@@ -64,6 +70,9 @@ export default function ExpenseDetailScreen() {
   if (detail.error || !detail.data) {
     return (
       <Screen background="groupedSheet">
+        <AndroidSheetActions>
+          <HeaderButton label="Close expense details" glyph="×" onPress={() => router.back()} />
+        </AndroidSheetActions>
         <ErrorState
           message={detail.error?.message}
           onRetry={() => void detail.refetch()}
@@ -83,7 +92,9 @@ export default function ExpenseDetailScreen() {
         rates,
       )
     : undefined;
-  const editExpense = () => router.push(`/expense/${expense.id}/edit` as Href);
+  const editExpense = () => {
+    if (!remove.isPending && (process.env.EXPO_OS !== "android" || acceptEdit())) router.push(`/expense/${expense.id}/edit` as Href);
+  };
 
   function confirmDelete() {
     Alert.alert(
@@ -111,7 +122,7 @@ export default function ExpenseDetailScreen() {
         formSheetBottomClearance
         contentContainerStyle={{ paddingTop: 8, gap: 20 }}
       >
-        <SheetCaption>Expense details</SheetCaption>
+
         <ExpenseDetailHero
           description={expense.description}
           iconKey={expense.iconKey}
@@ -312,6 +323,8 @@ export default function ExpenseDetailScreen() {
           onPress={editExpense}
         />
       </Stack.Toolbar>
+      <AndroidFormHeader title="Expense details" closeLabel="Close expense details"
+        action={{ label: "Edit", accessibilityLabel: "Edit expense", onPress: editExpense, disabled: remove.isPending }} />
     </>
   );
 }

@@ -6,6 +6,14 @@ type NativeHeaderOptions = Pick<
   "headerStyle" | "headerTransparent"
 >;
 
+export function androidFormHidesTabBar(segments: readonly string[]) {
+  if (process.env.EXPO_OS !== "android" || segments[0] !== "(tabs)") return false;
+  const section = segments[1];
+  const leaf = segments[segments.length - 1];
+  return (section === "groups" && (leaf === "new" || leaf === "edit")) ||
+    (section === "profile" && (leaf === "edit" || leaf === "notifications"));
+}
+
 export function nativeHeaderOptions(
   backgroundColor: ColorValue,
 ): NativeHeaderOptions {
@@ -24,7 +32,7 @@ export function nativeHeaderOptions(
 
 export function formSheetOptions(backgroundColor: ColorValue) {
   return {
-    presentation: "formSheet",
+    presentation: process.env.EXPO_OS === "android" ? "fullScreenModal" : "formSheet",
     headerTransparent: false,
     headerStyle: { backgroundColor },
     contentStyle: { backgroundColor },
