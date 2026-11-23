@@ -16,12 +16,12 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@better-auth/expo": "1.7.25",
+    "@better-auth/expo": "1.7.26",
     "@hono/node-server": "2.1.8",
     "@splidly/db": "workspace:*",
     "@splidly/shared": "workspace:*",
     "@trpc/server": "11.28.3",
-    "better-auth": "1.7.25",
+    "better-auth": "1.7.26",
     "drizzle-orm": "0.45.4",
     "hono": "4.13.19",
     "jose": "6.2.17",
