@@ -23,7 +23,7 @@
     "test:integration": "node ops/run-integration-tests.mjs"
   },
   "devDependencies": {
-    "turbo": "2.11.11",
+    "turbo": "2.11.13",
     "typescript": "7.0.2"
   }
 }
