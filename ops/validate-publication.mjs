@@ -1,6 +1,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { publicFirebaseScanText } from "./public-firebase-config.mjs";
 
 const repositoryDirectory = resolve(import.meta.dirname, "..");
 const errors = [];
@@ -26,7 +27,8 @@ const forbiddenPathPatterns = [
 for (const path of trackedFiles) {
   if (
     forbiddenPathPatterns.some((pattern) => pattern.test(path)) &&
-    !allowedEnvironmentFiles.has(path)
+    !allowedEnvironmentFiles.has(path) &&
+    publicFirebaseScanText(path, readFileSync(resolve(repositoryDirectory, path), "utf8")) === null
   ) {
     errors.push(`sensitive or machine-specific path is tracked: ${path}`);
   }
@@ -53,7 +55,8 @@ const contentPatterns = [
 for (const path of trackedFiles) {
   const value = readFileSync(resolve(repositoryDirectory, path));
   if (value.includes(0)) continue;
-  const text = value.toString("utf8");
+  const rawText = value.toString("utf8");
+  const text = publicFirebaseScanText(path, rawText) ?? rawText;
   for (const [label, pattern] of contentPatterns) {
     if (pattern.test(text)) errors.push(`${label} found in ${path}`);
   }
@@ -117,16 +120,27 @@ if (revisions.length > 0) {
     },
   );
   if (historyScan.status === 0) {
-    const paths = new Set(
+    const matches =
       historyScan.stdout
         .trim()
         .split("\n")
-        .filter(Boolean)
-        .map((line) => line.slice(line.indexOf(":") + 1)),
-    );
-    errors.push(
-      `high-confidence secret signature found in Git history: ${[...paths].join(", ")}`,
-    );
+        .filter(Boolean);
+    const paths = new Set();
+    const secretPattern = new RegExp(historyPattern);
+    for (const match of matches) {
+      const path = match.slice(match.indexOf(":") + 1);
+      const rawText = execFileSync("git", ["show", match], {
+        cwd: repositoryDirectory,
+        encoding: "utf8",
+      });
+      const text = publicFirebaseScanText(path, rawText) ?? rawText;
+      if (secretPattern.test(text)) paths.add(path);
+    }
+    if (paths.size > 0) {
+      errors.push(
+        `high-confidence secret signature found in Git history: ${[...paths].join(", ")}`,
+      );
+    }
   } else if (historyScan.status !== 1) {
     errors.push(`unable to scan Git history: ${historyScan.stderr.trim()}`);
   }
