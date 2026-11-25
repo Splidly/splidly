@@ -285,12 +285,25 @@ pnpm --filter @splidly/mobile build:production:ios
 pnpm --filter @splidly/mobile submit:ios
 ```
 
-The default `build:production` command is also iOS-only. Android production
-builds are blocked while `ANDROID_ENABLED=false`, and no Android submission
-command is exposed. When Android is release-ready, add its final package,
-certificate fingerprint, store URL, EAS variable, and submission profile, then
-enable it only after Play Console testing. EAS remotely owns the monotonically
-increasing iOS build number.
+The default `build:production` command is also iOS-only. Android store builds
+use the separate `production-android` profile, which enables Android and inherits
+the `production` EAS environment. Set `ANDROID_PACKAGE` in that environment to
+the final Play Console package name. Register the same package in Firebase and
+save its public Android configuration as `apps/mobile/google-services.json`.
+Keep private upload keystores and service-account JSON keys outside the
+repository; configure them in EAS Credentials instead.
+
+```sh
+pnpm --filter @splidly/mobile config:production:android
+pnpm --filter @splidly/mobile build:production:android
+```
+
+The Android build produces an AAB for Google Play. Before release, verify Google
+sign-in with the installed build's signing certificate, configure the Play
+signing SHA-256 fingerprint and store URL for app links, and test on Android.
+FCM credentials and the Firebase configuration prepare the native app for push;
+the current server notification delivery uses APNs only. No Android submission
+command is exposed. EAS remotely owns the monotonically increasing build numbers.
 
 The initial release supports iPhone only. Enable `supportsTablet` and complete
 physical iPad layout testing before adding iPad support in a later release.

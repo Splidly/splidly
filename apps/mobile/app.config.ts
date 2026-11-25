@@ -16,7 +16,7 @@ const config: ExpoConfig = {
   name: "Splidly",
   slug: "splidly",
   scheme: "splidly",
-  version: "1.0.1",
+  version: "1.0.2",
   orientation: "default",
   userInterfaceStyle: "automatic",
   experiments: { typedRoutes: true },
@@ -43,6 +43,7 @@ const config: ExpoConfig = {
     ],
     "expo-localization",
     "./plugins/with-google-signin-modular-headers",
+    "./plugins/with-optional-wifi",
     [
       "@react-native-google-signin/google-signin",
       {
@@ -84,6 +85,7 @@ const config: ExpoConfig = {
   },
   android: {
     package: buildConfig.androidPackage,
+    googleServicesFile: "./google-services.json",
     softwareKeyboardLayoutMode: "resize",
     icon: "./assets/icons/android-legacy.png",
     adaptiveIcon: {

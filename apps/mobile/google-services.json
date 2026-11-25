@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "177301780987",
+    "project_id": "lyrical-nectar-341117",
+    "storage_bucket": "lyrical-nectar-341117.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:177301780987:android:c8588e07b43a67ebacf35e",
+        "android_client_info": {
+          "package_name": "com.splidly"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC2naVdUDtMWDMLLFNM1TYHvFYOl4G_AOQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -9,10 +9,10 @@
     "android": "expo run:android",
     "build": "expo export --platform all --output-dir dist",
     "config:production:ios": "pnpm dlx eas-cli@27.11.0 env:exec production 'pnpm dlx eas-cli@27.11.0 config --platform ios --profile production --non-interactive'",
-    "config:production:android": "pnpm dlx eas-cli@27.11.0 env:exec production 'pnpm dlx eas-cli@27.11.0 config --platform android --profile production --non-interactive'",
+    "config:production:android": "pnpm dlx eas-cli@27.11.0 env:exec production 'pnpm dlx eas-cli@27.11.0 config --platform android --profile production-android --non-interactive'",
     "build:production": "pnpm run build:production:ios",
     "build:production:ios": "pnpm dlx eas-cli@27.11.0 env:exec production 'pnpm dlx eas-cli@27.11.0 build --platform ios --profile production'",
-    "build:production:android": "pnpm dlx eas-cli@27.11.0 env:exec production 'pnpm dlx eas-cli@27.11.0 build --platform android --profile production'",
+    "build:production:android": "pnpm dlx eas-cli@27.11.0 env:exec production 'pnpm dlx eas-cli@27.11.0 build --platform android --profile production-android'",
     "typecheck": "tsc --noEmit",
     "test": "jest --passWithNoTests",
     "submit:ios": "pnpm dlx eas-cli@27.11.0 env:exec production 'pnpm dlx eas-cli@27.11.0 submit --platform ios --profile production --latest'"

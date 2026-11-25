@@ -11,6 +11,9 @@ dist/
 coverage/
 *.log
 *.p8
+*.jks
+*.keystore
+credentials.json
 *service-account*.json
 AuthKey_*.p8
 .DS_Store

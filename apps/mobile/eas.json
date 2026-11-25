@@ -31,6 +31,12 @@
       "android": {
         "buildType": "app-bundle"
       }
+    },
+    "production-android": {
+      "extends": "production",
+      "env": {
+        "ANDROID_ENABLED": "true"
+      }
     }
   },
   "submit": {
